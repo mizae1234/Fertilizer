@@ -129,6 +129,5 @@ export async function createSaleFromPOS(data: {
     });
 
     revalidatePath('/sales');
-    revalidatePath('/');
     return sale;
 }

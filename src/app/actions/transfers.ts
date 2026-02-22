@@ -83,7 +83,6 @@ export async function createTransfer(data: {
     });
 
     revalidatePath('/transfers');
-    revalidatePath('/');
     return transfer;
 }
 
@@ -106,50 +105,31 @@ export async function approveTransfer(id: string) {
 
         for (const item of transfer.items) {
             // Deduct from source warehouse
-            const fromStock = await tx.productStock.findUnique({
+            await tx.productStock.update({
                 where: {
                     productId_warehouseId: {
                         productId: item.productId,
                         warehouseId: transfer.fromWarehouseId,
                     },
                 },
-            });
-
-            if (!fromStock || fromStock.quantity < item.quantity) {
-                throw new Error('สินค้ามี stock ไม่เพียงพอในคลังต้นทาง');
-            }
-
-            await tx.productStock.update({
-                where: { id: fromStock.id },
                 data: { quantity: { decrement: item.quantity } },
             });
 
             // Add to destination warehouse
-            const toStock = await tx.productStock.findUnique({
+            await tx.productStock.upsert({
                 where: {
                     productId_warehouseId: {
                         productId: item.productId,
                         warehouseId: transfer.toWarehouseId,
                     },
                 },
+                update: { quantity: { increment: item.quantity } },
+                create: {
+                    productId: item.productId,
+                    warehouseId: transfer.toWarehouseId,
+                    quantity: item.quantity,
+                },
             });
-
-            if (toStock) {
-                await tx.productStock.update({
-                    where: { id: toStock.id },
-                    data: { quantity: { increment: item.quantity } },
-                });
-            } else {
-                await tx.productStock.create({
-                    data: {
-                        productId: item.productId,
-                        warehouseId: transfer.toWarehouseId,
-                        quantity: item.quantity,
-                        avgCost: fromStock.avgCost,
-                        lastCost: fromStock.lastCost,
-                    },
-                });
-            }
 
             // Create TRANSFER_OUT transaction
             await tx.stockTransaction.create({
@@ -178,7 +158,6 @@ export async function approveTransfer(id: string) {
     });
 
     revalidatePath('/transfers');
-    revalidatePath('/');
 }
 
 export async function rejectTransfer(id: string) {
@@ -187,5 +166,4 @@ export async function rejectTransfer(id: string) {
         data: { status: 'REJECTED' },
     });
     revalidatePath('/transfers');
-    revalidatePath('/');
 }

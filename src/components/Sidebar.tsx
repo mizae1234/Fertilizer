@@ -11,6 +11,7 @@ const menuGroups = [
         items: [
             { name: 'Dashboard', href: '/', icon: '📊' },
             { name: 'POS ขายสินค้า', href: '/pos', icon: '🛒' },
+            { name: 'รายการขาย', href: '/sales', icon: '💰' },
         ],
     },
     {
@@ -29,7 +30,6 @@ const menuGroups = [
         label: 'เอกสาร',
         items: [
             { name: 'นำเข้าสินค้า', href: '/goods-receive', icon: '📥' },
-            { name: 'รายการขาย', href: '/sales', icon: '💰' },
             { name: 'โอนย้ายสินค้า', href: '/transfers', icon: '🔄' },
         ],
     },

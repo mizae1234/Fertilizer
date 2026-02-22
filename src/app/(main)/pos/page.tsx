@@ -353,11 +353,27 @@ export default function POSPage() {
     const updateCartUnit = (idx: number, unitId: string) => {
         setCart(cart.map((c, i) => {
             if (i !== idx) return c;
+            const product = products.find(p => p.id === c.productId);
+            const baseStock = product ? getStock(product, c.warehouseId) : 0;
+
+            // "default" = product's original unit (no productUnit record)
+            if (unitId === '__default__') {
+                const price = product ? getPrice(product) : c.unitPrice;
+                return {
+                    ...c,
+                    selectedUnitId: '',
+                    selectedUnitName: product?.unit || c.unit,
+                    conversionRate: 1,
+                    unitPrice: price,
+                    unit: product?.unit || c.unit,
+                    availableStock: baseStock,
+                    priceTier: 'custom',
+                };
+            }
+
             const unit = c.productUnits.find(u => u.id === unitId);
             if (!unit) return c;
             const convRate = Number(unit.conversionRate);
-            const product = products.find(p => p.id === c.productId);
-            const baseStock = product ? getStock(product, c.warehouseId) : 0;
             return {
                 ...c,
                 selectedUnitId: unit.id,
@@ -427,8 +443,8 @@ export default function POSPage() {
         !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase())
     );
 
-    // ─── Cart Panel Content ───
-    const CartContent = ({ isMobile = false }: { isMobile?: boolean }) => {
+    // ─── Cart Panel Content ─── (render function, NOT a component)
+    const renderCartContent = (isMobile = false) => {
         const isReview = !isMobile && reviewMode;
         const isDesktop = !isMobile;
 
@@ -551,14 +567,20 @@ export default function POSPage() {
                                                 </select>
                                                 <span className="text-[10px] text-gray-400">({item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock})</span>
                                             </div>
-                                            {item.productUnits && item.productUnits.length > 1 && (
+                                            {item.productUnits && item.productUnits.length > 0 && (
                                                 <div className="flex items-center gap-1">
                                                     <label className="text-[10px] text-gray-400 shrink-0">หน่วย:</label>
                                                     <select
-                                                        value={item.selectedUnitId}
+                                                        value={item.selectedUnitId || '__default__'}
                                                         onChange={e => updateCartUnit(idx, e.target.value)}
                                                         className="px-1.5 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-[11px] outline-none font-medium"
                                                     >
+                                                        {/* Always show product's default unit if no base unit in productUnits */}
+                                                        {!item.productUnits.some(u => u.isBaseUnit) && (
+                                                            <option value="__default__">
+                                                                {products.find(p => p.id === item.productId)?.unit || item.unit} (ปกติ)
+                                                            </option>
+                                                        )}
                                                         {item.productUnits.map(u => (
                                                             <option key={u.id} value={u.id}>
                                                                 {u.unitName} {u.isBaseUnit ? '(หลัก)' : `(×${Number(u.conversionRate)})`}
@@ -799,7 +821,7 @@ export default function POSPage() {
                             )}
                         </div>
                     </div>
-                    <CartContent />
+                    {renderCartContent()}
                 </div>
             </div>
 
@@ -849,7 +871,7 @@ export default function POSPage() {
                                 </svg>
                             </button>
                         </div>
-                        <CartContent isMobile />
+                        {renderCartContent(true)}
                     </div>
                 </>
             )}

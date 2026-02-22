@@ -126,7 +126,6 @@ export async function approveSale(id: string) {
     });
 
     revalidatePath('/sales');
-    revalidatePath('/');
 }
 
 export async function rejectSale(id: string) {
@@ -135,11 +134,11 @@ export async function rejectSale(id: string) {
         data: { status: 'REJECTED' },
     });
     revalidatePath('/sales');
-    revalidatePath('/');
 }
 
 export async function updateSale(id: string, data: {
     customerId?: string | null;
+    notes?: string | null;
     items: {
         productId: string;
         warehouseId: string;
@@ -180,6 +179,7 @@ export async function updateSale(id: string, data: {
             where: { id },
             data: {
                 customerId: data.customerId || null,
+                notes: data.notes !== undefined ? data.notes : undefined,
                 totalAmount,
                 totalPoints,
                 items: {
@@ -217,9 +217,24 @@ export async function updateSale(id: string, data: {
         }
     });
 
-    revalidatePath(`/sales/${id}`);
+    // Return updated sale data directly so client doesn't need a second fetch
+    const updated = await prisma.sale.findUnique({
+        where: { id },
+        include: {
+            customer: { select: { name: true, phone: true } },
+            createdBy: { select: { name: true } },
+            items: {
+                include: {
+                    product: { select: { name: true, code: true, unit: true } },
+                    warehouse: { select: { name: true } },
+                },
+            },
+        },
+    });
+
     revalidatePath('/sales');
-    revalidatePath('/');
+
+    return updated;
 }
 
 export async function cancelSale(id: string) {
@@ -247,6 +262,4 @@ export async function cancelSale(id: string) {
     });
 
     revalidatePath('/sales');
-    revalidatePath(`/sales/${id}`);
-    revalidatePath('/');
 }

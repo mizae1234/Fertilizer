@@ -33,7 +33,7 @@ export async function getGoodsReceiveDetail(id: string) {
     return prisma.goodsReceive.findUnique({
         where: { id },
         include: {
-            vendor: true,
+            vendor: { select: { id: true, name: true, phone: true, lineId: true } },
             createdBy: { select: { name: true } },
             items: {
                 include: {
@@ -92,7 +92,6 @@ export async function createGoodsReceive(data: {
     });
 
     revalidatePath('/goods-receive');
-    revalidatePath('/');
     return gr;
 }
 
@@ -143,9 +142,22 @@ export async function updateGoodsReceive(id: string, data: {
         });
     });
 
-    revalidatePath(`/goods-receive/${id}`);
     revalidatePath('/goods-receive');
-    revalidatePath('/');
+
+    // Return updated data so client doesn't need a second fetch
+    return prisma.goodsReceive.findUnique({
+        where: { id },
+        include: {
+            vendor: { select: { id: true, name: true, phone: true, lineId: true } },
+            createdBy: { select: { name: true } },
+            items: {
+                include: {
+                    product: { select: { name: true, code: true, unit: true } },
+                    warehouse: { select: { name: true } },
+                },
+            },
+        },
+    });
 }
 
 export async function approveGoodsReceive(id: string) {
@@ -165,31 +177,33 @@ export async function approveGoodsReceive(id: string) {
             data: { status: 'APPROVED' },
         });
 
-        // Update stock for each item
-        for (const item of gr.items) {
-            const existingStock = await tx.productStock.findUnique({
-                where: {
-                    productId_warehouseId: {
-                        productId: item.productId,
-                        warehouseId: item.warehouseId,
-                    },
-                },
-            });
+        // Update stock for each item — fetch all existing stocks in one query
+        const existingStocks = await tx.productStock.findMany({
+            where: {
+                OR: gr.items.map(item => ({
+                    productId: item.productId,
+                    warehouseId: item.warehouseId,
+                })),
+            },
+        });
 
-            if (existingStock) {
-                // Calculate average cost
-                const oldQty = existingStock.quantity;
-                const oldCost = Number(existingStock.avgCost);
+        // Run stock updates + transaction creates in parallel per item
+        await Promise.all(gr.items.map(async (item) => {
+            const key = `${item.productId}_${item.warehouseId}`;
+            const existing = existingStocks.find(s => `${s.productId}_${s.warehouseId}` === key);
+
+            if (existing) {
+                const oldQty = existing.quantity;
+                const oldCost = Number(existing.avgCost);
                 const newQty = item.quantity;
                 const newCost = Number(item.unitCost);
                 const totalQty = oldQty + newQty;
-                const avgCost =
-                    totalQty > 0
-                        ? ((oldQty * oldCost) + (newQty * newCost)) / totalQty
-                        : newCost;
+                const avgCost = totalQty > 0
+                    ? ((oldQty * oldCost) + (newQty * newCost)) / totalQty
+                    : newCost;
 
                 await tx.productStock.update({
-                    where: { id: existingStock.id },
+                    where: { id: existing.id },
                     data: {
                         quantity: { increment: item.quantity },
                         avgCost: parseFloat(avgCost.toFixed(2)),
@@ -208,7 +222,6 @@ export async function approveGoodsReceive(id: string) {
                 });
             }
 
-            // Create stock transaction
             await tx.stockTransaction.create({
                 data: {
                     productId: item.productId,
@@ -220,11 +233,10 @@ export async function approveGoodsReceive(id: string) {
                     notes: `รับสินค้าจาก GR ${gr.grNumber}`,
                 },
             });
-        }
+        }));
     });
 
     revalidatePath('/goods-receive');
-    revalidatePath('/');
 }
 
 export async function rejectGoodsReceive(id: string) {
@@ -233,7 +245,6 @@ export async function rejectGoodsReceive(id: string) {
         data: { status: 'REJECTED' },
     });
     revalidatePath('/goods-receive');
-    revalidatePath('/');
 }
 
 export async function deleteGoodsReceive(id: string) {
@@ -246,5 +257,4 @@ export async function deleteGoodsReceive(id: string) {
     });
 
     revalidatePath('/goods-receive');
-    revalidatePath('/');
 }

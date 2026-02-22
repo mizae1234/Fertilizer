@@ -106,6 +106,7 @@ model Product {
   productGroupId String?
   pointsPerUnit  Int       @default(0)
   minStock       Int       @default(10)
+  isActive       Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?

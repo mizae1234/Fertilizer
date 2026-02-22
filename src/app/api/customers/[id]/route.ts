@@ -19,16 +19,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const customer = await prisma.customer.findUnique({
         where: { id },
         include: {
-            customerGroup: true,
+            customerGroup: { select: { name: true } },
             pointTransactions: {
                 orderBy: { createdAt: 'desc' },
+                take: 50,
                 ...(hasDateFilter ? { where: { createdAt: dateFilter } } : {}),
             },
             sales: {
                 orderBy: { createdAt: 'desc' },
+                take: 20,
                 ...(hasDateFilter ? { where: { createdAt: dateFilter } } : {}),
                 include: {
-                    items: { include: { product: { select: { name: true, code: true } }, warehouse: { select: { name: true } } } },
+                    items: {
+                        select: { quantity: true, unitPrice: true, totalPrice: true, product: { select: { name: true, code: true } }, warehouse: { select: { name: true } } },
+                    },
                 },
             },
         },

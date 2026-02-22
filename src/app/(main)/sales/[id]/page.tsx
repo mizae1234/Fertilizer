@@ -12,6 +12,7 @@ interface SaleDetail {
     id: string; saleNumber: string; status: string;
     totalAmount: string; totalPoints: number; createdAt: string;
     customerId: string | null;
+    notes: string | null;
     customer: { name: string; phone: string } | null;
     createdBy: { name: string };
     items: {
@@ -46,6 +47,7 @@ export default function SaleDetailPage() {
     // Edit state
     const [items, setItems] = useState<EditItem[]>([]);
     const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+    const [editNotes, setEditNotes] = useState<string>('');
     const [saving, setSaving] = useState(false);
 
     // Reference data
@@ -78,6 +80,7 @@ export default function SaleDetailPage() {
         setWarehouses(whs);
         setCustomers(custs);
         setSelectedCustomerId(sale.customerId || '');
+        setEditNotes(sale.notes || '');
         setItems(sale.items.map(i => ({
             productId: i.productId,
             warehouseId: i.warehouseId,
@@ -120,12 +123,16 @@ export default function SaleDetailPage() {
         if (items.some(i => !i.productId)) { showAlert('กรุณาเลือกสินค้าทุกรายการ', 'error'); return; }
         setSaving(true);
         try {
-            await updateSale(id, {
+            const updated = await updateSale(id, {
                 customerId: selectedCustomerId || null,
+                notes: editNotes || null,
                 items,
             });
-            const data = await fetch(`/api/sales/${id}`).then(r => r.json());
-            setSale(data);
+            if (updated) {
+                // JSON round-trip to serialize Date/Decimal objects
+                const serialized = JSON.parse(JSON.stringify(updated));
+                setSale(serialized);
+            }
             setIsEditing(false);
             showAlert('บันทึกการแก้ไขเรียบร้อย', 'success', 'สำเร็จ');
         } catch (error) {
@@ -172,7 +179,7 @@ export default function SaleDetailPage() {
                 <div className="flex items-center gap-2">
                     <StatusBadge status={sale.status} className="text-sm px-3 py-1.5" />
                     {!isEditing && (
-                        <button onClick={() => window.open(`/sales/${id}/invoice`, '_blank')}
+                        <button onClick={() => window.open(`/invoice/${id}`, '_blank')}
                             className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-sm font-medium hover:bg-emerald-100">
                             🖨️ พิมพ์ใบเสร็จ
                         </button>
@@ -304,6 +311,28 @@ export default function SaleDetailPage() {
                     </>
                 )}
             </div>
+
+            {/* Notes display (view mode) */}
+            {!isEditing && sale.notes && (
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-6">
+                    <p className="text-xs text-gray-500 mb-1">📝 หมายเหตุ</p>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{sale.notes}</p>
+                </div>
+            )}
+
+            {/* Notes (edit mode) */}
+            {isEditing && (
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-6">
+                    <label className="text-sm font-semibold text-gray-700 mb-2 block">📝 หมายเหตุ</label>
+                    <textarea
+                        value={editNotes}
+                        onChange={e => setEditNotes(e.target.value)}
+                        rows={3}
+                        placeholder="หมายเหตุสำหรับบิลนี้..."
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                    />
+                </div>
+            )}
 
             {/* Edit Totals + Actions */}
             {isEditing && (

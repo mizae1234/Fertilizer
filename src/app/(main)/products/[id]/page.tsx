@@ -54,6 +54,7 @@ interface ProductDetail {
     productGroup: { name: string } | null;
     pointsPerUnit: number;
     minStock: number;
+    isActive: boolean;
     createdAt: string;
     productStocks: ProductStock[];
     productPrices: ProductPrice[];
@@ -339,6 +340,28 @@ export default function ProductDetailPage() {
                         <p className="text-sm text-gray-500 mt-1">{product.description}</p>
                     )}
                 </div>
+                <button
+                    onClick={async () => {
+                        try {
+                            const res = await fetch(`/api/products/${id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ isActive: !product.isActive }),
+                            });
+                            if (!res.ok) throw new Error('เกิดข้อผิดพลาด');
+                            await refreshProduct();
+                            showAlert(product.isActive ? 'ปิดใช้งานสินค้าแล้ว' : 'เปิดใช้งานสินค้าแล้ว', 'success', 'สำเร็จ');
+                        } catch (error) {
+                            showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
+                        }
+                    }}
+                    className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${product.isActive
+                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                            : 'bg-red-100 text-red-700 hover:bg-red-200'
+                        }`}
+                >
+                    {product.isActive ? '✅ เปิดใช้งาน' : '🚫 ปิดใช้งาน'}
+                </button>
             </div>
 
             {/* Summary Cards */}

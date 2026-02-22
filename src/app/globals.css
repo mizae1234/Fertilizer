@@ -119,3 +119,51 @@ body {
 .animate-cart-slide-in {
   animation: cartItemSlideIn 0.35s ease-out;
 }
+
+/* ═══ Print Styles ═══ */
+@media print {
+
+  /* Hide sidebar, mobile header, and any no-print elements */
+  aside,
+  .no-print {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Hide mobile top bar */
+  .lg\:hidden.fixed {
+    display: none !important;
+  }
+
+  /* Reset main content area - remove sidebar offset */
+  main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    padding-top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Reset body and root */
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+
+  /* Disable all animations and transitions */
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -154,7 +154,7 @@ export default function GoodsReceiveDetailPage() {
 
         setSaving(true);
         try {
-            await updateGoodsReceive(id, {
+            const updated = await updateGoodsReceive(id, {
                 vendorId,
                 poNumber: poNumber || undefined,
                 receivedDate,
@@ -166,10 +166,11 @@ export default function GoodsReceiveDetailPage() {
                     unitCost: i.unitCost,
                 })),
             });
+            if (updated) {
+                const serialized = JSON.parse(JSON.stringify(updated));
+                setGr(serialized);
+            }
             showAlert('บันทึกการแก้ไขเรียบร้อย', 'success', 'สำเร็จ');
-            // Refresh data
-            const data = await fetch(`/api/goods-receive/${id}`).then(r => r.json());
-            setGr(data);
         } catch (error) {
             showAlert((error as Error).message || 'ไม่สามารถบันทึกได้', 'error', 'เกิดข้อผิดพลาด');
         } finally {
