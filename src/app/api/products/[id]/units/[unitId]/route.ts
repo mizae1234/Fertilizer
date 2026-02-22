@@ -1,0 +1,84 @@
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export async function PUT(
+    request: Request,
+    { params }: { params: Promise<{ id: string; unitId: string }> }
+) {
+    const { id, unitId } = await params;
+    const body = await request.json();
+
+    const { unitName, conversionRate, sellingPrice, isBaseUnit } = body;
+
+    const existing = await prisma.productUnit.findUnique({ where: { id: unitId } });
+    if (!existing || existing.productId !== id) {
+        return NextResponse.json({ error: 'ไม่พบข้อมูลหน่วยขาย' }, { status: 404 });
+    }
+
+    // If changing to base unit, conversion rate must be 1
+    if (isBaseUnit && Number(conversionRate) !== 1) {
+        return NextResponse.json(
+            { error: 'หน่วยหลัก (Base Unit) ต้องมี Conversion Rate = 1' },
+            { status: 400 }
+        );
+    }
+
+    // Cannot change base unit flag if it's the only base unit
+    if (existing.isBaseUnit && !isBaseUnit) {
+        return NextResponse.json(
+            { error: 'ไม่สามารถเปลี่ยนหน่วยหลักเป็นหน่วยทั่วไปได้' },
+            { status: 400 }
+        );
+    }
+
+    // If setting as base unit, check no other base unit exists
+    if (isBaseUnit && !existing.isBaseUnit) {
+        const otherBase = await prisma.productUnit.findFirst({
+            where: { productId: id, isBaseUnit: true, id: { not: unitId } },
+        });
+        if (otherBase) {
+            return NextResponse.json(
+                { error: 'สินค้านี้มีหน่วยหลักแล้ว' },
+                { status: 400 }
+            );
+        }
+    }
+
+    try {
+        const unit = await prisma.productUnit.update({
+            where: { id: unitId },
+            data: { unitName, conversionRate, sellingPrice, isBaseUnit },
+        });
+        return NextResponse.json(unit);
+    } catch (error: any) {
+        if (error?.code === 'P2002') {
+            return NextResponse.json(
+                { error: `หน่วย "${unitName}" มีอยู่แล้วในสินค้านี้` },
+                { status: 400 }
+            );
+        }
+        throw error;
+    }
+}
+
+export async function DELETE(
+    request: Request,
+    { params }: { params: Promise<{ id: string; unitId: string }> }
+) {
+    const { id, unitId } = await params;
+
+    const existing = await prisma.productUnit.findUnique({ where: { id: unitId } });
+    if (!existing || existing.productId !== id) {
+        return NextResponse.json({ error: 'ไม่พบข้อมูลหน่วยขาย' }, { status: 404 });
+    }
+
+    if (existing.isBaseUnit) {
+        return NextResponse.json(
+            { error: 'ไม่สามารถลบหน่วยหลัก (Base Unit) ได้' },
+            { status: 400 }
+        );
+    }
+
+    await prisma.productUnit.delete({ where: { id: unitId } });
+    return NextResponse.json({ success: true });
+}

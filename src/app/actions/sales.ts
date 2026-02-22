@@ -1,0 +1,252 @@
+'use server';
+
+import { prisma } from '@/lib/prisma';
+import { revalidatePath } from 'next/cache';
+
+export async function getSales(page = 1, status = '') {
+    const perPage = 10;
+    const where = {
+        deletedAt: null,
+        ...(status ? { status: status as 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' } : {}),
+    };
+
+    const [sales, total] = await Promise.all([
+        prisma.sale.findMany({
+            where,
+            include: {
+                customer: { select: { name: true } },
+                createdBy: { select: { name: true } },
+                _count: { select: { items: true } },
+            },
+            skip: (page - 1) * perPage,
+            take: perPage,
+            orderBy: { createdAt: 'desc' },
+        }),
+        prisma.sale.count({ where }),
+    ]);
+
+    return { sales, totalPages: Math.ceil(total / perPage) };
+}
+
+export async function getSaleDetail(id: string) {
+    return prisma.sale.findUnique({
+        where: { id },
+        include: {
+            customer: { select: { name: true, phone: true } },
+            createdBy: { select: { name: true } },
+            items: {
+                include: {
+                    product: { select: { name: true, code: true, unit: true } },
+                    warehouse: { select: { name: true } },
+                },
+            },
+        },
+    });
+}
+
+export async function approveSale(id: string) {
+    const sale = await prisma.sale.findUnique({
+        where: { id },
+        include: { items: true },
+    });
+
+    if (!sale || sale.status !== 'PENDING') {
+        throw new Error('ไม่สามารถอนุมัติได้');
+    }
+
+    // Validate stock
+    for (const item of sale.items) {
+        const stock = await prisma.productStock.findUnique({
+            where: {
+                productId_warehouseId: {
+                    productId: item.productId,
+                    warehouseId: item.warehouseId,
+                },
+            },
+        });
+
+        if (!stock || stock.quantity < item.quantity) {
+            throw new Error('สินค้ามี stock ไม่เพียงพอ');
+        }
+    }
+
+    await prisma.$transaction(async (tx) => {
+        // Update sale status
+        await tx.sale.update({
+            where: { id },
+            data: { status: 'APPROVED' },
+        });
+
+        // Deduct stock for each item
+        for (const item of sale.items) {
+            await tx.productStock.update({
+                where: {
+                    productId_warehouseId: {
+                        productId: item.productId,
+                        warehouseId: item.warehouseId,
+                    },
+                },
+                data: {
+                    quantity: { decrement: item.quantity },
+                },
+            });
+
+            // Create stock transaction (OUT)
+            await tx.stockTransaction.create({
+                data: {
+                    productId: item.productId,
+                    warehouseId: item.warehouseId,
+                    type: 'SALE',
+                    quantity: -item.quantity,
+                    unitCost: item.unitPrice,
+                    reference: sale.saleNumber,
+                    notes: `ขายสินค้า ${sale.saleNumber}`,
+                },
+            });
+        }
+
+        // Update customer points
+        if (sale.customerId && sale.totalPoints > 0) {
+            await tx.customer.update({
+                where: { id: sale.customerId },
+                data: {
+                    totalPoints: { increment: sale.totalPoints },
+                },
+            });
+
+            await tx.pointTransaction.create({
+                data: {
+                    customerId: sale.customerId,
+                    points: sale.totalPoints,
+                    type: 'EARN',
+                    reference: sale.saleNumber,
+                },
+            });
+        }
+    });
+
+    revalidatePath('/sales');
+    revalidatePath('/');
+}
+
+export async function rejectSale(id: string) {
+    await prisma.sale.update({
+        where: { id },
+        data: { status: 'REJECTED' },
+    });
+    revalidatePath('/sales');
+    revalidatePath('/');
+}
+
+export async function updateSale(id: string, data: {
+    customerId?: string | null;
+    items: {
+        productId: string;
+        warehouseId: string;
+        quantity: number;
+        unitPrice: number;
+        points: number;
+    }[];
+}) {
+    const existing = await prisma.sale.findUnique({
+        where: { id },
+        include: { items: true },
+    });
+    if (!existing) throw new Error('ไม่พบรายการขาย');
+
+    const totalAmount = data.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+    const totalPoints = data.items.reduce((s, i) => s + i.points, 0);
+
+    await prisma.$transaction(async (tx) => {
+        // If APPROVED, reverse old stock first
+        if (existing.status === 'APPROVED') {
+            for (const item of existing.items) {
+                await tx.productStock.update({
+                    where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
+                    data: { quantity: { increment: item.quantity } },
+                });
+            }
+            // Remove old stock transactions
+            await tx.stockTransaction.deleteMany({
+                where: { reference: existing.saleNumber, type: 'SALE' },
+            });
+        }
+
+        // Delete old items
+        await tx.saleItem.deleteMany({ where: { saleId: id } });
+
+        // Update sale header + create new items
+        await tx.sale.update({
+            where: { id },
+            data: {
+                customerId: data.customerId || null,
+                totalAmount,
+                totalPoints,
+                items: {
+                    create: data.items.map(i => ({
+                        productId: i.productId,
+                        warehouseId: i.warehouseId,
+                        quantity: i.quantity,
+                        unitPrice: i.unitPrice,
+                        totalPrice: i.quantity * i.unitPrice,
+                        points: i.points,
+                    })),
+                },
+            },
+        });
+
+        // If APPROVED, deduct new stock
+        if (existing.status === 'APPROVED') {
+            for (const item of data.items) {
+                await tx.productStock.update({
+                    where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
+                    data: { quantity: { decrement: item.quantity } },
+                });
+                await tx.stockTransaction.create({
+                    data: {
+                        productId: item.productId,
+                        warehouseId: item.warehouseId,
+                        type: 'SALE',
+                        quantity: -item.quantity,
+                        unitCost: item.unitPrice,
+                        reference: existing.saleNumber,
+                        notes: `ขายสินค้า ${existing.saleNumber} (แก้ไข)`,
+                    },
+                });
+            }
+        }
+    });
+
+    revalidatePath(`/sales/${id}`);
+    revalidatePath('/sales');
+    revalidatePath('/');
+}
+
+export async function cancelSale(id: string) {
+    const sale = await prisma.sale.findUnique({
+        where: { id },
+        include: { items: true },
+    });
+    if (!sale) throw new Error('ไม่พบรายการ');
+    if (sale.status === 'CANCELLED') throw new Error('บิลนี้ถูกยกเลิกแล้ว');
+
+    await prisma.$transaction(async (tx) => {
+        // If APPROVED, restore stock
+        if (sale.status === 'APPROVED') {
+            for (const item of sale.items) {
+                await tx.productStock.update({
+                    where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
+                    data: { quantity: { increment: item.quantity } },
+                });
+            }
+            await tx.stockTransaction.deleteMany({
+                where: { reference: sale.saleNumber, type: 'SALE' },
+            });
+        }
+        await tx.sale.update({ where: { id }, data: { status: 'CANCELLED' } });
+    });
+
+    revalidatePath('/sales');
+    revalidatePath(`/sales/${id}`);
+    revalidatePath('/');
+}
