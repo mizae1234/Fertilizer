@@ -516,25 +516,34 @@ export default function ProductDetailPage() {
                         else if (costType === 'last') costVal = globalLastCost;
                         else if (costType === 'custom') costVal = customCost;
 
+                        const updateData: Record<string, any> = {
+                            name: infoForm.name,
+                            description: infoForm.description || null,
+                            brand: infoForm.brand || null,
+                            packaging: infoForm.packaging || null,
+                            cost: costVal,
+                            price: sellingPriceValue,
+                            unit: unitValue || product.unit,
+                            pointsPerUnit: pointsValue,
+                            minStock: infoForm.minStock,
+                        };
+                        if (infoForm.productGroupId) {
+                            updateData.productGroupId = infoForm.productGroupId;
+                        } else {
+                            updateData.productGroupId = null;
+                        }
+
                         const res = await fetch(`/api/products/${id}`, {
                             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                name: infoForm.name,
-                                description: infoForm.description || null,
-                                brand: infoForm.brand || null,
-                                packaging: infoForm.packaging || null,
-                                productGroupId: infoForm.productGroupId || null,
-                                cost: costVal,
-                                price: sellingPriceValue,
-                                unit: unitValue || product.unit,
-                                pointsPerUnit: pointsValue,
-                                minStock: infoForm.minStock,
-                            }),
+                            body: JSON.stringify(updateData),
                         });
-                        if (!res.ok) throw new Error('เกิดข้อผิดพลาด');
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            throw new Error(err.error || 'เกิดข้อผิดพลาด');
+                        }
                         await refreshProduct();
                         showAlert('บันทึกข้อมูลสินค้าเรียบร้อย', 'success', 'สำเร็จ');
-                    } catch { showAlert('เกิดข้อผิดพลาด', 'error', 'ผิดพลาด'); }
+                    } catch (e: any) { showAlert(e.message || 'เกิดข้อผิดพลาด', 'error', 'ผิดพลาด'); }
                     finally { setSavingInfo(false); }
                 }} disabled={savingInfo}
                     className="w-full py-3 rounded-xl bg-emerald-500 text-white font-medium hover:bg-emerald-600 disabled:opacity-50 transition-colors">
