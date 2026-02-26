@@ -39,13 +39,13 @@ async function getDebtSummary(saleId: string) {
     return computeDebtTotals({ ...sale, debtPayments, debtInterests });
 }
 
-function computeDebtTotals(sale: {
+function computeDebtTotals<T extends {
     totalAmount: unknown;
     payments: unknown;
     creditDueDate: Date | null;
     debtPayments: { method: string; amount: unknown; dueDate: Date | null; paidAt: Date }[];
     debtInterests: { amount: unknown }[];
-}) {
+}>(sale: T) {
     const totalBill = Number(sale.totalAmount);
     const totalInterest = sale.debtInterests.reduce((s, di) => s + Number(di.amount), 0);
     const grandTotal = totalBill + totalInterest;
