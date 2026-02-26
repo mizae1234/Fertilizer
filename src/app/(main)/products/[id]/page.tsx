@@ -396,17 +396,9 @@ export default function ProductDetailPage() {
                         </p>
                         {editingUnit ? (
                             <div className="flex items-center gap-1">
-                                <select value={unitValue} onChange={e => setUnitValue(e.target.value)}
-                                    className="px-2 py-1 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" autoFocus>
-                                    <option value="bag">ถุง</option>
-                                    <option value="kg">กิโลกรัม</option>
-                                    <option value="ton">ตัน</option>
-                                    <option value="bottle">ขวด</option>
-                                    <option value="piece">ชิ้น</option>
-                                    <option value="can">กระป๋อง</option>
-                                    <option value="pack">แพ็ค</option>
-                                    <option value="box">กล่อง</option>
-                                </select>
+                                <input type="text" value={unitValue} onChange={e => setUnitValue(e.target.value)}
+                                    className="w-24 px-2 py-1 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                    placeholder="เช่น ถุง, ขวด" autoFocus />
                                 <button onClick={async () => {
                                     setSavingUnit(true);
                                     try {

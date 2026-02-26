@@ -24,7 +24,7 @@ export default function NewProductPage() {
         code: '',
         name: '',
         description: '',
-        unit: 'bag',
+        unit: '',
         cost: 0,
         price: 0,
         brand: '',
@@ -172,17 +172,13 @@ export default function NewProductPage() {
                     <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">หน่วย</label>
-                            <select
+                            <input
+                                type="text"
                                 value={form.unit}
                                 onChange={(e) => setForm({ ...form, unit: e.target.value })}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                            >
-                                <option value="bag">ถุง</option>
-                                <option value="kg">กิโลกรัม</option>
-                                <option value="ton">ตัน</option>
-                                <option value="bottle">ขวด</option>
-                                <option value="piece">ชิ้น</option>
-                            </select>
+                                placeholder="เช่น ถุง, ขวด, กก., ตัน..."
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">แต้ม/หน่วย</label>
