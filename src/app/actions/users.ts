@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@/generated/prisma/client';
 import { hashPassword } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
@@ -53,7 +54,7 @@ export async function createUser(data: {
             password: hashedPwd,
             name: data.name,
             role: data.role,
-            allowedMenus: data.allowedMenus,
+            allowedMenus: data.allowedMenus === null ? Prisma.JsonNull : data.allowedMenus,
         },
     });
 
@@ -84,7 +85,7 @@ export async function updateUser(
     if (data.name) updateData.name = data.name;
     if (data.role) updateData.role = data.role;
     if (data.password) updateData.password = await hashPassword(data.password);
-    if ('allowedMenus' in data) updateData.allowedMenus = data.allowedMenus;
+    if ('allowedMenus' in data) updateData.allowedMenus = data.allowedMenus === null ? Prisma.JsonNull : data.allowedMenus;
 
     const user = await prisma.user.update({
         where: { id },
