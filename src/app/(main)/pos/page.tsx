@@ -10,7 +10,7 @@ interface ProductUnitInfo {
     id: string; unitName: string; conversionRate: string; sellingPrice: string; isBaseUnit: boolean;
 }
 interface Product {
-    id: string; code: string; name: string; unit: string;
+    id: string; code: string; name: string; unit: string; price: string;
     pointsPerUnit: number;
     productStocks: { warehouseId: string; quantity: number }[];
     productPrices: { customerGroupId: string; price: string; customerGroup: { id: string; name: string } }[];
@@ -325,7 +325,8 @@ export default function POSPage() {
             );
             if (groupPrice) return Number(groupPrice.price);
         }
-        return product.productPrices.length > 0 ? Number(product.productPrices[0].price) : 0;
+        // ลูกค้าทั่วไป → ใช้ราคาขายปกติ (product.price)
+        return Number(product.price);
     };
 
     const getStock = (product: Product, warehouseId: string): number => {
@@ -371,9 +372,8 @@ export default function POSPage() {
                 if (selectedCustomer) {
                     const gp = product.productPrices.find(p => p.customerGroup.id === selectedCustomer.customerGroup.id);
                     if (gp) priceTier = selectedCustomer.customerGroup.id;
-                } else if (product.productPrices.length > 0) {
-                    priceTier = product.productPrices[0].customerGroup.id;
                 }
+                // ลูกค้าทั่วไป (no selectedCustomer) → priceTier stays 'custom', uses product.price
             }
             setCart([...cart, {
                 productId: product.id, productName: product.name, productCode: product.code,
