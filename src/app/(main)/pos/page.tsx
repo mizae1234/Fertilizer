@@ -585,24 +585,18 @@ export default function POSPage() {
             // Auto-print based on selected print type
             if (result?.id) {
                 if (printType === 'bill') {
-                    // Silent print via hidden iframe (no popup, no visible window)
-                    const iframe = document.createElement('iframe');
-                    iframe.style.position = 'fixed';
-                    iframe.style.top = '-10000px';
-                    iframe.style.left = '-10000px';
-                    iframe.style.width = '0';
-                    iframe.style.height = '0';
-                    iframe.style.border = 'none';
-                    iframe.src = `/invoice/${result.id}?silent=1`;
-                    document.body.appendChild(iframe);
-                    // The InvoicePrint component already calls window.print() on load
-                    // After printing, remove the iframe
-                    iframe.onload = () => {
-                        setTimeout(() => {
-                            try { iframe.contentWindow?.print(); } catch { /* cross-origin fallback */ }
-                            setTimeout(() => iframe.remove(), 3000);
-                        }, 800);
-                    };
+                    // TODO: ปิดไว้ชั่วคราว — รอ set Chrome kiosk-printing ก่อน
+                    // Silent print via hidden iframe
+                    // const iframe = document.createElement('iframe');
+                    // iframe.style.cssText = 'position:fixed;top:-10000px;left:-10000px;width:0;height:0;border:none';
+                    // iframe.src = `/invoice/${result.id}?silent=1`;
+                    // document.body.appendChild(iframe);
+                    // iframe.onload = () => {
+                    //     setTimeout(() => {
+                    //         try { iframe.contentWindow?.print(); } catch {}
+                    //         setTimeout(() => iframe.remove(), 3000);
+                    //     }, 800);
+                    // };
                 } else {
                     // Open A4 invoice in new tab
                     window.open(`/invoice/${result.id}`, '_blank');
