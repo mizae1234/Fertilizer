@@ -585,8 +585,8 @@ export default function POSPage() {
             // Auto-print based on selected print type
             if (result?.id) {
                 if (printType === 'bill') {
-                    // Open receipt in new window → auto-prints via ReceiptPrint component
-                    window.open(`/receipt/${result.id}`, '_blank', 'width=350,height=600');
+                    // Open bill in popup → auto-prints via template (no dialog with --kiosk-printing)
+                    window.open(`/invoice/${result.id}`, '_blank', 'width=820,height=1000');
                 } else {
                     // Open A4 invoice in new tab
                     window.open(`/invoice/${result.id}`, '_blank');
