@@ -582,6 +582,17 @@ export default function POSPage() {
             setSaleNotes('');
             setShowNotes(false);
 
+            // Auto-print based on selected print type
+            if (result?.id) {
+                if (printType === 'bill') {
+                    // Open receipt in new window → auto-prints via ReceiptPrint component
+                    window.open(`/receipt/${result.id}`, '_blank', 'width=350,height=600');
+                } else {
+                    // Open A4 invoice in new tab
+                    window.open(`/invoice/${result.id}`, '_blank');
+                }
+            }
+
             // Show success and reload products for updated stock
             setAlertModal({ open: true, message: `สร้างบิลขาย ${result?.saleNumber || ''} เรียบร้อย ตัด stock แล้ว`, type: 'success', title: 'ชำระเงินสำเร็จ!' });
             if (defaultWarehouseId) loadProducts(defaultWarehouseId);
