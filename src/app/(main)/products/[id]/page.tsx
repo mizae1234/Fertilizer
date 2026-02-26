@@ -96,6 +96,11 @@ export default function ProductDetailPage() {
     const [sellingPriceValue, setSellingPriceValue] = useState(0);
     const [savingSellingPrice, setSavingSellingPrice] = useState(false);
 
+    // Unit editing
+    const [editingUnit, setEditingUnit] = useState(false);
+    const [unitValue, setUnitValue] = useState('');
+    const [savingUnit, setSavingUnit] = useState(false);
+
 
     // Inline editing
     const [savingId, setSavingId] = useState<string | null>(null);
@@ -384,10 +389,49 @@ export default function ProductDetailPage() {
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:col-span-2">
                     <p className="text-xs text-gray-400 mb-1">Stock รวม</p>
-                    <p className={`text-xl font-bold ${isLowStock ? 'text-red-600' : 'text-gray-800'}`}>
-                        {totalStock.toLocaleString()} <span className="text-sm font-normal text-gray-400">{product.unit}</span>
-                        {isLowStock && <span className="text-xs ml-1">⚠️</span>}
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <p className={`text-xl font-bold ${isLowStock ? 'text-red-600' : 'text-gray-800'}`}>
+                            {totalStock.toLocaleString()}
+                            {isLowStock && <span className="text-xs ml-1">⚠️</span>}
+                        </p>
+                        {editingUnit ? (
+                            <div className="flex items-center gap-1">
+                                <select value={unitValue} onChange={e => setUnitValue(e.target.value)}
+                                    className="px-2 py-1 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" autoFocus>
+                                    <option value="bag">ถุง</option>
+                                    <option value="kg">กิโลกรัม</option>
+                                    <option value="ton">ตัน</option>
+                                    <option value="bottle">ขวด</option>
+                                    <option value="piece">ชิ้น</option>
+                                    <option value="can">กระป๋อง</option>
+                                    <option value="pack">แพ็ค</option>
+                                    <option value="box">กล่อง</option>
+                                </select>
+                                <button onClick={async () => {
+                                    setSavingUnit(true);
+                                    try {
+                                        const res = await fetch(`/api/products/${id}`, {
+                                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ unit: unitValue }),
+                                        });
+                                        if (!res.ok) throw new Error('เกิดข้อผิดพลาด');
+                                        await refreshProduct();
+                                        showAlert('บันทึกหน่วยเรียบร้อย', 'success', 'สำเร็จ');
+                                        setEditingUnit(false);
+                                    } catch { showAlert('เกิดข้อผิดพลาด', 'error', 'ผิดพลาด'); }
+                                    finally { setSavingUnit(false); }
+                                }} disabled={savingUnit}
+                                    className="text-blue-500 hover:text-blue-700 text-xs disabled:opacity-50">{savingUnit ? '...' : '💾'}</button>
+                                <button onClick={() => setEditingUnit(false)}
+                                    className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                            </div>
+                        ) : (
+                            <span className="text-sm text-gray-400 cursor-pointer hover:text-emerald-600 transition-colors"
+                                onClick={() => { setUnitValue(product.unit); setEditingUnit(true); }}>
+                                {product.unit} ✏️
+                            </span>
+                        )}
+                    </div>
                     {product.productStocks.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2">
                             {product.productStocks.map(ps => (
