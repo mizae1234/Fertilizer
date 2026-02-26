@@ -1,0 +1,4 @@
+# เปลี่ยน pos.example.com เป็น domain จริงของคุณ
+pos.example.com {
+    reverse_proxy web:3000
+}
