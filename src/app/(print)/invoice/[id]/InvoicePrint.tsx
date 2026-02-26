@@ -90,9 +90,10 @@ function numberToThaiText(num: number): string {
 }
 
 export default function InvoicePrint({ sale, template }: { sale: SaleData; template: TemplateData | null }) {
-    // Auto print
+    // Auto print (skip if loaded silently via iframe with ?silent=1)
     useEffect(() => {
-        // small delay to let styles load
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('silent') === '1') return; // parent will handle printing
         const timer = setTimeout(() => window.print(), 500);
         return () => clearTimeout(timer);
     }, []);

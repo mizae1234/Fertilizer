@@ -593,7 +593,7 @@ export default function POSPage() {
                     iframe.style.width = '0';
                     iframe.style.height = '0';
                     iframe.style.border = 'none';
-                    iframe.src = `/invoice/${result.id}`;
+                    iframe.src = `/invoice/${result.id}?silent=1`;
                     document.body.appendChild(iframe);
                     // The InvoicePrint component already calls window.print() on load
                     // After printing, remove the iframe
