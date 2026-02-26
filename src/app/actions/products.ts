@@ -145,33 +145,35 @@ export async function deleteProduct(id: string) {
 }
 
 export async function updateProductCost(
-    stockId: string,
+    productId: string,
     costType: 'avg' | 'last' | 'custom',
     customCost?: number
 ) {
-    const stock = await prisma.productStock.findUnique({ where: { id: stockId } });
-    if (!stock) throw new Error('ไม่พบข้อมูล Stock');
+    const stocks = await prisma.productStock.findMany({ where: { productId } });
 
     let newCost: number;
     if (costType === 'avg') {
-        newCost = Number(stock.avgCost);
+        // Weighted average cost across all warehouses
+        const totalQty = stocks.reduce((s, st) => s + st.quantity, 0);
+        newCost = totalQty > 0
+            ? stocks.reduce((s, st) => s + Number(st.avgCost) * st.quantity, 0) / totalQty
+            : stocks.length > 0 ? Number(stocks[0].avgCost) : 0;
     } else if (costType === 'last') {
-        newCost = Number(stock.lastCost);
+        // Max last cost across warehouses (most recent receive cost)
+        newCost = stocks.length > 0
+            ? Math.max(...stocks.map(st => Number(st.lastCost)))
+            : 0;
     } else {
         if (customCost === undefined || customCost < 0) throw new Error('กรุณาระบุต้นทุนที่ถูกต้อง');
         newCost = customCost;
     }
 
-    await prisma.$transaction([
-        prisma.productStock.update({
-            where: { id: stockId },
-            data: { avgCost: newCost },
-        }),
-        prisma.product.update({
-            where: { id: stock.productId },
-            data: { cost: newCost },
-        }),
-    ]);
+    newCost = Math.round(newCost * 100) / 100;
+
+    await prisma.product.update({
+        where: { id: productId },
+        data: { cost: newCost },
+    });
 
     revalidatePath('/products');
 }

@@ -79,8 +79,8 @@ export default function ProductDetailPage() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'stock' | 'log'>('stock');
 
-    // Cost editing
-    const [editingStockId, setEditingStockId] = useState<string | null>(null);
+    // Cost editing (product-level)
+    const [editingCost, setEditingCost] = useState(false);
     const [costType, setCostType] = useState<'avg' | 'last' | 'custom'>('avg');
     const [customCost, setCustomCost] = useState(0);
     const [savingCost, setSavingCost] = useState(false);
@@ -118,15 +118,27 @@ export default function ProductDetailPage() {
             .then(data => setCustomerGroups(data));
     }, [id]);
 
-    const handleSaveCost = async (stock: ProductStock) => {
+    // Compute global avg / last costs from all warehouses
+    const globalAvgCost = product ? (() => {
+        const stocks = product.productStocks;
+        const totalQty = stocks.reduce((s, st) => s + st.quantity, 0);
+        return totalQty > 0
+            ? Math.round(stocks.reduce((s, st) => s + Number(st.avgCost) * st.quantity, 0) / totalQty * 100) / 100
+            : stocks.length > 0 ? Number(stocks[0].avgCost) : 0;
+    })() : 0;
+    const globalLastCost = product
+        ? (product.productStocks.length > 0 ? Math.max(...product.productStocks.map(st => Number(st.lastCost))) : 0)
+        : 0;
+
+    const handleSaveCost = async () => {
+        if (!product) return;
         setSavingCost(true);
         try {
-            await updateProductCost(stock.id, costType, costType === 'custom' ? customCost : undefined);
+            await updateProductCost(product.id, costType, costType === 'custom' ? customCost : undefined);
             showAlert('บันทึกต้นทุนเรียบร้อย', 'success', 'สำเร็จ');
-            // Refresh
             const data = await fetch(`/api/products/${id}`).then(r => r.json());
             setProduct(data);
-            setEditingStockId(null);
+            setEditingCost(false);
         } catch (error) {
             showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
         } finally {
@@ -134,10 +146,10 @@ export default function ProductDetailPage() {
         }
     };
 
-    const startEditing = (stock: ProductStock) => {
-        setEditingStockId(stock.id);
+    const startEditingCost = () => {
+        setEditingCost(true);
         setCostType('avg');
-        setCustomCost(Number(stock.avgCost));
+        setCustomCost(Number(product?.cost || 0));
     };
 
     const refreshProduct = async () => {
@@ -356,8 +368,8 @@ export default function ProductDetailPage() {
                         }
                     }}
                     className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${product.isActive
-                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                            : 'bg-red-100 text-red-700 hover:bg-red-200'
+                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                        : 'bg-red-100 text-red-700 hover:bg-red-200'
                         }`}
                 >
                     {product.isActive ? '✅ เปิดใช้งาน' : '🚫 ปิดใช้งาน'}
@@ -385,7 +397,49 @@ export default function ProductDetailPage() {
                 </div>
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4">
                     <p className="text-xs text-gray-400 mb-1">ต้นทุน</p>
-                    <p className="text-xl font-bold text-gray-800">{formatCurrency(Number(product.cost))}</p>
+                    {editingCost ? (
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 border border-blue-200 cursor-pointer hover:border-blue-300">
+                                <input type="radio" name="cost-type" checked={costType === 'avg'} onChange={() => setCostType('avg')} className="accent-emerald-500" />
+                                <div className="flex-1 flex justify-between items-center">
+                                    <span className="text-xs text-gray-700">ต้นทุนเฉลี่ย</span>
+                                    <span className="text-xs font-bold text-blue-700">{formatCurrency(globalAvgCost)}</span>
+                                </div>
+                            </label>
+                            <label className="flex items-center gap-2 p-2 rounded-lg bg-purple-50 border border-purple-200 cursor-pointer hover:border-purple-300">
+                                <input type="radio" name="cost-type" checked={costType === 'last'} onChange={() => setCostType('last')} className="accent-emerald-500" />
+                                <div className="flex-1 flex justify-between items-center">
+                                    <span className="text-xs text-gray-700">ต้นทุนล่าสุด</span>
+                                    <span className="text-xs font-bold text-purple-700">{formatCurrency(globalLastCost)}</span>
+                                </div>
+                            </label>
+                            <label className="flex items-center gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200 cursor-pointer hover:border-amber-300">
+                                <input type="radio" name="cost-type" checked={costType === 'custom'} onChange={() => setCostType('custom')} className="accent-emerald-500" />
+                                <div className="flex-1 flex justify-between items-center gap-2">
+                                    <span className="text-xs text-gray-700">กรอกเอง</span>
+                                    {costType === 'custom' && (
+                                        <input type="number" min={0} step="0.01" value={customCost}
+                                            onChange={e => setCustomCost(parseFloat(e.target.value) || 0)}
+                                            className="w-24 px-2 py-1 rounded-lg border border-gray-200 text-xs text-right focus:ring-2 focus:ring-emerald-500 outline-none"
+                                            autoFocus />
+                                    )}
+                                </div>
+                            </label>
+                            <div className="flex gap-1.5 pt-1">
+                                <button onClick={() => setEditingCost(false)}
+                                    className="flex-1 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-500 hover:bg-gray-50">ยกเลิก</button>
+                                <button onClick={handleSaveCost} disabled={savingCost}
+                                    className="flex-1 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 disabled:opacity-50">
+                                    {savingCost ? '...' : '💾 บันทึก'}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-xl font-bold text-gray-800 cursor-pointer hover:text-emerald-600 transition-colors"
+                            onClick={startEditingCost} title="คลิกเพื่อแก้ไข">
+                            {formatCurrency(Number(product.cost))} <span className="text-xs font-normal text-gray-400">✏️</span>
+                        </p>
+                    )}
                 </div>
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4">
                     <p className="text-xs text-gray-400 mb-1">ราคาขาย</p>
@@ -661,7 +715,7 @@ export default function ProductDetailPage() {
                                     </span>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-blue-50 rounded-lg p-3">
                                         <p className="text-xs text-blue-400 mb-1">ต้นทุนเฉลี่ย (Avg)</p>
                                         <p className="text-lg font-bold text-blue-700">{formatCurrency(Number(stock.avgCost))}</p>
@@ -671,65 +725,6 @@ export default function ProductDetailPage() {
                                         <p className="text-lg font-bold text-purple-700">{formatCurrency(Number(stock.lastCost))}</p>
                                     </div>
                                 </div>
-
-                                {/* Edit Cost */}
-                                {editingStockId === stock.id ? (
-                                    <div className="border border-emerald-200 rounded-xl p-4 bg-emerald-50/50">
-                                        <p className="text-sm font-semibold text-gray-700 mb-3">เลือกต้นทุนที่ต้องการใช้</p>
-                                        <div className="space-y-2 mb-4">
-                                            <label className="flex items-center gap-3 p-2.5 rounded-lg bg-white border border-gray-200 cursor-pointer hover:border-emerald-300">
-                                                <input type="radio" name={`cost-${stock.id}`} checked={costType === 'avg'} onChange={() => setCostType('avg')} className="accent-emerald-500" />
-                                                <div className="flex-1 flex justify-between items-center">
-                                                    <span className="text-sm text-gray-700">ต้นทุนเฉลี่ย</span>
-                                                    <span className="text-sm font-bold text-blue-700">{formatCurrency(Number(stock.avgCost))}</span>
-                                                </div>
-                                            </label>
-                                            <label className="flex items-center gap-3 p-2.5 rounded-lg bg-white border border-gray-200 cursor-pointer hover:border-emerald-300">
-                                                <input type="radio" name={`cost-${stock.id}`} checked={costType === 'last'} onChange={() => setCostType('last')} className="accent-emerald-500" />
-                                                <div className="flex-1 flex justify-between items-center">
-                                                    <span className="text-sm text-gray-700">ต้นทุนล่าสุด</span>
-                                                    <span className="text-sm font-bold text-purple-700">{formatCurrency(Number(stock.lastCost))}</span>
-                                                </div>
-                                            </label>
-                                            <label className="flex items-center gap-3 p-2.5 rounded-lg bg-white border border-gray-200 cursor-pointer hover:border-emerald-300">
-                                                <input type="radio" name={`cost-${stock.id}`} checked={costType === 'custom'} onChange={() => setCostType('custom')} className="accent-emerald-500" />
-                                                <div className="flex-1 flex justify-between items-center gap-3">
-                                                    <span className="text-sm text-gray-700">กรอกเอง</span>
-                                                    {costType === 'custom' && (
-                                                        <input
-                                                            type="number" min={0} step="0.01" value={customCost}
-                                                            onChange={e => setCustomCost(parseFloat(e.target.value) || 0)}
-                                                            className="w-32 px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 outline-none"
-                                                            autoFocus
-                                                        />
-                                                    )}
-                                                </div>
-                                            </label>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => setEditingStockId(null)}
-                                                className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
-                                            >
-                                                ยกเลิก
-                                            </button>
-                                            <button
-                                                onClick={() => handleSaveCost(stock)}
-                                                disabled={savingCost}
-                                                className="flex-1 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 disabled:opacity-50"
-                                            >
-                                                {savingCost ? 'กำลังบันทึก...' : '💾 บันทึกต้นทุน'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <button
-                                        onClick={() => startEditing(stock)}
-                                        className="w-full py-2 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors"
-                                    >
-                                        ✏️ แก้ไขต้นทุน
-                                    </button>
-                                )}
                             </div>
                         ))
                     )}
