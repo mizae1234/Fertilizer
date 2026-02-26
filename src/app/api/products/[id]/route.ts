@@ -42,13 +42,26 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
+    // Only allow known Product scalar fields
+    const allowedFields = [
+        'name', 'description', 'unit', 'cost', 'price', 'brand',
+        'packaging', 'productGroupId', 'pointsPerUnit', 'minStock', 'isActive', 'code'
+    ];
+    const data: Record<string, any> = {};
+    for (const key of allowedFields) {
+        if (key in body) {
+            data[key] = body[key];
+        }
+    }
+
     try {
         const updated = await prisma.product.update({
             where: { id },
-            data: body,
+            data,
         });
         return NextResponse.json(JSON.parse(JSON.stringify(updated)));
     } catch (error: any) {
+        console.error('Product PATCH error:', error.message, JSON.stringify(data));
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
