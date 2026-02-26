@@ -104,7 +104,7 @@ export default function ProductDetailPage() {
 
     // Product info editing
     const [editingInfo, setEditingInfo] = useState(false);
-    const [infoForm, setInfoForm] = useState({ name: '', description: '', brand: '', packaging: '', productGroupId: '' });
+    const [infoForm, setInfoForm] = useState({ name: '', description: '', brand: '', packaging: '', productGroupId: '', minStock: 10 });
     const [savingInfo, setSavingInfo] = useState(false);
     const [productGroups, setProductGroups] = useState<{ id: string; name: string }[]>([]);
 
@@ -133,6 +133,24 @@ export default function ProductDetailPage() {
             .then(r => r.json())
             .then(data => setProductGroups(Array.isArray(data) ? data : []));
     }, [id]);
+
+    // Initialize form values when product loads
+    useEffect(() => {
+        if (product) {
+            setInfoForm({
+                name: product.name,
+                description: product.description || '',
+                brand: product.brand || '',
+                packaging: product.packaging || '',
+                productGroupId: product.productGroupId || '',
+                minStock: product.minStock,
+            });
+            setSellingPriceValue(Number(product.price));
+            setPointsValue(product.pointsPerUnit);
+            setUnitValue(product.unit);
+            setCustomCost(Number(product.cost));
+        }
+    }, [product]);
 
     // Compute global avg / last costs from all warehouses
     const globalAvgCost = product ? (() => {
@@ -352,103 +370,8 @@ export default function ProductDetailPage() {
                 กลับรายการสินค้า
             </button>
 
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-6">
-                <div className="flex-1">
-                    {editingInfo ? (
-                        <div className="bg-white rounded-xl shadow-md border border-emerald-200 p-4 space-y-3">
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">{product.code}</span>
-                                <span className="text-xs text-gray-400">รหัสสินค้า (แก้ไขไม่ได้)</span>
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-500">ชื่อสินค้า *</label>
-                                <input type="text" value={infoForm.name} onChange={e => setInfoForm({ ...infoForm, name: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-semibold" />
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-500">คำอธิบาย</label>
-                                <input type="text" value={infoForm.description} onChange={e => setInfoForm({ ...infoForm, description: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="รายละเอียดสินค้า..." />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs text-gray-500">ยี่ห้อ</label>
-                                    <input type="text" value={infoForm.brand} onChange={e => setInfoForm({ ...infoForm, brand: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="เช่น นกปากห่าง" />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-gray-500">บรรจุภัณฑ์</label>
-                                    <input type="text" value={infoForm.packaging} onChange={e => setInfoForm({ ...infoForm, packaging: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="เช่น ถุง 50 กก." />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-500">หมวดหมู่</label>
-                                <select value={infoForm.productGroupId} onChange={e => setInfoForm({ ...infoForm, productGroupId: e.target.value })}
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
-                                    <option value="">-- ไม่ระบุ --</option>
-                                    {productGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                                </select>
-                            </div>
-                            <div className="flex gap-2 pt-1">
-                                <button onClick={() => setEditingInfo(false)}
-                                    className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">ยกเลิก</button>
-                                <button onClick={async () => {
-                                    if (!infoForm.name.trim()) { showAlert('กรุณาระบุชื่อสินค้า', 'error', 'ผิดพลาด'); return; }
-                                    setSavingInfo(true);
-                                    try {
-                                        const res = await fetch(`/api/products/${id}`, {
-                                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                name: infoForm.name,
-                                                description: infoForm.description || null,
-                                                brand: infoForm.brand || null,
-                                                packaging: infoForm.packaging || null,
-                                                productGroupId: infoForm.productGroupId || null,
-                                            }),
-                                        });
-                                        if (!res.ok) throw new Error('เกิดข้อผิดพลาด');
-                                        await refreshProduct();
-                                        showAlert('บันทึกข้อมูลสินค้าเรียบร้อย', 'success', 'สำเร็จ');
-                                        setEditingInfo(false);
-                                    } catch { showAlert('เกิดข้อผิดพลาด', 'error', 'ผิดพลาด'); }
-                                    finally { setSavingInfo(false); }
-                                }} disabled={savingInfo}
-                                    className="flex-1 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
-                                    {savingInfo ? 'กำลังบันทึก...' : '💾 บันทึก'}
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="cursor-pointer" onClick={() => {
-                            setInfoForm({
-                                name: product.name,
-                                description: product.description || '',
-                                brand: product.brand || '',
-                                packaging: product.packaging || '',
-                                productGroupId: product.productGroupId || '',
-                            });
-                            setEditingInfo(true);
-                        }}>
-                            <div className="flex items-center gap-3 flex-wrap">
-                                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{product.name} <span className="text-xs font-normal text-gray-400">✏️</span></h1>
-                                <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">{product.code}</span>
-                                {product.productGroup && (
-                                    <span className="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full font-medium">{product.productGroup.name}</span>
-                                )}
-                                {product.brand && (
-                                    <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-medium">{product.brand}</span>
-                                )}
-                                {product.packaging && (
-                                    <span className="text-xs bg-teal-50 text-teal-700 px-2.5 py-1 rounded-full font-medium">📦 {product.packaging}</span>
-                                )}
-                            </div>
-                            {product.description && (
-                                <p className="text-sm text-gray-500 mt-1">{product.description}</p>
-                            )}
-                        </div>
-                    )}
-                </div>
+            <div className="flex items-center justify-between mb-4">
+                <h1 className="text-xl font-bold text-gray-800">📦 {product.name}</h1>
                 <button
                     onClick={async () => {
                         try {
@@ -473,153 +396,174 @@ export default function ProductDetailPage() {
                 </button>
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:col-span-2">
-                    <p className="text-xs text-gray-400 mb-1">Stock รวม</p>
-                    <div className="flex items-center gap-2">
-                        <p className={`text-xl font-bold ${isLowStock ? 'text-red-600' : 'text-gray-800'}`}>
-                            {totalStock.toLocaleString()}
-                            {isLowStock && <span className="text-xs ml-1">⚠️</span>}
-                        </p>
-                        {editingUnit ? (
-                            <div className="flex items-center gap-1">
-                                <input type="text" value={unitValue} onChange={e => setUnitValue(e.target.value)}
-                                    className="w-24 px-2 py-1 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                    placeholder="เช่น ถุง, ขวด" autoFocus />
-                                <button onClick={async () => {
-                                    setSavingUnit(true);
-                                    try {
-                                        const res = await fetch(`/api/products/${id}`, {
-                                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ unit: unitValue }),
-                                        });
-                                        if (!res.ok) throw new Error('เกิดข้อผิดพลาด');
-                                        await refreshProduct();
-                                        showAlert('บันทึกหน่วยเรียบร้อย', 'success', 'สำเร็จ');
-                                        setEditingUnit(false);
-                                    } catch { showAlert('เกิดข้อผิดพลาด', 'error', 'ผิดพลาด'); }
-                                    finally { setSavingUnit(false); }
-                                }} disabled={savingUnit}
-                                    className="text-blue-500 hover:text-blue-700 text-xs disabled:opacity-50">{savingUnit ? '...' : '💾'}</button>
-                                <button onClick={() => setEditingUnit(false)}
-                                    className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                            </div>
-                        ) : (
-                            <span className="text-sm text-gray-400 cursor-pointer hover:text-emerald-600 transition-colors"
-                                onClick={() => { setUnitValue(product.unit); setEditingUnit(true); }}>
-                                {product.unit} ✏️
-                            </span>
-                        )}
-                    </div>
-                    {product.productStocks.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                            {product.productStocks.map(ps => (
-                                <div key={ps.id} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs ${ps.quantity < product.minStock ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-600'}`}>
-                                    <span className="font-medium">🏭 {ps.warehouse.name}</span>
-                                    <span className="font-bold">{ps.quantity.toLocaleString()}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 cursor-pointer hover:border-emerald-200 transition-colors"
-                    onClick={() => !editingCost && startEditingCost()}>
-                    <p className="text-xs text-gray-400 mb-1">ต้นทุน</p>
-                    <p className="text-xl font-bold text-gray-800">
-                        {formatCurrency(Number(product.cost))} <span className="text-xs font-normal text-gray-400">✏️</span>
-                    </p>
-                </div>
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4">
-                    <p className="text-xs text-gray-400 mb-1">ราคาขาย</p>
-                    {editingSellingPrice ? (
-                        <div className="flex items-center gap-2">
-                            <input type="number" value={sellingPriceValue || ''}
-                                onChange={e => setSellingPriceValue(parseFloat(e.target.value) || 0)}
-                                className="w-24 px-2 py-1 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-bold text-emerald-600"
-                                min={0} step="0.01" autoFocus />
-                            <button onClick={handleSaveSellingPrice} disabled={savingSellingPrice}
-                                className="text-blue-500 hover:text-blue-700 text-xs disabled:opacity-50">{savingSellingPrice ? '...' : '💾'}</button>
-                            <button onClick={() => setEditingSellingPrice(false)}
-                                className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                        </div>
-                    ) : (
-                        <p className="text-xl font-bold text-emerald-600 cursor-pointer hover:text-emerald-700 transition-colors"
-                            onClick={() => { setSellingPriceValue(Number(product.price)); setEditingSellingPrice(true); }}
-                            title="คลิกเพื่อแก้ไข">
-                            {formatCurrency(Number(product.price))} <span className="text-xs font-normal text-gray-400">✏️</span>
-                        </p>
-                    )}
-                </div>
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4">
-                    <p className="text-xs text-gray-400 mb-1">แต้ม/หน่วย</p>
-                    {editingPoints ? (
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="number"
-                                value={pointsValue || ''}
-                                onChange={e => setPointsValue(parseInt(e.target.value) || 0)}
-                                className="w-20 px-2 py-1 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-bold text-gray-800"
-                                min={0}
-                                autoFocus
-                            />
-                            <button onClick={handleSavePoints} disabled={savingPoints}
-                                className="text-blue-500 hover:text-blue-700 text-xs disabled:opacity-50">{savingPoints ? '...' : '💾'}</button>
-                            <button onClick={() => setEditingPoints(false)}
-                                className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                        </div>
-                    ) : (
-                        <p className="text-xl font-bold text-gray-800 cursor-pointer hover:text-emerald-600 transition-colors"
-                            onClick={() => { setPointsValue(product.pointsPerUnit); setEditingPoints(true); }}
-                            title="คลิกเพื่อแก้ไข">
-                            {product.pointsPerUnit} <span className="text-xs font-normal text-gray-400">pts ✏️</span>
-                        </p>
-                    )}
-                </div>
-            </div>
+            {/* Product Info Form Card */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
+                <h2 className="font-bold text-gray-800 mb-4">ข้อมูลสินค้า</h2>
 
-            {/* Cost Editor Panel (full-width, below summary) */}
-            {editingCost && (
-                <div className="bg-white rounded-xl shadow-md border border-emerald-200 p-4 sm:p-5 mb-6">
-                    <p className="text-sm font-semibold text-gray-700 mb-3">เลือกต้นทุนที่ต้องการใช้</p>
-                    <div className="space-y-2 mb-4">
-                        <label className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200 cursor-pointer hover:border-blue-300">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">รหัสสินค้า</label>
+                        <input type="text" value={product.code} disabled
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-500 cursor-not-allowed" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">ชื่อสินค้า *</label>
+                        <input type="text" value={infoForm.name} onChange={e => setInfoForm({ ...infoForm, name: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm" />
+                    </div>
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">คำอธิบาย</label>
+                    <textarea value={infoForm.description} onChange={e => setInfoForm({ ...infoForm, description: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm" rows={2} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">หมวดหมู่สินค้า</label>
+                        <select value={infoForm.productGroupId} onChange={e => setInfoForm({ ...infoForm, productGroupId: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm">
+                            <option value="">-- ไม่ระบุ --</option>
+                            {productGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">ยี่ห้อ (Brand)</label>
+                        <input type="text" value={infoForm.brand} onChange={e => setInfoForm({ ...infoForm, brand: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                            placeholder="เช่น นกปากห่าง, Extra..." />
+                    </div>
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">บรรจุภัณฑ์</label>
+                    <input type="text" value={infoForm.packaging} onChange={e => setInfoForm({ ...infoForm, packaging: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm sm:w-1/2"
+                        placeholder="เช่น ถุง 50 กก., กระสอบ 25 กก..." />
+                </div>
+
+                {/* Cost with 3 options */}
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">ต้นทุน (Cost)</label>
+                    <div className="space-y-2">
+                        <label className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200 cursor-pointer hover:border-blue-300">
                             <input type="radio" name="cost-type" checked={costType === 'avg'} onChange={() => setCostType('avg')} className="accent-emerald-500" />
                             <div className="flex-1 flex justify-between items-center">
                                 <span className="text-sm text-gray-700">ต้นทุนเฉลี่ย</span>
                                 <span className="text-sm font-bold text-blue-700">{formatCurrency(globalAvgCost)}</span>
                             </div>
                         </label>
-                        <label className="flex items-center gap-3 p-3 rounded-lg bg-purple-50 border border-purple-200 cursor-pointer hover:border-purple-300">
+                        <label className="flex items-center gap-3 p-3 rounded-xl bg-purple-50 border border-purple-200 cursor-pointer hover:border-purple-300">
                             <input type="radio" name="cost-type" checked={costType === 'last'} onChange={() => setCostType('last')} className="accent-emerald-500" />
                             <div className="flex-1 flex justify-between items-center">
                                 <span className="text-sm text-gray-700">ต้นทุนล่าสุด</span>
                                 <span className="text-sm font-bold text-purple-700">{formatCurrency(globalLastCost)}</span>
                             </div>
                         </label>
-                        <label className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200 cursor-pointer hover:border-amber-300">
+                        <label className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200 cursor-pointer hover:border-amber-300">
                             <input type="radio" name="cost-type" checked={costType === 'custom'} onChange={() => setCostType('custom')} className="accent-emerald-500" />
                             <div className="flex-1 flex justify-between items-center gap-3">
                                 <span className="text-sm text-gray-700">กรอกเอง</span>
                                 {costType === 'custom' && (
                                     <input type="number" min={0} step="0.01" value={customCost}
                                         onChange={e => setCustomCost(parseFloat(e.target.value) || 0)}
-                                        className="w-32 px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        autoFocus />
+                                        className="w-32 px-3 py-1.5 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        onClick={e => e.stopPropagation()} />
                                 )}
                             </div>
                         </label>
                     </div>
-                    <div className="flex gap-2">
-                        <button onClick={() => setEditingCost(false)}
-                            className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">ยกเลิก</button>
-                        <button onClick={handleSaveCost} disabled={savingCost}
-                            className="flex-1 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
-                            {savingCost ? 'กำลังบันทึก...' : '💾 บันทึกต้นทุน'}
-                        </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">ราคาขาย (Price)</label>
+                        <input type="number" value={sellingPriceValue || ''} onChange={e => setSellingPriceValue(parseFloat(e.target.value) || 0)}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                            min={0} step="0.01" placeholder="0.00" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">Stock ขั้นต่ำ</label>
+                        <input type="number" value={infoForm.minStock} onChange={e => setInfoForm({ ...infoForm, minStock: parseInt(e.target.value) || 0 })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                            min={0} />
                     </div>
                 </div>
-            )}
+
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">หน่วย</label>
+                        <input type="text" value={unitValue || product.unit} onChange={e => setUnitValue(e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                            placeholder="เช่น ถุง, ขวด, กก..." />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">แต้ม/หน่วย</label>
+                        <input type="number" value={pointsValue || ''} onChange={e => setPointsValue(parseInt(e.target.value) || 0)}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                            min={0} />
+                    </div>
+                </div>
+
+                {/* Save Button */}
+                <button onClick={async () => {
+                    if (!infoForm.name.trim()) { showAlert('กรุณาระบุชื่อสินค้า', 'error', 'ผิดพลาด'); return; }
+                    setSavingInfo(true);
+                    try {
+                        let costVal = Number(product.cost);
+                        if (costType === 'avg') costVal = globalAvgCost;
+                        else if (costType === 'last') costVal = globalLastCost;
+                        else if (costType === 'custom') costVal = customCost;
+
+                        const res = await fetch(`/api/products/${id}`, {
+                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: infoForm.name,
+                                description: infoForm.description || null,
+                                brand: infoForm.brand || null,
+                                packaging: infoForm.packaging || null,
+                                productGroupId: infoForm.productGroupId || null,
+                                cost: costVal,
+                                price: sellingPriceValue,
+                                unit: unitValue || product.unit,
+                                pointsPerUnit: pointsValue,
+                                minStock: infoForm.minStock,
+                            }),
+                        });
+                        if (!res.ok) throw new Error('เกิดข้อผิดพลาด');
+                        await refreshProduct();
+                        showAlert('บันทึกข้อมูลสินค้าเรียบร้อย', 'success', 'สำเร็จ');
+                    } catch { showAlert('เกิดข้อผิดพลาด', 'error', 'ผิดพลาด'); }
+                    finally { setSavingInfo(false); }
+                }} disabled={savingInfo}
+                    className="w-full py-3 rounded-xl bg-emerald-500 text-white font-medium hover:bg-emerald-600 disabled:opacity-50 transition-colors">
+                    {savingInfo ? 'กำลังบันทึก...' : '💾 บันทึกข้อมูลสินค้า'}
+                </button>
+            </div>
+
+            {/* Stock Summary */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className="font-semibold text-gray-800">📊 Stock รวม</h2>
+                    <span className={`text-lg font-bold ${isLowStock ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {totalStock.toLocaleString()} {product.unit}
+                        {isLowStock && <span className="text-xs ml-1">⚠️</span>}
+                    </span>
+                </div>
+                {product.productStocks.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                        {product.productStocks.map(ps => (
+                            <div key={ps.id} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs ${ps.quantity < product.minStock ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-600'}`}>
+                                <span className="font-medium">🏭 {ps.warehouse.name}</span>
+                                <span className="font-bold">{ps.quantity.toLocaleString()}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+
 
             {/* Pricing - Inline Rows */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
@@ -828,112 +772,116 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Stock Tab */}
-            {activeTab === 'stock' && (
-                <div className="space-y-4">
-                    {product.productStocks.length === 0 ? (
-                        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-8 text-center text-gray-400">
-                            ยังไม่มี stock ในคลังสินค้า
-                        </div>
-                    ) : (
-                        product.productStocks.map(stock => (
-                            <div key={stock.id} className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-lg">🏭</span>
-                                        <h3 className="text-sm font-semibold text-gray-700">{stock.warehouse.name}</h3>
-                                    </div>
-                                    <span className={`text-lg font-bold ${stock.quantity < product.minStock ? 'text-red-600' : 'text-emerald-600'}`}>
-                                        {stock.quantity.toLocaleString()} {product.unit}
-                                    </span>
-                                </div>
+            {
+                activeTab === 'stock' && (
+                    <div className="space-y-4">
+                        {product.productStocks.length === 0 ? (
+                            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-8 text-center text-gray-400">
+                                ยังไม่มี stock ในคลังสินค้า
                             </div>
-                        ))
-                    )}
-                </div>
-            )}
+                        ) : (
+                            product.productStocks.map(stock => (
+                                <div key={stock.id} className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg">🏭</span>
+                                            <h3 className="text-sm font-semibold text-gray-700">{stock.warehouse.name}</h3>
+                                        </div>
+                                        <span className={`text-lg font-bold ${stock.quantity < product.minStock ? 'text-red-600' : 'text-emerald-600'}`}>
+                                            {stock.quantity.toLocaleString()} {product.unit}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )
+            }
 
             {/* Log Tab */}
-            {activeTab === 'log' && (
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-                    {product.stockTransactions.length === 0 ? (
-                        <div className="p-8 text-center text-gray-400">ยังไม่มีประวัติรับ-จ่ายสินค้า</div>
-                    ) : (
-                        <>
-                            {/* Desktop Table */}
-                            <div className="hidden sm:block">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="bg-gray-50 border-b border-gray-100">
-                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">วันที่</th>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ประเภท</th>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
-                                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
-                                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">อ้างอิง</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {product.stockTransactions.map(tx => {
-                                            const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
-                                            return (
-                                                <tr key={tx.id} className="hover:bg-gray-50">
-                                                    <td className="px-4 py-3 text-sm text-gray-600">{formatDate(tx.createdAt)}</td>
-                                                    <td className="px-4 py-3">
-                                                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
-                                                            {info.icon} {info.label}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm text-gray-600">{tx.warehouse.name}</td>
-                                                    <td className="px-4 py-3 text-sm text-right">
-                                                        <span className={tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}>
-                                                            {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
-                                                            {tx.quantity.toLocaleString()} {product.unit}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(tx.unitCost))}</td>
-                                                    <td className="px-4 py-3 text-xs text-gray-500">
-                                                        {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
-                                                        {tx.notes && <p className="text-gray-400 mt-0.5">{tx.notes}</p>}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+            {
+                activeTab === 'log' && (
+                    <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                        {product.stockTransactions.length === 0 ? (
+                            <div className="p-8 text-center text-gray-400">ยังไม่มีประวัติรับ-จ่ายสินค้า</div>
+                        ) : (
+                            <>
+                                {/* Desktop Table */}
+                                <div className="hidden sm:block">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="bg-gray-50 border-b border-gray-100">
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">วันที่</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ประเภท</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
+                                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
+                                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">อ้างอิง</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {product.stockTransactions.map(tx => {
+                                                const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
+                                                return (
+                                                    <tr key={tx.id} className="hover:bg-gray-50">
+                                                        <td className="px-4 py-3 text-sm text-gray-600">{formatDate(tx.createdAt)}</td>
+                                                        <td className="px-4 py-3">
+                                                            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
+                                                                {info.icon} {info.label}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-gray-600">{tx.warehouse.name}</td>
+                                                        <td className="px-4 py-3 text-sm text-right">
+                                                            <span className={tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}>
+                                                                {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
+                                                                {tx.quantity.toLocaleString()} {product.unit}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(tx.unitCost))}</td>
+                                                        <td className="px-4 py-3 text-xs text-gray-500">
+                                                            {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
+                                                            {tx.notes && <p className="text-gray-400 mt-0.5">{tx.notes}</p>}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
 
-                            {/* Mobile Cards */}
-                            <div className="sm:hidden divide-y divide-gray-50">
-                                {product.stockTransactions.map(tx => {
-                                    const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
-                                    return (
-                                        <div key={tx.id} className="p-4">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
-                                                    {info.icon} {info.label}
-                                                </span>
-                                                <span className={`text-sm font-bold ${tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}`}>
-                                                    {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
-                                                    {tx.quantity.toLocaleString()} {product.unit}
-                                                </span>
+                                {/* Mobile Cards */}
+                                <div className="sm:hidden divide-y divide-gray-50">
+                                    {product.stockTransactions.map(tx => {
+                                        const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
+                                        return (
+                                            <div key={tx.id} className="p-4">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
+                                                        {info.icon} {info.label}
+                                                    </span>
+                                                    <span className={`text-sm font-bold ${tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                        {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
+                                                        {tx.quantity.toLocaleString()} {product.unit}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between text-xs text-gray-500">
+                                                    <span>{formatDate(tx.createdAt)}</span>
+                                                    <span>{tx.warehouse.name}</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                                    <span>@ {formatCurrency(Number(tx.unitCost))}</span>
+                                                    {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
+                                                </div>
+                                                {tx.notes && <p className="text-xs text-gray-400 mt-1">{tx.notes}</p>}
                                             </div>
-                                            <div className="flex justify-between text-xs text-gray-500">
-                                                <span>{formatDate(tx.createdAt)}</span>
-                                                <span>{tx.warehouse.name}</span>
-                                            </div>
-                                            <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                                <span>@ {formatCurrency(Number(tx.unitCost))}</span>
-                                                {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
-                                            </div>
-                                            {tx.notes && <p className="text-xs text-gray-400 mt-1">{tx.notes}</p>}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </>
-                    )}
-                </div>
-            )}
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )
+            }
 
             <AlertModal
                 open={alertModal.open}
@@ -944,6 +892,6 @@ export default function ProductDetailPage() {
             />
 
 
-        </div>
+        </div >
     );
 }
