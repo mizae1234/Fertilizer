@@ -75,13 +75,13 @@ export default function NewProductPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1.5">รหัสสินค้า *</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-1.5">รหัสสินค้า <span className="text-xs text-gray-400">(ถ้าไม่กรอก ระบบจะสร้างให้)</span></label>
                             <input
                                 type="text"
                                 value={form.code}
                                 onChange={(e) => setForm({ ...form, code: e.target.value })}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                required
+                                placeholder="เช่น FT-009 (ไม่กรอก = auto)"
                             />
                         </div>
                         <div>

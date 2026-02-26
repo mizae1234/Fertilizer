@@ -41,7 +41,7 @@ export async function getProducts(page = 1, search = '') {
 }
 
 export async function createProduct(data: {
-    code: string;
+    code?: string;
     name: string;
     description?: string;
     unit?: string;
@@ -55,9 +55,21 @@ export async function createProduct(data: {
     prices?: { customerGroupId: string; price: number }[];
     units?: { unitName: string; conversionRate: number; sellingPrice: number; isBaseUnit: boolean }[];
 }) {
+    // Auto-generate code if not provided
+    let code = data.code?.trim();
+    if (!code) {
+        const lastProduct = await prisma.product.findFirst({
+            where: { code: { startsWith: 'FT-' } },
+            orderBy: { code: 'desc' },
+            select: { code: true },
+        });
+        const lastNum = lastProduct ? parseInt(lastProduct.code.replace('FT-', '')) || 0 : 0;
+        code = `FT-${String(lastNum + 1).padStart(3, '0')}`;
+    }
+
     const product = await prisma.product.create({
         data: {
-            code: data.code,
+            code,
             name: data.name,
             description: data.description,
             unit: data.unit || 'bag',

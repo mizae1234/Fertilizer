@@ -52,6 +52,7 @@ interface ProductDetail {
     price: number | string;
     brand: string | null;
     packaging: string | null;
+    productGroupId: string | null;
     productGroup: { name: string } | null;
     pointsPerUnit: number;
     minStock: number;
@@ -101,6 +102,12 @@ export default function ProductDetailPage() {
     const [unitValue, setUnitValue] = useState('');
     const [savingUnit, setSavingUnit] = useState(false);
 
+    // Product info editing
+    const [editingInfo, setEditingInfo] = useState(false);
+    const [infoForm, setInfoForm] = useState({ name: '', description: '', brand: '', packaging: '', productGroupId: '' });
+    const [savingInfo, setSavingInfo] = useState(false);
+    const [productGroups, setProductGroups] = useState<{ id: string; name: string }[]>([]);
+
 
     // Inline editing
     const [savingId, setSavingId] = useState<string | null>(null);
@@ -122,6 +129,9 @@ export default function ProductDetailPage() {
         fetch('/api/customer-groups')
             .then(r => r.json())
             .then(data => setCustomerGroups(data));
+        fetch('/api/product-groups')
+            .then(r => r.json())
+            .then(data => setProductGroups(Array.isArray(data) ? data : []));
     }, [id]);
 
     // Compute global avg / last costs from all warehouses
@@ -342,23 +352,101 @@ export default function ProductDetailPage() {
                 กลับรายการสินค้า
             </button>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                <div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{product.name}</h1>
-                        <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">{product.code}</span>
-                        {product.productGroup && (
-                            <span className="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full font-medium">{product.productGroup.name}</span>
-                        )}
-                        {product.brand && (
-                            <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-medium">{product.brand}</span>
-                        )}
-                        {product.packaging && (
-                            <span className="text-xs bg-teal-50 text-teal-700 px-2.5 py-1 rounded-full font-medium">📦 {product.packaging}</span>
-                        )}
-                    </div>
-                    {product.description && (
-                        <p className="text-sm text-gray-500 mt-1">{product.description}</p>
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-6">
+                <div className="flex-1">
+                    {editingInfo ? (
+                        <div className="bg-white rounded-xl shadow-md border border-emerald-200 p-4 space-y-3">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">{product.code}</span>
+                                <span className="text-xs text-gray-400">รหัสสินค้า (แก้ไขไม่ได้)</span>
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500">ชื่อสินค้า *</label>
+                                <input type="text" value={infoForm.name} onChange={e => setInfoForm({ ...infoForm, name: e.target.value })}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-semibold" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500">คำอธิบาย</label>
+                                <input type="text" value={infoForm.description} onChange={e => setInfoForm({ ...infoForm, description: e.target.value })}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="รายละเอียดสินค้า..." />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-gray-500">ยี่ห้อ</label>
+                                    <input type="text" value={infoForm.brand} onChange={e => setInfoForm({ ...infoForm, brand: e.target.value })}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="เช่น นกปากห่าง" />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500">บรรจุภัณฑ์</label>
+                                    <input type="text" value={infoForm.packaging} onChange={e => setInfoForm({ ...infoForm, packaging: e.target.value })}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="เช่น ถุง 50 กก." />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500">หมวดหมู่</label>
+                                <select value={infoForm.productGroupId} onChange={e => setInfoForm({ ...infoForm, productGroupId: e.target.value })}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                                    <option value="">-- ไม่ระบุ --</option>
+                                    {productGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                                <button onClick={() => setEditingInfo(false)}
+                                    className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">ยกเลิก</button>
+                                <button onClick={async () => {
+                                    if (!infoForm.name.trim()) { showAlert('กรุณาระบุชื่อสินค้า', 'error', 'ผิดพลาด'); return; }
+                                    setSavingInfo(true);
+                                    try {
+                                        const res = await fetch(`/api/products/${id}`, {
+                                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                name: infoForm.name,
+                                                description: infoForm.description || null,
+                                                brand: infoForm.brand || null,
+                                                packaging: infoForm.packaging || null,
+                                                productGroupId: infoForm.productGroupId || null,
+                                            }),
+                                        });
+                                        if (!res.ok) throw new Error('เกิดข้อผิดพลาด');
+                                        await refreshProduct();
+                                        showAlert('บันทึกข้อมูลสินค้าเรียบร้อย', 'success', 'สำเร็จ');
+                                        setEditingInfo(false);
+                                    } catch { showAlert('เกิดข้อผิดพลาด', 'error', 'ผิดพลาด'); }
+                                    finally { setSavingInfo(false); }
+                                }} disabled={savingInfo}
+                                    className="flex-1 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
+                                    {savingInfo ? 'กำลังบันทึก...' : '💾 บันทึก'}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="cursor-pointer" onClick={() => {
+                            setInfoForm({
+                                name: product.name,
+                                description: product.description || '',
+                                brand: product.brand || '',
+                                packaging: product.packaging || '',
+                                productGroupId: product.productGroupId || '',
+                            });
+                            setEditingInfo(true);
+                        }}>
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{product.name} <span className="text-xs font-normal text-gray-400">✏️</span></h1>
+                                <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">{product.code}</span>
+                                {product.productGroup && (
+                                    <span className="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full font-medium">{product.productGroup.name}</span>
+                                )}
+                                {product.brand && (
+                                    <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-medium">{product.brand}</span>
+                                )}
+                                {product.packaging && (
+                                    <span className="text-xs bg-teal-50 text-teal-700 px-2.5 py-1 rounded-full font-medium">📦 {product.packaging}</span>
+                                )}
+                            </div>
+                            {product.description && (
+                                <p className="text-sm text-gray-500 mt-1">{product.description}</p>
+                            )}
+                        </div>
                     )}
                 </div>
                 <button
