@@ -84,17 +84,17 @@ export default function ProductDetailPage() {
     // Cost editing (product-level)
     const [editingCost, setEditingCost] = useState(false);
     const [costType, setCostType] = useState<'avg' | 'last' | 'custom'>('avg');
-    const [customCost, setCustomCost] = useState(0);
+    const [customCost, setCustomCost] = useState('0');
     const [savingCost, setSavingCost] = useState(false);
 
     // Points editing
     const [editingPoints, setEditingPoints] = useState(false);
-    const [pointsValue, setPointsValue] = useState(0);
+    const [pointsValue, setPointsValue] = useState('0');
     const [savingPoints, setSavingPoints] = useState(false);
 
     // Price editing
     const [editingSellingPrice, setEditingSellingPrice] = useState(false);
-    const [sellingPriceValue, setSellingPriceValue] = useState(0);
+    const [sellingPriceValue, setSellingPriceValue] = useState('0');
     const [savingSellingPrice, setSavingSellingPrice] = useState(false);
 
     // Unit editing
@@ -145,10 +145,27 @@ export default function ProductDetailPage() {
                 productGroupId: product.productGroupId || '',
                 minStock: product.minStock,
             });
-            setSellingPriceValue(Number(product.price));
-            setPointsValue(product.pointsPerUnit);
+            setSellingPriceValue(String(Number(product.price)));
+            setPointsValue(String(product.pointsPerUnit));
             setUnitValue(product.unit);
-            setCustomCost(Number(product.cost));
+            setCustomCost(String(Number(product.cost)));
+
+            // Auto-detect which cost type matches the saved cost
+            const savedCost = Number(product.cost);
+            const stocks = product.productStocks;
+            const totalQty = stocks.reduce((s, st) => s + st.quantity, 0);
+            const avgCost = totalQty > 0
+                ? Math.round(stocks.reduce((s, st) => s + Number(st.avgCost) * st.quantity, 0) / totalQty * 100) / 100
+                : stocks.length > 0 ? Number(stocks[0].avgCost) : 0;
+            const lastCost = stocks.length > 0 ? Math.max(...stocks.map(st => Number(st.lastCost))) : 0;
+
+            if (savedCost === lastCost && lastCost > 0) {
+                setCostType('last');
+            } else if (savedCost === avgCost && avgCost > 0) {
+                setCostType('avg');
+            } else {
+                setCostType('custom');
+            }
         }
     }, [product]);
 
@@ -168,7 +185,7 @@ export default function ProductDetailPage() {
         if (!product) return;
         setSavingCost(true);
         try {
-            await updateProductCost(product.id, costType, costType === 'custom' ? customCost : undefined);
+            await updateProductCost(product.id, costType, costType === 'custom' ? parseFloat(customCost) || 0 : undefined);
             showAlert('บันทึกต้นทุนเรียบร้อย', 'success', 'สำเร็จ');
             const data = await fetch(`/api/products/${id}`).then(r => r.json());
             setProduct(data);
@@ -183,7 +200,7 @@ export default function ProductDetailPage() {
     const startEditingCost = () => {
         setEditingCost(true);
         setCostType('avg');
-        setCustomCost(Number(product?.cost || 0));
+        setCustomCost(String(Number(product?.cost || 0)));
     };
 
     const refreshProduct = async () => {
@@ -467,7 +484,8 @@ export default function ProductDetailPage() {
                                 <span className="text-sm text-gray-700">กรอกเอง</span>
                                 {costType === 'custom' && (
                                     <input type="number" min={0} step="0.01" value={customCost}
-                                        onChange={e => setCustomCost(parseFloat(e.target.value) || 0)}
+                                        onChange={e => setCustomCost(e.target.value)}
+                                        onFocus={e => { e.stopPropagation(); e.target.select(); }}
                                         className="w-32 px-3 py-1.5 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 outline-none"
                                         onClick={e => e.stopPropagation()} />
                                 )}
@@ -479,13 +497,15 @@ export default function ProductDetailPage() {
                 <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">ราคาขาย (Price)</label>
-                        <input type="number" value={sellingPriceValue || ''} onChange={e => setSellingPriceValue(parseFloat(e.target.value) || 0)}
+                        <input type="number" value={sellingPriceValue} onChange={e => setSellingPriceValue(e.target.value)}
+                            onFocus={e => e.target.select()}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                             min={0} step="0.01" placeholder="0.00" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">Stock ขั้นต่ำ</label>
-                        <input type="number" value={infoForm.minStock} onChange={e => setInfoForm({ ...infoForm, minStock: parseInt(e.target.value) || 0 })}
+                        <input type="number" value={infoForm.minStock || ''} onChange={e => setInfoForm({ ...infoForm, minStock: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                            onFocus={e => e.target.select()}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                             min={0} />
                     </div>
@@ -500,7 +520,8 @@ export default function ProductDetailPage() {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">แต้ม/หน่วย</label>
-                        <input type="number" value={pointsValue || ''} onChange={e => setPointsValue(parseInt(e.target.value) || 0)}
+                        <input type="number" value={pointsValue} onChange={e => setPointsValue(e.target.value)}
+                            onFocus={e => e.target.select()}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                             min={0} />
                     </div>
@@ -514,7 +535,7 @@ export default function ProductDetailPage() {
                         let costVal = Number(product.cost);
                         if (costType === 'avg') costVal = globalAvgCost;
                         else if (costType === 'last') costVal = globalLastCost;
-                        else if (costType === 'custom') costVal = customCost;
+                        else if (costType === 'custom') costVal = parseFloat(customCost) || 0;
 
                         const updateData: Record<string, any> = {
                             name: infoForm.name,
@@ -522,9 +543,9 @@ export default function ProductDetailPage() {
                             brand: infoForm.brand || null,
                             packaging: infoForm.packaging || null,
                             cost: costVal,
-                            price: sellingPriceValue,
+                            price: parseFloat(sellingPriceValue) || 0,
                             unit: unitValue || product.unit,
-                            pointsPerUnit: pointsValue,
+                            pointsPerUnit: parseInt(pointsValue) || 0,
                             minStock: infoForm.minStock,
                         };
                         if (infoForm.productGroupId) {

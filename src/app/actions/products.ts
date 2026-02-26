@@ -55,16 +55,11 @@ export async function createProduct(data: {
     prices?: { customerGroupId: string; price: number }[];
     units?: { unitName: string; conversionRate: number; sellingPrice: number; isBaseUnit: boolean }[];
 }) {
-    // Auto-generate code if not provided
+    // Auto-generate code: 5-digit running number (00001, 00002, ...)
     let code = data.code?.trim();
     if (!code) {
-        const lastProduct = await prisma.product.findFirst({
-            where: { code: { startsWith: 'FT-' } },
-            orderBy: { code: 'desc' },
-            select: { code: true },
-        });
-        const lastNum = lastProduct ? parseInt(lastProduct.code.replace('FT-', '')) || 0 : 0;
-        code = `FT-${String(lastNum + 1).padStart(3, '0')}`;
+        const count = await prisma.product.count();
+        code = String(count + 1).padStart(5, '0');
     }
 
     const product = await prisma.product.create({

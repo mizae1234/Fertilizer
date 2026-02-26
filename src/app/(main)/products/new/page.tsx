@@ -73,27 +73,15 @@ export default function NewProductPage() {
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 space-y-4">
                     <h2 className="font-semibold text-gray-800">ข้อมูลสินค้า</h2>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1.5">รหัสสินค้า <span className="text-xs text-gray-400">(ถ้าไม่กรอก ระบบจะสร้างให้)</span></label>
-                            <input
-                                type="text"
-                                value={form.code}
-                                onChange={(e) => setForm({ ...form, code: e.target.value })}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                placeholder="เช่น FT-009 (ไม่กรอก = auto)"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1.5">ชื่อสินค้า *</label>
-                            <input
-                                type="text"
-                                value={form.name}
-                                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                required
-                            />
-                        </div>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">ชื่อสินค้า *</label>
+                        <input
+                            type="text"
+                            value={form.name}
+                            onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                            required
+                        />
                     </div>
 
                     <div>
