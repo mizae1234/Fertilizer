@@ -105,6 +105,7 @@ model Product {
   cost           Decimal   @default(0) @db.Decimal(12, 2)
   price          Decimal   @default(0) @db.Decimal(12, 2)
   brand          String?
+  packaging      String?
   productGroupId String?
   pointsPerUnit  Int       @default(0)
   minStock       Int       @default(10)

@@ -28,6 +28,7 @@ export default function NewProductPage() {
         cost: 0,
         price: 0,
         brand: '',
+        packaging: '',
         productGroupId: '',
         pointsPerUnit: 0,
         minStock: 10,
@@ -127,6 +128,16 @@ export default function NewProductPage() {
                                 onChange={(e) => setForm({ ...form, brand: e.target.value })}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                                 placeholder="เช่น นกปากห่าง, Extra..."
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1.5">บรรจุภัณฑ์</label>
+                            <input
+                                type="text"
+                                value={form.packaging}
+                                onChange={(e) => setForm({ ...form, packaging: e.target.value })}
+                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                placeholder="เช่น ถุง 50 กก., กระสอบ 25 กก..."
                             />
                         </div>
                     </div>

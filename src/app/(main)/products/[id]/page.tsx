@@ -51,6 +51,7 @@ interface ProductDetail {
     cost: number | string;
     price: number | string;
     brand: string | null;
+    packaging: string | null;
     productGroup: { name: string } | null;
     pointsPerUnit: number;
     minStock: number;
@@ -346,6 +347,9 @@ export default function ProductDetailPage() {
                         )}
                         {product.brand && (
                             <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-medium">{product.brand}</span>
+                        )}
+                        {product.packaging && (
+                            <span className="text-xs bg-teal-50 text-teal-700 px-2.5 py-1 rounded-full font-medium">📦 {product.packaging}</span>
                         )}
                     </div>
                     {product.description && (

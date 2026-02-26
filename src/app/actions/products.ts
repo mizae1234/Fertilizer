@@ -48,6 +48,7 @@ export async function createProduct(data: {
     cost?: number;
     price?: number;
     brand?: string;
+    packaging?: string;
     productGroupId?: string;
     pointsPerUnit?: number;
     minStock?: number;
@@ -63,6 +64,7 @@ export async function createProduct(data: {
             cost: data.cost || 0,
             price: data.price || 0,
             brand: data.brand || null,
+            packaging: data.packaging || null,
             productGroupId: data.productGroupId || null,
             pointsPerUnit: data.pointsPerUnit || 0,
             minStock: data.minStock || 10,
