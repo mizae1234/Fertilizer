@@ -4,22 +4,22 @@ import { comparePassword, signToken } from '@/lib/auth';
 
 export async function POST(request: Request) {
     try {
-        const { email, password } = await request.json();
+        const { username, password } = await request.json();
 
-        if (!email || !password) {
+        if (!username || !password) {
             return NextResponse.json(
-                { error: 'กรุณากรอกอีเมลและรหัสผ่าน' },
+                { error: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' },
                 { status: 400 }
             );
         }
 
         const user = await prisma.user.findUnique({
-            where: { email },
+            where: { username },
         });
 
-        if (!user) {
+        if (!user || user.deletedAt) {
             return NextResponse.json(
-                { error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' },
+                { error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' },
                 { status: 401 }
             );
         }
@@ -28,19 +28,25 @@ export async function POST(request: Request) {
 
         if (!isValid) {
             return NextResponse.json(
-                { error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' },
+                { error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' },
                 { status: 401 }
             );
         }
 
+        const allowedMenus = user.allowedMenus as string[] | null;
+
         const token = signToken({
             userId: user.id,
-            email: user.email,
+            username: user.username,
             name: user.name,
             role: user.role,
+            allowedMenus,
         });
 
-        return NextResponse.json({ token, user: { id: user.id, name: user.name, role: user.role } });
+        return NextResponse.json({
+            token,
+            user: { id: user.id, name: user.name, role: user.role },
+        });
     } catch (error) {
         console.error('Login error:', error);
         return NextResponse.json(

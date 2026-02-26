@@ -4,53 +4,13 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-
-const menuGroups = [
-    {
-        label: 'หลัก',
-        items: [
-            { name: 'Dashboard', href: '/', icon: '📊' },
-            { name: 'POS ขายสินค้า', href: '/pos', icon: '🛒' },
-            { name: 'รายการขาย', href: '/sales', icon: '💰' },
-            { name: 'บิลค้างจ่าย', href: '/overdue-bills', icon: '📋' },
-        ],
-    },
-    {
-        label: 'จัดการข้อมูล',
-        items: [
-            { name: 'สินค้า', href: '/products', icon: '📦' },
-            { name: 'ชุดสินค้า', href: '/bundles', icon: '🎁' },
-            { name: 'คลังสินค้า', href: '/warehouses', icon: '🏭' },
-            { name: 'ผู้ส่งสินค้า', href: '/vendors', icon: '🚚' },
-            { name: 'ลูกค้า', href: '/customers', icon: '👥' },
-            { name: 'กลุ่มลูกค้า', href: '/customer-groups', icon: '🏷️' },
-            { name: 'Template บิล', href: '/settings/receipt-template', icon: '🧾' },
-            { name: 'หมวดหมู่สินค้า', href: '/settings/product-groups', icon: '📦' },
-            { name: 'บัญชีร้านค้า', href: '/bank-accounts', icon: '🏦' },
-        ],
-    },
-    {
-        label: 'เอกสาร',
-        items: [
-            { name: 'นำเข้าสินค้า', href: '/goods-receive', icon: '📥' },
-            { name: 'โอนย้ายสินค้า', href: '/transfers', icon: '🔄' },
-            { name: 'ปรับปรุง Stock', href: '/stock-adjustments', icon: '📉' },
-            { name: 'บันทึกรายจ่าย', href: '/expenses', icon: '💸' },
-        ],
-    },
-    {
-        label: 'รายงาน',
-        items: [
-            { name: 'รายงาน (Reports)', href: '/reports', icon: '📈' },
-        ],
-    },
-];
+import { MENU_GROUPS } from '@/lib/menus';
 
 export default function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const [open, setOpen] = useState(false);
-    const [user, setUser] = useState<{ name: string; role: string } | null>(null);
+    const [user, setUser] = useState<{ name: string; role: string; allowedMenus: string[] | null } | null>(null);
 
     // Read user info from JWT token
     useEffect(() => {
@@ -61,7 +21,11 @@ export default function Sidebar() {
                 const binary = atob(base64);
                 const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
                 const payload = JSON.parse(new TextDecoder().decode(bytes));
-                setUser({ name: payload.name || 'User', role: payload.role || '' });
+                setUser({
+                    name: payload.name || 'User',
+                    role: payload.role || '',
+                    allowedMenus: payload.allowedMenus ?? null,
+                });
             }
         } catch { /* ignore */ }
     }, []);
@@ -89,6 +53,29 @@ export default function Sidebar() {
     const displayName = user?.name || 'Admin';
     const displayRole = user?.role === 'ADMIN' ? 'ผู้ดูแลระบบ' : user?.role === 'STAFF' ? 'พนักงาน' : 'ผู้ใช้งาน';
     const initials = displayName.charAt(0).toUpperCase();
+    const isAdmin = user?.role === 'ADMIN';
+
+    // Filter menu items based on user's allowed menus
+    const filteredMenuGroups = MENU_GROUPS.map(group => ({
+        ...group,
+        items: group.items.filter(item => {
+            // null = all access (admin)
+            if (user?.allowedMenus === null) return true;
+            return user?.allowedMenus?.includes(item.href);
+        }),
+    })).filter(group => group.items.length > 0);
+
+    // Add admin-only menu group
+    const adminMenuGroup = {
+        label: 'ระบบ',
+        items: [
+            { name: 'จัดการผู้ใช้', href: '/users', icon: '👤' },
+        ],
+    };
+
+    const allMenuGroups = isAdmin
+        ? [...filteredMenuGroups, adminMenuGroup]
+        : filteredMenuGroups;
 
     return (
         <>
@@ -152,7 +139,7 @@ export default function Sidebar() {
 
                 {/* Navigation */}
                 <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-                    {menuGroups.map((group) => (
+                    {allMenuGroups.map((group) => (
                         <div key={group.label}>
                             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2">
                                 {group.label}

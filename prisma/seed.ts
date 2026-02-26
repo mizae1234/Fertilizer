@@ -16,29 +16,30 @@ async function main() {
     // Create admin user
     const hashedPassword = await bcrypt.hash('admin123', 10);
     const admin = await prisma.user.upsert({
-        where: { email: 'admin@fertilizer.com' },
+        where: { username: 'admin' },
         update: {},
         create: {
-            email: 'admin@fertilizer.com',
+            username: 'admin',
             name: 'ผู้ดูแลระบบ',
             password: hashedPassword,
             role: 'ADMIN',
         },
     });
-    console.log('✅ สร้าง Admin user:', admin.email);
+    console.log('✅ สร้าง Admin user:', admin.username);
 
     // Create another user
     const staff = await prisma.user.upsert({
-        where: { email: 'staff@fertilizer.com' },
+        where: { username: 'staff' },
         update: {},
         create: {
-            email: 'staff@fertilizer.com',
+            username: 'staff',
             name: 'พนักงานขาย',
             password: await bcrypt.hash('staff123', 10),
             role: 'STAFF',
+            allowedMenus: ['/pos', '/sales', '/overdue-bills', '/products', '/customers', '/warehouses'],
         },
     });
-    console.log('✅ สร้าง Staff user:', staff.email);
+    console.log('✅ สร้าง Staff user:', staff.username);
 
     // Create warehouses
     const warehouse1 = await prisma.warehouse.upsert({
@@ -309,8 +310,8 @@ async function main() {
     console.log('🎉 Seed data เสร็จสมบูรณ์!');
     console.log('');
     console.log('📧 Login Credentials:');
-    console.log('   Admin: admin@fertilizer.com / admin123');
-    console.log('   Staff: staff@fertilizer.com / staff123');
+    console.log('   Admin: admin / admin123');
+    console.log('   Staff: staff / staff123');
 }
 
 main()

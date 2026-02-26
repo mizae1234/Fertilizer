@@ -5,9 +5,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fertilizer-pos-secret-key-2024';
 
 export interface JWTPayload {
     userId: string;
-    email: string;
+    username: string;
     name: string;
     role: string;
+    allowedMenus: string[] | null;
 }
 
 export function signToken(payload: JWTPayload): string {
