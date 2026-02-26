@@ -399,51 +399,12 @@ export default function ProductDetailPage() {
                         </div>
                     )}
                 </div>
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4">
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 cursor-pointer hover:border-emerald-200 transition-colors"
+                    onClick={() => !editingCost && startEditingCost()}>
                     <p className="text-xs text-gray-400 mb-1">ต้นทุน</p>
-                    {editingCost ? (
-                        <div className="space-y-2">
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 border border-blue-200 cursor-pointer hover:border-blue-300">
-                                <input type="radio" name="cost-type" checked={costType === 'avg'} onChange={() => setCostType('avg')} className="accent-emerald-500" />
-                                <div className="flex-1 flex justify-between items-center">
-                                    <span className="text-xs text-gray-700">ต้นทุนเฉลี่ย</span>
-                                    <span className="text-xs font-bold text-blue-700">{formatCurrency(globalAvgCost)}</span>
-                                </div>
-                            </label>
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-purple-50 border border-purple-200 cursor-pointer hover:border-purple-300">
-                                <input type="radio" name="cost-type" checked={costType === 'last'} onChange={() => setCostType('last')} className="accent-emerald-500" />
-                                <div className="flex-1 flex justify-between items-center">
-                                    <span className="text-xs text-gray-700">ต้นทุนล่าสุด</span>
-                                    <span className="text-xs font-bold text-purple-700">{formatCurrency(globalLastCost)}</span>
-                                </div>
-                            </label>
-                            <label className="flex items-center gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200 cursor-pointer hover:border-amber-300">
-                                <input type="radio" name="cost-type" checked={costType === 'custom'} onChange={() => setCostType('custom')} className="accent-emerald-500" />
-                                <div className="flex-1 flex justify-between items-center gap-2">
-                                    <span className="text-xs text-gray-700">กรอกเอง</span>
-                                    {costType === 'custom' && (
-                                        <input type="number" min={0} step="0.01" value={customCost}
-                                            onChange={e => setCustomCost(parseFloat(e.target.value) || 0)}
-                                            className="w-24 px-2 py-1 rounded-lg border border-gray-200 text-xs text-right focus:ring-2 focus:ring-emerald-500 outline-none"
-                                            autoFocus />
-                                    )}
-                                </div>
-                            </label>
-                            <div className="flex gap-1.5 pt-1">
-                                <button onClick={() => setEditingCost(false)}
-                                    className="flex-1 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-500 hover:bg-gray-50">ยกเลิก</button>
-                                <button onClick={handleSaveCost} disabled={savingCost}
-                                    className="flex-1 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 disabled:opacity-50">
-                                    {savingCost ? '...' : '💾 บันทึก'}
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <p className="text-xl font-bold text-gray-800 cursor-pointer hover:text-emerald-600 transition-colors"
-                            onClick={startEditingCost} title="คลิกเพื่อแก้ไข">
-                            {formatCurrency(Number(product.cost))} <span className="text-xs font-normal text-gray-400">✏️</span>
-                        </p>
-                    )}
+                    <p className="text-xl font-bold text-gray-800">
+                        {formatCurrency(Number(product.cost))} <span className="text-xs font-normal text-gray-400">✏️</span>
+                    </p>
                 </div>
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4">
                     <p className="text-xs text-gray-400 mb-1">ราคาขาย</p>
@@ -492,6 +453,49 @@ export default function ProductDetailPage() {
                     )}
                 </div>
             </div>
+
+            {/* Cost Editor Panel (full-width, below summary) */}
+            {editingCost && (
+                <div className="bg-white rounded-xl shadow-md border border-emerald-200 p-4 sm:p-5 mb-6">
+                    <p className="text-sm font-semibold text-gray-700 mb-3">เลือกต้นทุนที่ต้องการใช้</p>
+                    <div className="space-y-2 mb-4">
+                        <label className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200 cursor-pointer hover:border-blue-300">
+                            <input type="radio" name="cost-type" checked={costType === 'avg'} onChange={() => setCostType('avg')} className="accent-emerald-500" />
+                            <div className="flex-1 flex justify-between items-center">
+                                <span className="text-sm text-gray-700">ต้นทุนเฉลี่ย</span>
+                                <span className="text-sm font-bold text-blue-700">{formatCurrency(globalAvgCost)}</span>
+                            </div>
+                        </label>
+                        <label className="flex items-center gap-3 p-3 rounded-lg bg-purple-50 border border-purple-200 cursor-pointer hover:border-purple-300">
+                            <input type="radio" name="cost-type" checked={costType === 'last'} onChange={() => setCostType('last')} className="accent-emerald-500" />
+                            <div className="flex-1 flex justify-between items-center">
+                                <span className="text-sm text-gray-700">ต้นทุนล่าสุด</span>
+                                <span className="text-sm font-bold text-purple-700">{formatCurrency(globalLastCost)}</span>
+                            </div>
+                        </label>
+                        <label className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200 cursor-pointer hover:border-amber-300">
+                            <input type="radio" name="cost-type" checked={costType === 'custom'} onChange={() => setCostType('custom')} className="accent-emerald-500" />
+                            <div className="flex-1 flex justify-between items-center gap-3">
+                                <span className="text-sm text-gray-700">กรอกเอง</span>
+                                {costType === 'custom' && (
+                                    <input type="number" min={0} step="0.01" value={customCost}
+                                        onChange={e => setCustomCost(parseFloat(e.target.value) || 0)}
+                                        className="w-32 px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        autoFocus />
+                                )}
+                            </div>
+                        </label>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => setEditingCost(false)}
+                            className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">ยกเลิก</button>
+                        <button onClick={handleSaveCost} disabled={savingCost}
+                            className="flex-1 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
+                            {savingCost ? 'กำลังบันทึก...' : '💾 บันทึกต้นทุน'}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Pricing - Inline Rows */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
@@ -709,7 +713,7 @@ export default function ProductDetailPage() {
                     ) : (
                         product.productStocks.map(stock => (
                             <div key={stock.id} className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6">
-                                <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <span className="text-lg">🏭</span>
                                         <h3 className="text-sm font-semibold text-gray-700">{stock.warehouse.name}</h3>
@@ -717,17 +721,6 @@ export default function ProductDetailPage() {
                                     <span className={`text-lg font-bold ${stock.quantity < product.minStock ? 'text-red-600' : 'text-emerald-600'}`}>
                                         {stock.quantity.toLocaleString()} {product.unit}
                                     </span>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-blue-50 rounded-lg p-3">
-                                        <p className="text-xs text-blue-400 mb-1">ต้นทุนเฉลี่ย (Avg)</p>
-                                        <p className="text-lg font-bold text-blue-700">{formatCurrency(Number(stock.avgCost))}</p>
-                                    </div>
-                                    <div className="bg-purple-50 rounded-lg p-3">
-                                        <p className="text-xs text-purple-400 mb-1">ต้นทุนล่าสุด (Last)</p>
-                                        <p className="text-lg font-bold text-purple-700">{formatCurrency(Number(stock.lastCost))}</p>
-                                    </div>
                                 </div>
                             </div>
                         ))
