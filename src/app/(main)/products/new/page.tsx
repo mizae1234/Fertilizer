@@ -36,14 +36,17 @@ export default function NewProductPage() {
     const [prices, setPrices] = useState<{ customerGroupId: string; price: number }[]>([]);
     const [units, setUnits] = useState<{ unitName: string; conversionRate: number; sellingPrice: number; isBaseUnit: boolean }[]>([]);
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
+    const [brands, setBrands] = useState<string[]>([]);
 
     useEffect(() => {
         Promise.all([
             fetch('/api/customer-groups').then(r => r.json()),
             fetch('/api/product-groups').then(r => r.json()),
-        ]).then(([cg, pg]) => {
+            fetch('/api/products/brands').then(r => r.json()),
+        ]).then(([cg, pg, br]) => {
             setCustomerGroups(cg);
             setProductGroups(pg);
+            setBrands(Array.isArray(br) ? br : []);
         });
     }, []);
 
@@ -114,9 +117,13 @@ export default function NewProductPage() {
                                 type="text"
                                 value={form.brand}
                                 onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                                list="brand-suggestions-new"
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                placeholder="เช่น นกปากห่าง, Extra..."
+                                placeholder="พิมพ์เพื่อค้นหาหรือเพิ่มใหม่"
                             />
+                            <datalist id="brand-suggestions-new">
+                                {brands.map(b => <option key={b} value={b} />)}
+                            </datalist>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">บรรจุภัณฑ์</label>

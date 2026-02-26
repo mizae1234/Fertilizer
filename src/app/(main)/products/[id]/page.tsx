@@ -107,6 +107,7 @@ export default function ProductDetailPage() {
     const [infoForm, setInfoForm] = useState({ name: '', description: '', brand: '', packaging: '', productGroupId: '', minStock: 10 });
     const [savingInfo, setSavingInfo] = useState(false);
     const [productGroups, setProductGroups] = useState<{ id: string; name: string }[]>([]);
+    const [brands, setBrands] = useState<string[]>([]);
 
 
     // Inline editing
@@ -132,6 +133,9 @@ export default function ProductDetailPage() {
         fetch('/api/product-groups')
             .then(r => r.json())
             .then(data => setProductGroups(Array.isArray(data) ? data : []));
+        fetch('/api/products/brands')
+            .then(r => r.json())
+            .then(data => setBrands(Array.isArray(data) ? data : []));
     }, [id]);
 
     // Initialize form values when product loads
@@ -448,8 +452,12 @@ export default function ProductDetailPage() {
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">ยี่ห้อ (Brand)</label>
                         <input type="text" value={infoForm.brand} onChange={e => setInfoForm({ ...infoForm, brand: e.target.value })}
+                            list="brand-suggestions"
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                            placeholder="เช่น นกปากห่าง, Extra..." />
+                            placeholder="พิมพ์เพื่อค้นหาหรือเพิ่มใหม่" />
+                        <datalist id="brand-suggestions">
+                            {brands.map(b => <option key={b} value={b} />)}
+                        </datalist>
                     </div>
                 </div>
 
