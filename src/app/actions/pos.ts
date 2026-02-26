@@ -18,9 +18,9 @@ export async function createSaleFromPOS(data: {
     payments: { method: string; amount: number; dueDate?: string }[];
     notes?: string;
 }) {
-    // Validate user exists
-    const user = await prisma.user.findUnique({ where: { id: data.userId } });
-    if (!user) {
+    const t0 = Date.now();
+
+    if (!data.userId) {
         throw new Error('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่');
     }
 
@@ -75,8 +75,8 @@ export async function createSaleFromPOS(data: {
             },
         });
 
-        // Deduct stock + create stock transactions
-        for (const item of data.items) {
+        // Deduct stock + create stock transactions in parallel per item
+        await Promise.all(data.items.map(async (item) => {
             const stockToDeduct = item.quantity * (item.conversionRate || 1);
             await tx.productStock.upsert({
                 where: {
@@ -106,7 +106,7 @@ export async function createSaleFromPOS(data: {
                     notes: `ขายสินค้า ${saleNumber}${(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
                 },
             });
-        }
+        }));
 
         // Award customer points
         if (data.customerId && totalPoints > 0) {
@@ -128,6 +128,8 @@ export async function createSaleFromPOS(data: {
         return newSale;
     });
 
-    revalidatePath('/sales');
-    return sale;
+    console.log(`[POS] createSaleFromPOS TOTAL: ${Date.now() - t0}ms (${data.items.length} items)`);
+
+    // Serialize Decimal values before returning to client
+    return { id: sale.id, saleNumber: sale.saleNumber, totalAmount: Number(sale.totalAmount) };
 }

@@ -13,7 +13,7 @@ export default async function TransfersPage({ searchParams }: Props) {
 
     const where = {
         deletedAt: null,
-        ...(status ? { status: status as 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' } : {}),
+        ...(status ? { status: status as 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' } : {}),
     };
 
     const [transfers, total] = await Promise.all([

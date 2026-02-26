@@ -46,11 +46,8 @@ export default async function ProductsPage({ searchParams }: Props) {
             include: {
                 productGroup: { select: { name: true } },
                 productStocks: {
-                    include: { warehouse: { select: { name: true } } },
+                    select: { warehouseId: true, quantity: true, warehouse: { select: { name: true } } },
                     ...(warehouseFilter ? { where: { warehouseId: warehouseFilter } } : {}),
-                },
-                productPrices: {
-                    include: { customerGroup: { select: { name: true } } },
                 },
             },
             skip: (page - 1) * perPage,

@@ -23,6 +23,7 @@ interface Sale {
 interface CustomerGroup { id: string; name: string; }
 interface Customer {
     id: string; name: string; phone: string; totalPoints: number; createdAt: string;
+    address: string | null; taxId: string | null;
     customerGroup: { id: string; name: string };
     pointTransactions: PointTransaction[];
     sales: Sale[];
@@ -42,6 +43,8 @@ export default function CustomerDetailPage() {
     const [editName, setEditName] = useState('');
     const [editPhone, setEditPhone] = useState('');
     const [editGroupId, setEditGroupId] = useState('');
+    const [editAddress, setEditAddress] = useState('');
+    const [editTaxId, setEditTaxId] = useState('');
     const [saving, setSaving] = useState(false);
 
     // Redeem state
@@ -72,6 +75,8 @@ export default function CustomerDetailPage() {
         setEditName(customer.name);
         setEditPhone(customer.phone);
         setEditGroupId(customer.customerGroup.id);
+        setEditAddress(customer.address || '');
+        setEditTaxId(customer.taxId || '');
         setEditing(true);
     };
 
@@ -82,7 +87,7 @@ export default function CustomerDetailPage() {
         }
         setSaving(true);
         try {
-            await updateCustomer(id, { name: editName.trim(), phone: editPhone.trim(), customerGroupId: editGroupId });
+            await updateCustomer(id, { name: editName.trim(), phone: editPhone.trim(), customerGroupId: editGroupId, address: editAddress.trim(), taxId: editTaxId.trim() });
             setEditing(false);
             await loadCustomer();
             setAlertModal({ open: true, message: 'บันทึกข้อมูลเรียบร้อย', type: 'success', title: 'สำเร็จ' });
@@ -162,6 +167,18 @@ export default function CustomerDetailPage() {
                                 </select>
                             </div>
                         </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs text-gray-500 mb-1 block">ที่อยู่</label>
+                                <textarea value={editAddress} onChange={e => setEditAddress(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-emerald-500 resize-none" rows={2} placeholder="ที่อยู่สำหรับออกใบกำกับ" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500 mb-1 block">เลขประจำตัวผู้เสียภาษี</label>
+                                <input type="text" value={editTaxId} onChange={e => setEditTaxId(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="เลข 13 หลัก" />
+                            </div>
+                        </div>
                         <div className="flex gap-2 justify-end">
                             <button onClick={() => setEditing(false)} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50">ยกเลิก</button>
                             <button onClick={handleSave} disabled={saving}
@@ -171,7 +188,7 @@ export default function CustomerDetailPage() {
                         </div>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
                         <div>
                             <p className="text-xs text-gray-400 mb-1">เบอร์โทร</p>
                             <p className="text-sm font-semibold text-gray-800">{customer.phone}</p>
@@ -189,9 +206,19 @@ export default function CustomerDetailPage() {
                             <p className="text-lg font-bold text-gray-800">{formatCurrency(totalPurchaseAmount)}</p>
                         </div>
                         <div>
+                            <p className="text-xs text-gray-400 mb-1">เลขผู้เสียภาษี</p>
+                            <p className="text-sm font-semibold text-gray-800">{customer.taxId || '-'}</p>
+                        </div>
+                        <div>
                             <p className="text-xs text-gray-400 mb-1">สมัครเมื่อ</p>
                             <p className="text-sm font-semibold text-gray-800">{formatDate(customer.createdAt)}</p>
                         </div>
+                        {customer.address && (
+                            <div className="col-span-2 sm:col-span-6">
+                                <p className="text-xs text-gray-400 mb-1">ที่อยู่</p>
+                                <p className="text-sm text-gray-800">{customer.address}</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

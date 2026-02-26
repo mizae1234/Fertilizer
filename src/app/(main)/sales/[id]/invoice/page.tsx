@@ -32,7 +32,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     }
 
     // Serialize Decimal fields
-    const saleData = {
+    const saleData = JSON.parse(JSON.stringify({
         ...sale,
         totalAmount: Number(sale.totalAmount),
         items: sale.items.map(item => ({
@@ -40,7 +40,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             unitPrice: Number(item.unitPrice),
             totalPrice: Number(item.totalPrice),
         })),
-    };
+    }));
 
     return <InvoicePrint sale={saleData} template={template} />;
 }

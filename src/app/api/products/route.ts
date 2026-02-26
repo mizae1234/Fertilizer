@@ -19,22 +19,24 @@ export async function GET(request: Request) {
                     }
                     : {}),
             },
-            include: {
+            select: {
+                id: true, code: true, name: true, price: true, cost: true, unit: true,
+                pointsPerUnit: true, minStock: true,
                 productStocks: warehouseId
-                    ? { where: { warehouseId } }
-                    : true,
+                    ? { where: { warehouseId }, select: { warehouseId: true, quantity: true } }
+                    : { select: { warehouseId: true, quantity: true } },
                 productPrices: {
-                    include: { customerGroup: { select: { name: true, id: true } } },
+                    select: { price: true, customerGroup: { select: { name: true, id: true } } },
                 },
                 productUnits: {
+                    select: { id: true, unitName: true, conversionRate: true, sellingPrice: true, isBaseUnit: true },
                     orderBy: [{ isBaseUnit: 'desc' }, { conversionRate: 'asc' }],
                 },
             },
-            take: 50,
+            take: 200,
             orderBy: { name: 'asc' },
         });
 
-        // Serialize Decimal objects to plain values
         return NextResponse.json(JSON.parse(JSON.stringify(products)));
     } catch (error: any) {
         console.error('GET /api/products ERROR:', error);

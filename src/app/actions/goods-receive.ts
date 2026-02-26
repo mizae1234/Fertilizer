@@ -55,6 +55,7 @@ export async function createGoodsReceive(data: {
         warehouseId: string;
         quantity: number;
         unitCost: number;
+        lotNo?: string;
     }[];
     userId: string;
 }) {
@@ -86,6 +87,7 @@ export async function createGoodsReceive(data: {
                     quantity: item.quantity,
                     unitCost: item.unitCost,
                     totalCost: item.quantity * item.unitCost,
+                    lotNo: item.lotNo || null,
                 })),
             },
         },
@@ -105,6 +107,7 @@ export async function updateGoodsReceive(id: string, data: {
         warehouseId: string;
         quantity: number;
         unitCost: number;
+        lotNo?: string;
     }[];
 }) {
     const existing = await prisma.goodsReceive.findUnique({ where: { id } });
@@ -136,6 +139,7 @@ export async function updateGoodsReceive(id: string, data: {
                         quantity: item.quantity,
                         unitCost: item.unitCost,
                         totalCost: item.quantity * item.unitCost,
+                        lotNo: item.lotNo || null,
                     })),
                 },
             },

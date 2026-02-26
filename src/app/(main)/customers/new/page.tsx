@@ -11,7 +11,7 @@ export default function NewCustomerPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [groups, setGroups] = useState<CustomerGroup[]>([]);
-    const [form, setForm] = useState({ name: '', phone: '', customerGroupId: '' });
+    const [form, setForm] = useState({ name: '', phone: '', customerGroupId: '', address: '', taxId: '' });
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
 
     useEffect(() => {
@@ -49,6 +49,14 @@ export default function NewCustomerPage() {
                     <select value={form.customerGroupId} onChange={e => setForm({ ...form, customerGroupId: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm">
                         {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                     </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">ที่อยู่</label>
+                    <textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm resize-none" rows={2} placeholder="ที่อยู่สำหรับออกใบกำกับ" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">เลขประจำตัวผู้เสียภาษี</label>
+                    <input type="text" value={form.taxId} onChange={e => setForm({ ...form, taxId: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm" placeholder="เลข 13 หลัก" />
                 </div>
                 <div className="flex gap-3 pt-4">
                     <button type="button" onClick={() => router.back()} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-medium text-sm hover:bg-gray-50">ยกเลิก</button>

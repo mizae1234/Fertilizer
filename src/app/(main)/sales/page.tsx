@@ -26,13 +26,14 @@ export default async function SalesPage({ searchParams }: Props) {
     const [sales, total] = await Promise.all([
         prisma.sale.findMany({
             where,
-            include: {
+            select: {
+                id: true, saleNumber: true, totalAmount: true, status: true, createdAt: true,
                 customer: { select: { name: true } },
                 createdBy: { select: { name: true } },
+                _count: { select: { items: true } },
                 items: {
-                    include: {
-                        product: { select: { name: true, code: true, unit: true } },
-                    },
+                    take: 3,
+                    select: { quantity: true, product: { select: { name: true, unit: true } } },
                 },
             },
             skip: (page - 1) * perPage,
@@ -68,7 +69,7 @@ export default async function SalesPage({ searchParams }: Props) {
                 <div className="flex flex-wrap items-end gap-3">
                     {/* Status Filter */}
                     <div className="flex gap-1">
-                        {[{ v: '', l: 'ทั้งหมด' }, { v: 'APPROVED', l: 'อนุมัติแล้ว' }, { v: 'PENDING', l: 'รออนุมัติ' }, { v: 'REJECTED', l: 'ปฏิเสธ' }, { v: 'CANCELLED', l: 'ยกเลิก' }].map(f => (
+                        {[{ v: '', l: 'ทั้งหมด' }, { v: 'APPROVED', l: 'อนุมัติแล้ว' }, { v: 'CANCELLED', l: 'ยกเลิก' }].map(f => (
                             <Link key={f.v} href={buildUrl({ status: f.v, page: '1' })}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium ${status === f.v || (!status && !f.v) ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                                 {f.l}
@@ -108,13 +109,13 @@ export default async function SalesPage({ searchParams }: Props) {
                                     <td className="px-4 py-3 text-sm text-gray-800">{sale.customer?.name || 'ลูกค้าทั่วไป'}</td>
                                     <td className="px-4 py-3">
                                         <div className="space-y-0.5">
-                                            {sale.items.slice(0, 3).map((item, i) => (
+                                            {sale.items.map((item, i) => (
                                                 <p key={i} className="text-xs text-gray-500">
                                                     {item.product.name} x{item.quantity} {item.product.unit}
                                                 </p>
                                             ))}
-                                            {sale.items.length > 3 && (
-                                                <p className="text-xs text-gray-400">+{sale.items.length - 3} รายการ</p>
+                                            {sale._count.items > 3 && (
+                                                <p className="text-xs text-gray-400">+{sale._count.items - 3} รายการ</p>
                                             )}
                                         </div>
                                     </td>

@@ -16,9 +16,11 @@ export default async function WarehousesPage({ searchParams }: Props) {
     const [warehouses, total] = await Promise.all([
         prisma.warehouse.findMany({
             where,
-            include: {
+            select: {
+                id: true, name: true, location: true, createdAt: true,
+                _count: { select: { productStocks: true } },
                 productStocks: {
-                    include: { product: { select: { name: true } } },
+                    select: { quantity: true },
                 },
             },
             skip: (page - 1) * perPage,

@@ -19,6 +19,15 @@ interface Product {
 interface Warehouse { id: string; name: string; }
 interface CustomerGroup { id: string; name: string; }
 interface Customer { id: string; name: string; phone: string; customerGroup: { id: string; name: string } }
+interface BundleInfo {
+    id: string; code: string; name: string; description: string | null;
+    bundlePrice: string; bundleCost: string; isActive: boolean;
+    items: { id: string; productId: string; quantity: number; product: { id: string; name: string; code: string; price: string; unit: string } }[];
+}
+interface BundleSubItem {
+    productId: string; productName: string; productCode: string; unit: string;
+    warehouseId: string; quantity: number; unitPrice: number; points: number;
+}
 interface CartItem {
     productId: string; productName: string; productCode: string; unit: string;
     warehouseId: string; quantity: number; unitPrice: number; points: number;
@@ -30,23 +39,39 @@ interface CartItem {
     selectedUnitName: string;
     conversionRate: number;
     productUnits: ProductUnitInfo[];
+    // Bundle fields
+    isBundle?: boolean;
+    bundleId?: string;
+    bundleName?: string;
+    bundleItems?: BundleSubItem[];
 }
 
-interface PaymentLine { method: string; amount: number; dueDate: string }
+interface PaymentLine { method: string; amount: number; dueDate: string; bankAccountId?: string }
+interface BankAccountInfo { id: string; accountName: string; accountNumber: string; bankName: string; qrCodeUrl: string | null; isDefault: boolean; isActive: boolean }
 const PAYMENT_METHODS = [
     { value: 'CASH', label: '💵 เงินสด', color: 'emerald' },
-    { value: 'CREDIT_CARD', label: '💳 บัตรเครดิต', color: 'blue' },
+    { value: 'TRANSFER', label: '🏦 เงินโอน', color: 'blue' },
     { value: 'CREDIT', label: '📋 เครดิต', color: 'amber' },
 ];
 
 function PaymentModal({ total, loading, onConfirm, onClose }: {
     total: number; loading: boolean;
-    onConfirm: (payments: { method: string; amount: number; dueDate?: string }[]) => void;
+    onConfirm: (payments: { method: string; amount: number; dueDate?: string }[], printType: 'bill' | 'invoice') => void;
     onClose: () => void;
 }) {
     const [lines, setLines] = useState<PaymentLine[]>([
         { method: 'CASH', amount: total, dueDate: '' }
     ]);
+    const [bankAccounts, setBankAccounts] = useState<BankAccountInfo[]>([]);
+    const [printType, setPrintType] = useState<'bill' | 'invoice'>('bill');
+
+    // Fetch bank accounts on mount
+    useEffect(() => {
+        fetch('/api/bank-accounts').then(r => r.json()).then((data: BankAccountInfo[]) => {
+            const active = data.filter(a => a.isActive);
+            setBankAccounts(active);
+        }).catch(console.error);
+    }, []);
 
     const paid = lines.reduce((s, l) => s + (l.amount || 0), 0);
     const remaining = total - paid;
@@ -63,11 +88,23 @@ function PaymentModal({ total, loading, onConfirm, onClose }: {
     };
     const addLine = () => {
         const rem = Math.max(0, total - lines.reduce((s, l) => s + (l.amount || 0), 0));
-        setLines([...lines, { method: 'CASH', amount: Math.round(rem * 100) / 100, dueDate: '' }]);
+        // Auto-select default bank for TRANSFER lines
+        const defaultBank = bankAccounts.find(a => a.isDefault);
+        setLines([...lines, { method: 'CASH', amount: Math.round(rem * 100) / 100, dueDate: '', bankAccountId: defaultBank?.id }]);
     };
     const setFullAmount = (idx: number) => {
         const otherSum = lines.reduce((s, l, i) => i === idx ? s : s + (l.amount || 0), 0);
         updateLine(idx, { amount: Math.round((total - otherSum) * 100) / 100 });
+    };
+
+    // When switching to TRANSFER, auto-select default bank
+    const handleMethodChange = (idx: number, method: string) => {
+        const defaultBank = bankAccounts.find(a => a.isDefault);
+        updateLine(idx, {
+            method,
+            dueDate: method !== 'CREDIT' ? '' : lines[idx].dueDate,
+            bankAccountId: method === 'TRANSFER' ? (lines[idx].bankAccountId || defaultBank?.id) : undefined,
+        });
     };
 
     const handleConfirm = () => {
@@ -76,7 +113,7 @@ function PaymentModal({ total, loading, onConfirm, onClose }: {
             amount: l.amount,
             ...(l.method === 'CREDIT' && l.dueDate ? { dueDate: l.dueDate } : {}),
         }));
-        onConfirm(payments);
+        onConfirm(payments, printType);
     };
 
     return (
@@ -99,7 +136,7 @@ function PaymentModal({ total, loading, onConfirm, onClose }: {
                             <div className="flex gap-1">
                                 {PAYMENT_METHODS.map(m => (
                                     <button key={m.value} type="button"
-                                        onClick={() => updateLine(idx, { method: m.value, dueDate: m.value !== 'CREDIT' ? '' : line.dueDate })}
+                                        onClick={() => handleMethodChange(idx, m.value)}
                                         className={`flex-1 rounded-lg text-xs font-medium py-1.5 transition-all ${line.method === m.value
                                             ? 'bg-emerald-500 text-white shadow-sm'
                                             : 'bg-white border border-gray-200 text-gray-600 hover:border-emerald-300'
@@ -108,6 +145,22 @@ function PaymentModal({ total, loading, onConfirm, onClose }: {
                                     </button>
                                 ))}
                             </div>
+
+                            {/* Bank account selector for TRANSFER */}
+                            {line.method === 'TRANSFER' && bankAccounts.length > 0 && (
+                                <div>
+                                    <select value={line.bankAccountId || ''}
+                                        onChange={e => updateLine(idx, { bankAccountId: e.target.value })}
+                                        className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
+                                        <option value="">เลือกบัญชี...</option>
+                                        {bankAccounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>
+                                                {acc.bankName} - {acc.accountNumber} ({acc.accountName}){acc.isDefault ? ' ⭐' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             {/* Amount */}
                             <div className="flex items-center gap-2">
@@ -148,6 +201,21 @@ function PaymentModal({ total, loading, onConfirm, onClose }: {
                         className="w-full py-2 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 text-xs font-medium hover:border-emerald-400 hover:text-emerald-500 transition-colors">
                         + เพิ่มช่องทางชำระ (แยกจ่าย)
                     </button>
+
+                    {/* Print type selector */}
+                    <div className="rounded-xl border border-gray-200 p-3 bg-gray-50/50">
+                        <p className="text-xs text-gray-500 mb-2">🖨️ เลือกรูปแบบการพิมพ์</p>
+                        <div className="flex gap-2">
+                            <button type="button" onClick={() => setPrintType('bill')}
+                                className={`flex-1 rounded-lg text-xs font-medium py-2 transition-all ${printType === 'bill' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-emerald-300'}`}>
+                                🧾 ปริ้นบิล
+                            </button>
+                            <button type="button" onClick={() => setPrintType('invoice')}
+                                className={`flex-1 rounded-lg text-xs font-medium py-2 transition-all ${printType === 'invoice' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-emerald-300'}`}>
+                                📄 ใบกำกับ
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Footer: Remaining + Confirm */}
@@ -182,6 +250,7 @@ function PaymentModal({ total, loading, onConfirm, onClose }: {
 export default function POSPage() {
     const router = useRouter();
     const [products, setProducts] = useState<Product[]>([]);
+    const [bundles, setBundles] = useState<BundleInfo[]>([]);
     const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([]);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -195,6 +264,7 @@ export default function POSPage() {
     const [showCustomerPicker, setShowCustomerPicker] = useState(false);
     const [showCart, setShowCart] = useState(false);
     const [reviewMode, setReviewMode] = useState(false);
+    const [posTab, setPosTab] = useState<'products' | 'bundles'>('products');
 
     // Track which items just had quantity changes (for pulse animation)
     const [pulsingItems, setPulsingItems] = useState<Set<string>>(new Set());
@@ -214,9 +284,11 @@ export default function POSPage() {
         Promise.all([
             fetch('/api/warehouses').then(r => r.json()),
             fetch('/api/customer-groups').then(r => r.json()),
-        ]).then(([w, cg]) => {
+            fetch('/api/bundles').then(r => r.json()).catch(() => []),
+        ]).then(([w, cg, b]) => {
             setWarehouses(w);
             setCustomerGroups(cg);
+            setBundles(b);
             if (w.length > 0) setDefaultWarehouseId(w[0].id);
         });
     }, []);
@@ -321,6 +393,73 @@ export default function POSPage() {
         }
     };
 
+    const addBundleToCart = (bundle: BundleInfo) => {
+        const warehouseId = defaultWarehouseId;
+        const bundlePrice = Number(bundle.bundlePrice);
+        const totalItemPrice = bundle.items.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
+
+        // Build sub-items for stock deduction
+        const subItems: BundleSubItem[] = bundle.items.map(bundleItem => {
+            const product = products.find(p => p.id === bundleItem.productId);
+            const proportion = totalItemPrice > 0
+                ? (Number(bundleItem.product.price) * bundleItem.quantity / totalItemPrice)
+                : (1 / bundle.items.length);
+            const itemPrice = Math.round((bundlePrice * proportion / bundleItem.quantity) * 100) / 100;
+            return {
+                productId: bundleItem.productId,
+                productName: bundleItem.product.name,
+                productCode: bundleItem.product.code,
+                unit: bundleItem.product.unit,
+                warehouseId,
+                quantity: bundleItem.quantity,
+                unitPrice: itemPrice,
+                points: (product?.pointsPerUnit || 0) * bundleItem.quantity,
+            };
+        });
+
+        // Check if same bundle already in cart → increment qty
+        const existing = cart.find(c => c.isBundle && c.bundleId === bundle.id);
+        if (existing) {
+            setCart(prev => prev.map(c =>
+                c.isBundle && c.bundleId === bundle.id
+                    ? {
+                        ...c,
+                        quantity: c.quantity + 1,
+                        bundleItems: c.bundleItems?.map(si => ({ ...si, quantity: si.quantity / (c.quantity) * (c.quantity + 1) })),
+                    }
+                    : c
+            ));
+            triggerPulse(bundle.id);
+        } else {
+            // Add as 1 single line
+            setCart(prev => [...prev, {
+                productId: bundle.id,
+                productName: bundle.name,
+                productCode: bundle.code,
+                unit: 'ชุด',
+                warehouseId,
+                quantity: 1,
+                unitPrice: bundlePrice,
+                points: subItems.reduce((s, si) => s + si.points, 0),
+                availableStock: 9999,
+                pointsPerUnit: subItems.reduce((s, si) => s + si.points, 0),
+                priceTier: 'custom',
+                productPrices: [],
+                selectedUnitId: '',
+                selectedUnitName: 'ชุด',
+                conversionRate: 1,
+                productUnits: [],
+                isBundle: true,
+                bundleId: bundle.id,
+                bundleName: bundle.name,
+                bundleItems: subItems,
+            }]);
+        }
+        setLastAddedId(bundle.id);
+        setTimeout(() => setLastAddedId(null), 400);
+        setTimeout(() => cartEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    };
+
     const updateCartQty = (idx: number, qty: number) => {
         if (qty <= 0) { removeFromCart(idx); return; }
         const item = cart[idx];
@@ -407,27 +546,45 @@ export default function POSPage() {
         setShowPaymentModal(true);
     };
 
-    const confirmPayment = async (payments: { method: string; amount: number; dueDate?: string }[]) => {
+    const confirmPayment = async (payments: { method: string; amount: number; dueDate?: string }[], printType: 'bill' | 'invoice') => {
         setLoading(true);
         try {
-            await createSaleFromPOS({
+            // Expand bundle items into individual product items for stock deduction
+            const saleItems: { productId: string; warehouseId: string; quantity: number; unitPrice: number; points: number; conversionRate: number }[] = [];
+            for (const c of cart) {
+                if (c.isBundle && c.bundleItems) {
+                    for (const si of c.bundleItems) {
+                        saleItems.push({
+                            productId: si.productId, warehouseId: si.warehouseId,
+                            quantity: si.quantity * c.quantity, unitPrice: si.unitPrice, points: si.points * c.quantity,
+                            conversionRate: 1,
+                        });
+                    }
+                } else {
+                    saleItems.push({
+                        productId: c.productId, warehouseId: c.warehouseId,
+                        quantity: c.quantity, unitPrice: c.unitPrice, points: c.points,
+                        conversionRate: c.conversionRate,
+                    });
+                }
+            }
+            const result = await createSaleFromPOS({
                 customerId: selectedCustomer?.id,
-                items: cart.map(c => ({
-                    productId: c.productId, warehouseId: c.warehouseId,
-                    quantity: c.quantity, unitPrice: c.unitPrice, points: c.points,
-                    conversionRate: c.conversionRate,
-                })),
+                items: saleItems,
                 userId,
                 payments,
                 notes: saleNotes.trim() || undefined,
             });
             setShowPaymentModal(false);
-            setAlertModal({ open: true, message: 'สร้างบิลขายเรียบร้อย ตัด stock แล้ว', type: 'success', title: 'ชำระเงินสำเร็จ!' });
             setCart([]);
             setShowCart(false);
             setReviewMode(false);
             setSaleNotes('');
             setShowNotes(false);
+
+            // Show success and reload products for updated stock
+            setAlertModal({ open: true, message: `สร้างบิลขาย ${result?.saleNumber || ''} เรียบร้อย ตัด stock แล้ว`, type: 'success', title: 'ชำระเงินสำเร็จ!' });
+            if (defaultWarehouseId) loadProducts(defaultWarehouseId);
         } catch (error) {
             const msg = (error as Error).message;
             if (msg.includes('เข้าสู่ระบบ')) {
@@ -441,6 +598,10 @@ export default function POSPage() {
 
     const filteredProducts = products.filter(p =>
         !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase())
+    );
+
+    const filteredBundles = bundles.filter(b =>
+        !search || b.name.toLowerCase().includes(search.toLowerCase()) || b.code.toLowerCase().includes(search.toLowerCase())
     );
 
     // ─── Cart Panel Content ─── (render function, NOT a component)
@@ -503,118 +664,163 @@ export default function POSPage() {
                         <>
                             {cart.map((item, idx) => (
                                 <div
-                                    key={item.productId}
+                                    key={item.productId + (item.bundleId || '')}
                                     className={`rounded-lg transition-all ${pulsingItems.has(item.productId) ? 'animate-cart-pulse' : ''
                                         } ${lastAddedId === item.productId ? 'animate-cart-slide-in' : ''
                                         } ${isDesktop
-                                            ? 'bg-white border border-gray-100 p-3 shadow-sm'
-                                            : 'bg-gray-50 p-2.5'
+                                            ? item.isBundle ? 'bg-purple-50 border border-purple-200 p-3 shadow-sm' : 'bg-white border border-gray-100 p-3 shadow-sm'
+                                            : item.isBundle ? 'bg-purple-50 p-2.5' : 'bg-gray-50 p-2.5'
                                         }`}
                                 >
-                                    {/* Row 1: Product name + qty controls + line total */}
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-gray-800 truncate">{item.productName}</p>
-                                            <p className="text-[11px] text-gray-400">{item.productCode} · {item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}</p>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            <button
-                                                onClick={() => updateCartQty(idx, item.quantity - 1)}
-                                                className="w-7 h-7 rounded-md bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm"
-                                            >−</button>
-                                            <input
-                                                type="number"
-                                                value={item.quantity}
-                                                onChange={e => {
-                                                    const val = parseInt(e.target.value) || 0;
-                                                    if (val >= 0 && val <= item.availableStock) {
-                                                        updateCartQty(idx, val);
-                                                    }
-                                                }}
-                                                onBlur={e => {
-                                                    const val = parseInt(e.target.value) || 1;
-                                                    updateCartQty(idx, Math.max(1, Math.min(val, item.availableStock)));
-                                                }}
-                                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                                                className="font-bold text-sm text-center w-10 rounded-md border border-gray-200 py-0.5 outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                min={1}
-                                                max={item.availableStock}
-                                            />
-                                            <button
-                                                onClick={() => updateCartQty(idx, item.quantity + 1)}
-                                                disabled={item.quantity >= item.availableStock}
-                                                className="w-7 h-7 rounded-md bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >+</button>
-                                        </div>
-                                        <p className="text-sm font-bold text-emerald-600 shrink-0 w-24 text-right">
-                                            {formatCurrency(item.quantity * item.unitPrice)}
-                                        </p>
-                                        <button onClick={() => removeFromCart(idx)}
-                                            className="text-red-300 hover:text-red-500 text-xs shrink-0 ml-1">✕</button>
-                                    </div>
-
-                                    {/* Row 2: Selectors — hidden in review mode */}
-                                    {!isReview && (
-                                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                            <div className="flex items-center gap-1">
-                                                <label className="text-[10px] text-gray-400 shrink-0">คลัง:</label>
-                                                <select
-                                                    value={item.warehouseId}
-                                                    onChange={e => updateCartWarehouse(idx, e.target.value)}
-                                                    className="px-1.5 py-0.5 rounded border border-gray-200 text-[11px] outline-none"
-                                                >
-                                                    {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                                </select>
-                                                <span className="text-[10px] text-gray-400">({item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock})</span>
+                                    {item.isBundle ? (
+                                        /* ── Bundle: single non-editable row ── */
+                                        <>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-purple-800 truncate">🎁 {item.productName}</p>
+                                                    <p className="text-[11px] text-purple-400">
+                                                        {item.productCode} · {item.quantity} ชุด × {formatCurrency(item.unitPrice)}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <button
+                                                        onClick={() => updateCartQty(idx, item.quantity - 1)}
+                                                        className="w-7 h-7 rounded-md bg-purple-100 border border-purple-200 text-purple-600 hover:bg-purple-200 flex items-center justify-center text-sm"
+                                                    >−</button>
+                                                    <span className="font-bold text-sm text-center w-8 text-purple-700">{item.quantity}</span>
+                                                    <button
+                                                        onClick={() => updateCartQty(idx, item.quantity + 1)}
+                                                        className="w-7 h-7 rounded-md bg-purple-100 border border-purple-200 text-purple-600 hover:bg-purple-200 flex items-center justify-center text-sm"
+                                                    >+</button>
+                                                </div>
+                                                <p className="text-sm font-bold text-purple-600 shrink-0 w-24 text-right">
+                                                    {formatCurrency(item.quantity * item.unitPrice)}
+                                                </p>
+                                                <button onClick={() => removeFromCart(idx)}
+                                                    className="text-red-300 hover:text-red-500 text-xs shrink-0 ml-1">✕</button>
                                             </div>
-                                            {item.productUnits && item.productUnits.length > 0 && (
-                                                <div className="flex items-center gap-1">
-                                                    <label className="text-[10px] text-gray-400 shrink-0">หน่วย:</label>
-                                                    <select
-                                                        value={item.selectedUnitId || '__default__'}
-                                                        onChange={e => updateCartUnit(idx, e.target.value)}
-                                                        className="px-1.5 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-[11px] outline-none font-medium"
-                                                    >
-                                                        {/* Always show product's default unit if no base unit in productUnits */}
-                                                        {!item.productUnits.some(u => u.isBaseUnit) && (
-                                                            <option value="__default__">
-                                                                {products.find(p => p.id === item.productId)?.unit || item.unit} (ปกติ)
-                                                            </option>
-                                                        )}
-                                                        {item.productUnits.map(u => (
-                                                            <option key={u.id} value={u.id}>
-                                                                {u.unitName} {u.isBaseUnit ? '(หลัก)' : `(×${Number(u.conversionRate)})`}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                            {/* Sub-items list */}
+                                            {!isReview && item.bundleItems && (
+                                                <div className="mt-1.5 pl-2 border-l-2 border-purple-200 space-y-0.5">
+                                                    {item.bundleItems.map(si => (
+                                                        <p key={si.productId} className="text-[10px] text-purple-400">
+                                                            {si.productName} ×{si.quantity * item.quantity} {si.unit}
+                                                        </p>
+                                                    ))}
                                                 </div>
                                             )}
-                                            <div className="flex items-center gap-1">
-                                                <label className="text-[10px] text-gray-400 shrink-0">ราคา:</label>
-                                                <select
-                                                    value={item.priceTier}
-                                                    onChange={e => updateCartPriceTier(idx, e.target.value)}
-                                                    className="px-1.5 py-0.5 rounded border border-gray-200 text-[11px] outline-none"
-                                                >
-                                                    {item.productPrices.map(pp => {
-                                                        const grp = customerGroups.find(g => g.id === pp.customerGroupId);
-                                                        return <option key={pp.customerGroupId} value={pp.customerGroupId}>{grp?.name || 'กลุ่ม'} ({formatCurrency(pp.price)})</option>;
-                                                    })}
-                                                    <option value="custom">กำหนดเอง</option>
-                                                </select>
+                                        </>
+                                    ) : (
+                                        /* ── Normal product row (unchanged) ── */
+                                        <>
+                                            {/* Row 1: Product name + qty controls + line total */}
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-gray-800 truncate">{item.productName}</p>
+                                                    <p className="text-[11px] text-gray-400">
+                                                        {item.productCode} · {item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <button
+                                                        onClick={() => updateCartQty(idx, item.quantity - 1)}
+                                                        className="w-7 h-7 rounded-md bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm"
+                                                    >−</button>
+                                                    <input
+                                                        type="number"
+                                                        value={item.quantity}
+                                                        onChange={e => {
+                                                            const val = parseInt(e.target.value) || 0;
+                                                            if (val >= 0 && val <= item.availableStock) {
+                                                                updateCartQty(idx, val);
+                                                            }
+                                                        }}
+                                                        onBlur={e => {
+                                                            const val = parseInt(e.target.value) || 1;
+                                                            updateCartQty(idx, Math.max(1, Math.min(val, item.availableStock)));
+                                                        }}
+                                                        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                                        className="font-bold text-sm text-center w-10 rounded-md border border-gray-200 py-0.5 outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                        min={1}
+                                                        max={item.availableStock}
+                                                    />
+                                                    <button
+                                                        onClick={() => updateCartQty(idx, item.quantity + 1)}
+                                                        disabled={item.quantity >= item.availableStock}
+                                                        className="w-7 h-7 rounded-md bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >+</button>
+                                                </div>
+                                                <p className="text-sm font-bold text-emerald-600 shrink-0 w-24 text-right">
+                                                    {formatCurrency(item.quantity * item.unitPrice)}
+                                                </p>
+                                                <button onClick={() => removeFromCart(idx)}
+                                                    className="text-red-300 hover:text-red-500 text-xs shrink-0 ml-1">✕</button>
                                             </div>
-                                            <div className="flex items-center gap-1">
-                                                <label className="text-[10px] text-gray-400 shrink-0">฿</label>
-                                                <input
-                                                    type="number"
-                                                    value={item.unitPrice}
-                                                    onChange={e => updateCartPrice(idx, parseFloat(e.target.value) || 0)}
-                                                    className="w-16 px-1.5 py-0.5 rounded border border-gray-200 text-[11px] outline-none text-right font-semibold"
-                                                    step="0.01" min={0}
-                                                />
-                                                <span className="text-[10px] text-gray-400">/{item.unit}</span>
-                                            </div>
-                                        </div>
+
+                                            {/* Row 2: Selectors — hidden in review mode */}
+                                            {!isReview && (
+                                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                                    <div className="flex items-center gap-1">
+                                                        <label className="text-[10px] text-gray-400 shrink-0">คลัง:</label>
+                                                        <select
+                                                            value={item.warehouseId}
+                                                            onChange={e => updateCartWarehouse(idx, e.target.value)}
+                                                            className="px-1.5 py-0.5 rounded border border-gray-200 text-[11px] outline-none"
+                                                        >
+                                                            {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                                        </select>
+                                                        <span className="text-[10px] text-gray-400">({item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock})</span>
+                                                    </div>
+                                                    {item.productUnits && item.productUnits.length > 0 && (
+                                                        <div className="flex items-center gap-1">
+                                                            <label className="text-[10px] text-gray-400 shrink-0">หน่วย:</label>
+                                                            <select
+                                                                value={item.selectedUnitId || '__default__'}
+                                                                onChange={e => updateCartUnit(idx, e.target.value)}
+                                                                className="px-1.5 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-[11px] outline-none font-medium"
+                                                            >
+                                                                {/* Always show product's default unit if no base unit in productUnits */}
+                                                                {!item.productUnits.some(u => u.isBaseUnit) && (
+                                                                    <option value="__default__">
+                                                                        {products.find(p => p.id === item.productId)?.unit || item.unit} (ปกติ)
+                                                                    </option>
+                                                                )}
+                                                                {item.productUnits.map(u => (
+                                                                    <option key={u.id} value={u.id}>
+                                                                        {u.unitName} {u.isBaseUnit ? '(หลัก)' : `(×${Number(u.conversionRate)})`}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center gap-1">
+                                                        <label className="text-[10px] text-gray-400 shrink-0">ราคา:</label>
+                                                        <select
+                                                            value={item.priceTier}
+                                                            onChange={e => updateCartPriceTier(idx, e.target.value)}
+                                                            className="px-1.5 py-0.5 rounded border border-gray-200 text-[11px] outline-none"
+                                                        >
+                                                            {item.productPrices.map(pp => {
+                                                                const grp = customerGroups.find(g => g.id === pp.customerGroupId);
+                                                                return <option key={pp.customerGroupId} value={pp.customerGroupId}>{grp?.name || 'กลุ่ม'} ({formatCurrency(pp.price)})</option>;
+                                                            })}
+                                                            <option value="custom">กำหนดเอง</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <label className="text-[10px] text-gray-400 shrink-0">฿</label>
+                                                        <input
+                                                            type="number"
+                                                            value={item.unitPrice}
+                                                            onChange={e => updateCartPrice(idx, parseFloat(e.target.value) || 0)}
+                                                            className="w-16 px-1.5 py-0.5 rounded border border-gray-200 text-[11px] outline-none text-right font-semibold"
+                                                            step="0.01" min={0}
+                                                        />
+                                                        <span className="text-[10px] text-gray-400">/{item.unit}</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             ))}
@@ -687,10 +893,34 @@ export default function POSPage() {
                         <div className="mt-2 sm:mt-3">
                             <input
                                 type="text" value={search} onChange={e => setSearch(e.target.value)}
-                                placeholder="🔍 ค้นหาสินค้า..."
+                                placeholder={posTab === 'bundles' ? '🔍 ค้นหาชุดสินค้า...' : '🔍 ค้นหาสินค้า...'}
                                 className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                             />
                         </div>
+
+                        {/* Tab Switcher: สินค้า / ชุดสินค้า */}
+                        {bundles.length > 0 && (
+                            <div className="mt-2 flex bg-gray-100 rounded-xl p-1">
+                                <button
+                                    onClick={() => setPosTab('products')}
+                                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${posTab === 'products'
+                                        ? 'bg-white text-emerald-700 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    📦 สินค้า ({filteredProducts.length})
+                                </button>
+                                <button
+                                    onClick={() => setPosTab('bundles')}
+                                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${posTab === 'bundles'
+                                        ? 'bg-purple-500 text-white shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    🎁 ชุดสินค้า ({filteredBundles.length})
+                                </button>
+                            </div>
+                        )}
 
                         {/* Mobile: Customer Selector */}
                         <div className="lg:hidden mt-2">
@@ -738,47 +968,86 @@ export default function POSPage() {
                     {/* Product Grid — centered */}
                     <div className="flex-1 overflow-y-auto p-3 sm:p-4">
                         <div className="max-w-5xl mx-auto">
-                            <div className={`grid gap-2 sm:gap-3 ${reviewMode
-                                ? 'grid-cols-2 lg:grid-cols-2'
-                                : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
-                                }`}>
-                                {filteredProducts.map(product => {
-                                    const stock = getStock(product, defaultWarehouseId);
-                                    const price = getPrice(product);
-                                    const outOfStock = stock <= 0;
-                                    const inCart = cart.find(c => c.productId === product.id);
-                                    return (
-                                        <button
-                                            key={product.id}
-                                            onClick={() => addToCart(product)}
-                                            className={`rounded-xl text-left transition-all relative ${reviewMode ? 'p-2.5' : 'p-3 sm:p-4'
-                                                } ${inCart
-                                                    ? 'bg-emerald-50 border-2 border-emerald-300 shadow-sm'
-                                                    : outOfStock
-                                                        ? 'bg-orange-50 border border-orange-200 shadow-sm hover:shadow-md active:scale-[0.97]'
-                                                        : 'bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 active:scale-[0.97]'
-                                                }`}
-                                        >
-                                            {inCart && (
-                                                <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">
-                                                    {inCart.quantity}
-                                                </span>
-                                            )}
-                                            <div className="flex items-center justify-between mb-1">
-                                                <span className={`font-mono text-gray-400 ${reviewMode ? 'text-[9px]' : 'text-[10px] sm:text-xs'}`}>{product.code}</span>
-                                                <span className={`font-semibold ${reviewMode ? 'text-[9px]' : 'text-[10px] sm:text-xs'} ${outOfStock ? 'text-red-500' : stock < 10 ? 'text-orange-500' : 'text-emerald-600'}`}>
-                                                    {stock}
-                                                </span>
-                                            </div>
-                                            <p className={`font-medium text-gray-800 mb-1 line-clamp-2 leading-tight ${reviewMode ? 'text-xs' : 'text-xs sm:text-sm'}`}>{product.name}</p>
-                                            <p className={`font-bold text-emerald-600 ${reviewMode ? 'text-xs' : 'text-xs sm:text-sm'}`}>{formatCurrency(price)}</p>
-                                            {!reviewMode && product.pointsPerUnit > 0 && (
-                                                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 sm:mt-1">+{product.pointsPerUnit} แต้ม</p>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            {posTab === 'products' ? (
+                                <div className={`grid gap-2 sm:gap-3 ${reviewMode
+                                    ? 'grid-cols-2 lg:grid-cols-2'
+                                    : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+                                    }`}>
+                                    {filteredProducts.map(product => {
+                                        const stock = getStock(product, defaultWarehouseId);
+                                        const price = getPrice(product);
+                                        const outOfStock = stock <= 0;
+                                        const inCart = cart.find(c => c.productId === product.id);
+                                        return (
+                                            <button
+                                                key={product.id}
+                                                onClick={() => addToCart(product)}
+                                                className={`rounded-xl text-left transition-all relative ${reviewMode ? 'p-2.5' : 'p-3 sm:p-4'
+                                                    } ${inCart
+                                                        ? 'bg-emerald-50 border-2 border-emerald-300 shadow-sm'
+                                                        : outOfStock
+                                                            ? 'bg-orange-50 border border-orange-200 shadow-sm hover:shadow-md active:scale-[0.97]'
+                                                            : 'bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 active:scale-[0.97]'
+                                                    }`}
+                                            >
+                                                {inCart && (
+                                                    <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">
+                                                        {inCart.quantity}
+                                                    </span>
+                                                )}
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className={`font-mono text-gray-400 ${reviewMode ? 'text-[9px]' : 'text-[10px] sm:text-xs'}`}>{product.code}</span>
+                                                    <span className={`font-semibold ${reviewMode ? 'text-[9px]' : 'text-[10px] sm:text-xs'} ${outOfStock ? 'text-red-500' : stock < 10 ? 'text-orange-500' : 'text-emerald-600'}`}>
+                                                        {stock}
+                                                    </span>
+                                                </div>
+                                                <p className={`font-medium text-gray-800 mb-1 line-clamp-2 leading-tight ${reviewMode ? 'text-xs' : 'text-xs sm:text-sm'}`}>{product.name}</p>
+                                                <p className={`font-bold text-emerald-600 ${reviewMode ? 'text-xs' : 'text-xs sm:text-sm'}`}>{formatCurrency(price)}</p>
+                                                {!reviewMode && product.pointsPerUnit > 0 && (
+                                                    <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 sm:mt-1">+{product.pointsPerUnit} แต้ม</p>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                /* Bundle Grid */
+                                <div className={`grid gap-2 sm:gap-3 ${reviewMode
+                                    ? 'grid-cols-1 lg:grid-cols-2'
+                                    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                                    }`}>
+                                    {filteredBundles.length === 0 ? (
+                                        <div className="col-span-full text-center py-12 text-gray-400">
+                                            <p className="text-3xl mb-2">🎁</p>
+                                            <p className="text-sm">ไม่พบชุดสินค้า</p>
+                                        </div>
+                                    ) : (
+                                        filteredBundles.map(bundle => (
+                                            <button
+                                                key={bundle.id}
+                                                onClick={() => addBundleToCart(bundle)}
+                                                className="rounded-xl text-left transition-all p-3 sm:p-4 bg-white border border-purple-100 shadow-sm hover:shadow-md hover:border-purple-300 active:scale-[0.98]"
+                                            >
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="font-mono text-purple-400 text-[10px] sm:text-xs">{bundle.code}</span>
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-700">
+                                                        {bundle.items.length} สินค้า
+                                                    </span>
+                                                </div>
+                                                <p className="font-medium text-gray-800 mb-1 text-xs sm:text-sm">🎁 {bundle.name}</p>
+                                                <p className="font-bold text-purple-600 text-xs sm:text-sm">{formatCurrency(Number(bundle.bundlePrice))}</p>
+                                                <div className="mt-1.5 space-y-0.5">
+                                                    {bundle.items.map(item => (
+                                                        <p key={item.id} className="text-[10px] text-gray-400">
+                                                            {item.product.name} ×{item.quantity}
+                                                        </p>
+                                                    ))}
+                                                </div>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

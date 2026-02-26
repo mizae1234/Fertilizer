@@ -27,8 +27,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             },
             sales: {
                 orderBy: { createdAt: 'desc' },
-                take: 20,
-                ...(hasDateFilter ? { where: { createdAt: dateFilter } } : {}),
+                ...(hasDateFilter ? { where: { createdAt: dateFilter, status: 'APPROVED', deletedAt: null } } : { where: { status: 'APPROVED', deletedAt: null } }),
                 include: {
                     items: {
                         select: { quantity: true, unitPrice: true, totalPrice: true, product: { select: { name: true, code: true } }, warehouse: { select: { name: true } } },

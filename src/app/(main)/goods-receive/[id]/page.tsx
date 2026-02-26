@@ -22,6 +22,7 @@ interface GRItem {
     warehouseName: string;
     quantity: number;
     unitCost: number;
+    lotNo: string;
 }
 
 interface GRDetail {
@@ -43,6 +44,7 @@ interface GRDetail {
         quantity: number;
         unitCost: number | string;
         totalCost: number | string;
+        lotNo: string | null;
         product: { name: string; code: string; unit: string };
         warehouse: { name: string };
     }[];
@@ -102,6 +104,7 @@ export default function GoodsReceiveDetailPage() {
                     warehouseName: item.warehouse.name,
                     quantity: item.quantity,
                     unitCost: Number(item.unitCost),
+                    lotNo: item.lotNo || '',
                 })));
                 setLoading(false);
             });
@@ -123,7 +126,7 @@ export default function GoodsReceiveDetailPage() {
 
     // Item helpers
     const addItem = () => {
-        setItems([...items, { productId: '', productName: '', productCode: '', productUnit: '', warehouseId: warehouses[0]?.id || '', warehouseName: warehouses[0]?.name || '', quantity: 1, unitCost: 0 }]);
+        setItems([...items, { productId: '', productName: '', productCode: '', productUnit: '', warehouseId: warehouses[0]?.id || '', warehouseName: warehouses[0]?.name || '', quantity: 1, unitCost: 0, lotNo: '' }]);
     };
 
     const removeItem = (idx: number) => {
@@ -164,6 +167,7 @@ export default function GoodsReceiveDetailPage() {
                     warehouseId: i.warehouseId,
                     quantity: i.quantity,
                     unitCost: i.unitCost,
+                    lotNo: i.lotNo || undefined,
                 })),
             });
             if (updated) {
@@ -390,6 +394,16 @@ export default function GoodsReceiveDetailPage() {
                                             </button>
                                         )}
                                     </div>
+                                    {/* Lot No */}
+                                    <div className="sm:col-span-4">
+                                        <label className="text-xs text-gray-400 mb-1 block">Lot No.</label>
+                                        <input
+                                            type="text" value={item.lotNo}
+                                            onChange={e => updateItem(idx, 'lotNo', e.target.value)}
+                                            placeholder="เลข Lot (ถ้ามี)"
+                                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        />
+                                    </div>
                                 </div>
                                 {/* Line total */}
                                 <div className="text-right mt-2">
@@ -408,6 +422,7 @@ export default function GoodsReceiveDetailPage() {
                                 <tr className="bg-gray-50 border-b border-gray-100">
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">สินค้า</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">รวม</th>
@@ -421,6 +436,7 @@ export default function GoodsReceiveDetailPage() {
                                             <p className="text-xs text-gray-400">{item.product.code}</p>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-600">{item.warehouse.name}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-600">{item.lotNo || '-'}</td>
                                         <td className="px-4 py-3 text-sm text-gray-800 text-right">{item.quantity} {item.product.unit}</td>
                                         <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitCost))}</td>
                                         <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(item.totalCost))}</td>
@@ -435,7 +451,7 @@ export default function GoodsReceiveDetailPage() {
                                     <div className="flex justify-between items-start mb-1">
                                         <div>
                                             <p className="text-sm font-medium text-gray-800">{item.product.name}</p>
-                                            <p className="text-xs text-gray-400">{item.product.code} · {item.warehouse.name}</p>
+                                            <p className="text-xs text-gray-400">{item.product.code} · {item.warehouse.name}{item.lotNo ? ` · Lot: ${item.lotNo}` : ''}</p>
                                         </div>
                                         <p className="text-sm font-bold text-gray-800">{formatCurrency(Number(item.totalCost))}</p>
                                     </div>

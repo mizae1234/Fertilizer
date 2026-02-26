@@ -3,10 +3,11 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
     const transfer = await prisma.stockTransfer.findUnique({
-        where: { id: params.id },
+        where: { id },
         include: {
             fromWarehouse: { select: { name: true } },
             toWarehouse: { select: { name: true } },

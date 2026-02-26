@@ -35,12 +35,16 @@ export async function createCustomer(data: {
     name: string;
     phone: string;
     customerGroupId: string;
+    address?: string;
+    taxId?: string;
 }) {
     const customer = await prisma.customer.create({
         data: {
             name: data.name,
             phone: data.phone,
             customerGroupId: data.customerGroupId,
+            address: data.address || null,
+            taxId: data.taxId || null,
         },
     });
     revalidatePath('/customers');
@@ -49,7 +53,7 @@ export async function createCustomer(data: {
 
 export async function updateCustomer(
     id: string,
-    data: { name: string; phone: string; customerGroupId: string }
+    data: { name: string; phone: string; customerGroupId: string; address?: string; taxId?: string }
 ) {
     await prisma.customer.update({
         where: { id },
@@ -57,6 +61,8 @@ export async function updateCustomer(
             name: data.name,
             phone: data.phone,
             customerGroupId: data.customerGroupId,
+            address: data.address || null,
+            taxId: data.taxId || null,
         },
     });
     revalidatePath('/customers');

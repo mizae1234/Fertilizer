@@ -15,6 +15,7 @@ interface LineItem {
     warehouseId: string;
     quantity: number;
     unitCost: number;
+    lotNo: string;
 }
 
 // ── Searchable Product Picker ─────────────────────────────
@@ -142,7 +143,7 @@ export default function NewGoodsReceivePage() {
     const addItem = () => {
         setItems([...items, {
             productId: '', productName: '', productCode: '',
-            warehouseId: defaultWarehouseId, quantity: 1, unitCost: 0,
+            warehouseId: defaultWarehouseId, quantity: 1, unitCost: 0, lotNo: '',
         }]);
     };
 
@@ -191,6 +192,7 @@ export default function NewGoodsReceivePage() {
                     warehouseId: i.warehouseId,
                     quantity: i.quantity,
                     unitCost: i.unitCost,
+                    lotNo: i.lotNo || undefined,
                 })),
                 userId: payload.userId,
             });
@@ -371,6 +373,16 @@ export default function NewGoodsReceivePage() {
                                                     ))}
                                                 </select>
                                             </div>
+                                            <div className="w-28 shrink-0">
+                                                <label className="block text-xs text-gray-500 mb-1">Lot No.</label>
+                                                <input
+                                                    type="text"
+                                                    value={item.lotNo}
+                                                    onChange={(e) => updateItem(idx, 'lotNo', e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
+                                                    placeholder="LOT-xxx"
+                                                />
+                                            </div>
                                             <button type="button" onClick={() => removeItem(idx)}
                                                 className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg shrink-0 mb-0.5"
                                                 title="ลบรายการ">
@@ -441,6 +453,16 @@ export default function NewGoodsReceivePage() {
                                                         รีเซ็ต
                                                     </button>
                                                 )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-1">Lot No.</label>
+                                                <input
+                                                    type="text"
+                                                    value={item.lotNo}
+                                                    onChange={(e) => updateItem(idx, 'lotNo', e.target.value)}
+                                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
+                                                    placeholder="LOT-xxx"
+                                                />
                                             </div>
                                         </div>
 

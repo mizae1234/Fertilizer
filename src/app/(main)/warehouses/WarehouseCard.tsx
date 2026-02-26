@@ -17,7 +17,8 @@ interface Warehouse {
     name: string;
     location: string | null;
     isActive: boolean;
-    productStocks: ProductStock[];
+    _count: { productStocks: number };
+    productStocks: { quantity: number }[];
 }
 
 export default function WarehouseCard({ wh }: { wh: Warehouse }) {
@@ -126,7 +127,7 @@ export default function WarehouseCard({ wh }: { wh: Warehouse }) {
                     <div className="grid grid-cols-2 gap-3 mt-4">
                         <div className="bg-gray-50 rounded-lg p-3 text-center">
                             <p className="text-xs text-gray-500">สินค้าทั้งหมด</p>
-                            <p className="text-lg font-bold text-gray-800">{wh.productStocks.length}</p>
+                            <p className="text-lg font-bold text-gray-800">{wh._count.productStocks}</p>
                         </div>
                         <div className="bg-gray-50 rounded-lg p-3 text-center">
                             <p className="text-xs text-gray-500">จำนวน Stock</p>
@@ -134,20 +135,6 @@ export default function WarehouseCard({ wh }: { wh: Warehouse }) {
                         </div>
                     </div>
 
-                    {wh.productStocks.length > 0 && (
-                        <div className="mt-4 space-y-2">
-                            <p className="text-xs font-semibold text-gray-500">สินค้าในคลัง:</p>
-                            {wh.productStocks.slice(0, 3).map((ps) => (
-                                <div key={ps.id} className="flex justify-between text-xs text-gray-600">
-                                    <span>{ps.product.name}</span>
-                                    <span className="font-medium">{ps.quantity.toLocaleString()}</span>
-                                </div>
-                            ))}
-                            {wh.productStocks.length > 3 && (
-                                <p className="text-xs text-gray-400">+{wh.productStocks.length - 3} รายการ</p>
-                            )}
-                        </div>
-                    )}
 
                     {/* Action Buttons */}
                     <div className="flex gap-2 mt-4 pt-3 border-t border-gray-100">

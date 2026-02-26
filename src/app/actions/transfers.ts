@@ -10,7 +10,7 @@ export async function getTransfers(page = 1, status = '') {
     const perPage = 10;
     const where = {
         deletedAt: null,
-        ...(status ? { status: status as 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' } : {}),
+        ...(status ? { status: status as 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' } : {}),
     };
 
     const [transfers, total] = await Promise.all([
