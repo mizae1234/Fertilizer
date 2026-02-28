@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { updateProductCost } from '@/app/actions/products';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 import AlertModal from '@/components/AlertModal';
 
 interface ProductStock {
@@ -84,6 +84,7 @@ interface ProductDetail {
 const txTypeLabels: Record<string, { label: string; color: string; icon: string }> = {
     GOODS_RECEIVE: { label: 'รับสินค้า', color: 'text-emerald-700 bg-emerald-50', icon: '📥' },
     SALE: { label: 'ขาย', color: 'text-blue-700 bg-blue-50', icon: '💰' },
+    SALE_CANCEL: { label: 'ยกเลิกบิล', color: 'text-rose-700 bg-rose-50', icon: '❌' },
     TRANSFER_IN: { label: 'โอนเข้า', color: 'text-purple-700 bg-purple-50', icon: '⬅️' },
     TRANSFER_OUT: { label: 'โอนออก', color: 'text-orange-700 bg-orange-50', icon: '➡️' },
     ADJUSTMENT: { label: 'ปรับ', color: 'text-gray-700 bg-gray-50', icon: '🔧' },
@@ -889,7 +890,7 @@ export default function ProductDetailPage() {
                                                 const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
                                                 return (
                                                     <tr key={tx.id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-sm text-gray-600">{formatDate(tx.createdAt)}</td>
+                                                        <td className="px-4 py-3 text-sm text-gray-600">{formatDateTime(tx.createdAt)}</td>
                                                         <td className="px-4 py-3">
                                                             <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
                                                                 {info.icon} {info.label}
@@ -936,7 +937,7 @@ export default function ProductDetailPage() {
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between text-xs text-gray-500">
-                                                    <span>{formatDate(tx.createdAt)}</span>
+                                                    <span>{formatDateTime(tx.createdAt)}</span>
                                                     <span>{tx.warehouse.name}</span>
                                                 </div>
                                                 <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -979,7 +980,7 @@ export default function ProductDetailPage() {
                                         <tbody className="divide-y divide-gray-50">
                                             {product.productLogs.map(log => (
                                                 <tr key={log.id} className="hover:bg-gray-50">
-                                                    <td className="px-4 py-3 text-sm text-gray-600">{formatDate(log.createdAt)}</td>
+                                                    <td className="px-4 py-3 text-sm text-gray-600">{formatDateTime(log.createdAt)}</td>
                                                     <td className="px-4 py-3">
                                                         <span className="inline-flex items-center text-xs font-medium px-2 py-1 rounded-lg bg-blue-50 text-blue-700">
                                                             {log.field || log.action}
@@ -1012,7 +1013,7 @@ export default function ProductDetailPage() {
                                                 <span className="inline-flex items-center text-xs font-medium px-2 py-1 rounded-lg bg-blue-50 text-blue-700">
                                                     {log.field || log.action}
                                                 </span>
-                                                <span className="text-xs text-gray-400">{formatDate(log.createdAt)}</span>
+                                                <span className="text-xs text-gray-400">{formatDateTime(log.createdAt)}</span>
                                             </div>
                                             {log.details && <p className="text-sm text-gray-700 mb-1">{log.details}</p>}
                                             {log.user && <p className="text-xs text-blue-500">👤 {log.user.name}</p>}

@@ -22,6 +22,7 @@ enum OrderStatus {
 enum TransactionType {
   GOODS_RECEIVE
   SALE
+  SALE_CANCEL
   TRANSFER_IN
   TRANSFER_OUT
   ADJUSTMENT

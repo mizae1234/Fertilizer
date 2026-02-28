@@ -248,17 +248,28 @@ export async function cancelSale(id: string) {
     if (sale.status === 'CANCELLED') throw new Error('บิลนี้ถูกยกเลิกแล้ว');
 
     await prisma.$transaction(async (tx) => {
-        // If APPROVED, restore stock
+        // If APPROVED, restore stock and record the cancellation
         if (sale.status === 'APPROVED') {
             for (const item of sale.items) {
                 await tx.productStock.update({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
                     data: { quantity: { increment: item.quantity } },
                 });
+
+                // Create SALE_CANCEL stock transaction (positive qty = stock returned)
+                await tx.stockTransaction.create({
+                    data: {
+                        productId: item.productId,
+                        warehouseId: item.warehouseId,
+                        type: 'SALE_CANCEL',
+                        quantity: item.quantity,
+                        unitCost: item.unitPrice,
+                        reference: sale.saleNumber,
+                        userId: sale.createdById,
+                        notes: `ยกเลิกบิล ${sale.saleNumber}`,
+                    },
+                });
             }
-            await tx.stockTransaction.deleteMany({
-                where: { reference: sale.saleNumber, type: 'SALE' },
-            });
         }
         await tx.sale.update({ where: { id }, data: { status: 'CANCELLED' } });
     });

@@ -184,7 +184,14 @@ export default function NewStockAdjustmentPage() {
 
         setSaving(true);
         try {
-            const userId = localStorage.getItem('userId') || '';
+            let userId = '';
+            try {
+                const token = document.cookie.split('; ').find(c => c.startsWith('token='))?.split('=')[1];
+                if (token) {
+                    const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(token.split('.')[1]), c => c.charCodeAt(0))));
+                    userId = payload.userId || '';
+                }
+            } catch { /* ignore */ }
             const result = await createStockAdjustment({
                 adjustmentType,
                 note: note.trim() || undefined,
@@ -231,8 +238,8 @@ export default function NewStockAdjustmentPage() {
                         type="button"
                         onClick={() => setAdjustmentType('increase')}
                         className={`flex-1 py-3 rounded-xl text-sm font-semibold transition-all ${!isDecrease
-                                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200'
-                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                             }`}
                     >
                         📈 เพิ่ม Stock
@@ -241,8 +248,8 @@ export default function NewStockAdjustmentPage() {
                         type="button"
                         onClick={() => setAdjustmentType('decrease')}
                         className={`flex-1 py-3 rounded-xl text-sm font-semibold transition-all ${isDecrease
-                                ? 'bg-red-500 text-white shadow-md shadow-red-200'
-                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            ? 'bg-red-500 text-white shadow-md shadow-red-200'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                             }`}
                     >
                         📉 ลด Stock
@@ -357,8 +364,8 @@ export default function NewStockAdjustmentPage() {
                 onClick={handleSubmit}
                 disabled={saving}
                 className={`w-full py-3.5 rounded-xl text-white font-semibold text-base shadow-lg disabled:opacity-50 transition-all ${isDecrease
-                        ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 shadow-red-200'
-                        : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-emerald-200'
+                    ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 shadow-red-200'
+                    : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-emerald-200'
                     }`}
             >
                 {saving ? '⏳ กำลังบันทึก...' : (isDecrease ? '📉 บันทึกลด Stock' : '📈 บันทึกเพิ่ม Stock')}
