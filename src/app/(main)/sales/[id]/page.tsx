@@ -179,10 +179,16 @@ export default function SaleDetailPage() {
                 <div className="flex items-center gap-2">
                     <StatusBadge status={sale.status} className="text-sm px-3 py-1.5" />
                     {!isEditing && (
-                        <button onClick={() => window.open(`/invoice/${id}`, '_blank')}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-sm font-medium hover:bg-emerald-100">
-                            🖨️ พิมพ์ใบเสร็จ
-                        </button>
+                        <>
+                            <button onClick={() => window.open(`/receipt/${id}`, '_blank')}
+                                className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 text-sm font-medium hover:bg-amber-100">
+                                🧾 สลิป
+                            </button>
+                            <button onClick={() => window.open(`/invoice/${id}`, '_blank')}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-sm font-medium hover:bg-emerald-100">
+                                🖨️ ใบเสร็จ A4
+                            </button>
+                        </>
                     )}
                     {!isEditing && sale.status !== 'CANCELLED' && (
                         <button onClick={startEditing} className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100">

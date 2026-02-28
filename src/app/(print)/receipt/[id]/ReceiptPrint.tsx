@@ -118,7 +118,10 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
                         <span>พนง: {sale.createdBy?.name || '-'}</span>
                     </div>
                     {sale.customer && (
-                        <div>ลูกค้า: {sale.customer.name}</div>
+                        <div>
+                            <div>ลูกค้า: {sale.customer.name}</div>
+                            {sale.customer.phone && <div>โทร: {sale.customer.phone}</div>}
+                        </div>
                     )}
                 </div>
 
