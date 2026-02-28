@@ -258,8 +258,20 @@ export default function POSPage() {
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [defaultWarehouseId, setDefaultWarehouseId] = useState('');
-    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-    const [cart, setCart] = useState<CartItem[]>([]);
+    const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(() => {
+        if (typeof window === 'undefined') return null;
+        try {
+            const saved = sessionStorage.getItem('pos_customer');
+            return saved ? JSON.parse(saved) : null;
+        } catch { return null; }
+    });
+    const [cart, setCart] = useState<CartItem[]>(() => {
+        if (typeof window === 'undefined') return [];
+        try {
+            const saved = sessionStorage.getItem('pos_cart');
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
     const [userId, setUserId] = useState('');
     const [search, setSearch] = useState('');
     const [customerSearch, setCustomerSearch] = useState('');
@@ -282,10 +294,9 @@ export default function POSPage() {
     const [billDiscount, setBillDiscount] = useState(0);
     const [showBillDiscount, setShowBillDiscount] = useState(false);
 
-    // Cart persistence via sessionStorage
+    // Cart persistence keys
     const CART_STORAGE_KEY = 'pos_cart';
     const CUSTOMER_STORAGE_KEY = 'pos_customer';
-    const cartInitialized = useRef(false);
 
     useEffect(() => {
         try {
@@ -306,15 +317,6 @@ export default function POSPage() {
             setBundles(b);
             if (w.length > 0) setDefaultWarehouseId(w[0].id);
         });
-
-        // Restore cart + customer from sessionStorage
-        try {
-            const savedCart = sessionStorage.getItem(CART_STORAGE_KEY);
-            if (savedCart) setCart(JSON.parse(savedCart));
-            const savedCustomer = sessionStorage.getItem(CUSTOMER_STORAGE_KEY);
-            if (savedCustomer) setSelectedCustomer(JSON.parse(savedCustomer));
-        } catch { /* ignore */ }
-        cartInitialized.current = true;
     }, []);
 
     const loadProducts = useCallback(async (warehouseId: string) => {
@@ -335,11 +337,9 @@ export default function POSPage() {
 
     // Persist cart to sessionStorage
     useEffect(() => {
-        if (!cartInitialized.current) return;
         try { sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart)); } catch { /* ignore */ }
     }, [cart]);
     useEffect(() => {
-        if (!cartInitialized.current) return;
         try {
             if (selectedCustomer) sessionStorage.setItem(CUSTOMER_STORAGE_KEY, JSON.stringify(selectedCustomer));
             else sessionStorage.removeItem(CUSTOMER_STORAGE_KEY);
