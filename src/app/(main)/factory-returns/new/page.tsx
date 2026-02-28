@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createFactoryReturn } from '@/app/actions/factory-returns';
 import { formatCurrency } from '@/lib/utils';
 import AlertModal from '@/components/AlertModal';
 
 interface Vendor { id: string; name: string }
-interface Product { id: string; name: string; code: string; unit: string; cost: string; productStocks: { warehouseId: string; quantity: number; warehouse: { name: string } }[] }
+interface Product { id: string; name: string; code: string; unit: string; cost: string; productStocks: { warehouseId: string; quantity: number }[] }
 interface Warehouse { id: string; name: string }
 
 interface ReturnItem {
     productId: string; productName: string; productCode: string; unit: string;
-    warehouseId: string; warehouseName: string;
+    warehouseId: string;
     quantity: number; unitCost: number;
     availableStock: number;
 }
@@ -20,7 +20,6 @@ interface ReturnItem {
 export default function NewFactoryReturnPage() {
     const router = useRouter();
     const [vendors, setVendors] = useState<Vendor[]>([]);
-    const [products, setProducts] = useState<Product[]>([]);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -31,9 +30,12 @@ export default function NewFactoryReturnPage() {
     const [senderName, setSenderName] = useState('');
     const [receiverName, setReceiverName] = useState('');
 
-    // Product search
+    // Product search (on-demand)
     const [productSearch, setProductSearch] = useState('');
+    const [searchResults, setSearchResults] = useState<Product[]>([]);
     const [showProductPicker, setShowProductPicker] = useState(false);
+    const [searching, setSearching] = useState(false);
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Alert modal
     const [alertModal, setAlertModal] = useState<{ show: boolean; title: string; message: string; type: 'success' | 'error' }>({ show: false, title: '', message: '', type: 'success' });
@@ -41,47 +43,52 @@ export default function NewFactoryReturnPage() {
     useEffect(() => {
         Promise.all([
             fetch('/api/vendors').then(r => r.json()),
-            fetch('/api/products?all=1').then(r => r.json()),
             fetch('/api/warehouses').then(r => r.json()),
-        ]).then(([v, p, w]) => {
+        ]).then(([v, w]) => {
             setVendors(v);
-            setProducts(Array.isArray(p) ? p : p.products || []);
             setWarehouses(w);
             setLoading(false);
         });
     }, []);
 
-    const filteredProducts = products.filter(p =>
-        p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-        p.code.toLowerCase().includes(productSearch.toLowerCase())
-    ).slice(0, 20);
+    // Debounced product search
+    const handleProductSearch = (term: string) => {
+        setProductSearch(term);
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+        if (!term.trim()) {
+            setSearchResults([]);
+            return;
+        }
+        searchTimerRef.current = setTimeout(async () => {
+            setSearching(true);
+            try {
+                const res = await fetch(`/api/products?search=${encodeURIComponent(term.trim())}`);
+                const data = await res.json();
+                setSearchResults(Array.isArray(data) ? data : []);
+            } catch { setSearchResults([]); }
+            setSearching(false);
+        }, 300);
+    };
 
     const addProduct = (product: Product) => {
-        const defaultWh = product.productStocks?.[0];
+        const defaultWhId = warehouses[0]?.id || '';
+        const stock = product.productStocks?.find(ps => ps.warehouseId === defaultWhId);
         setItems([...items, {
             productId: product.id, productName: product.name, productCode: product.code, unit: product.unit,
-            warehouseId: defaultWh?.warehouseId || warehouses[0]?.id || '',
-            warehouseName: defaultWh?.warehouse.name || warehouses[0]?.name || '',
+            warehouseId: defaultWhId,
             quantity: 1,
             unitCost: Number(product.cost),
-            availableStock: defaultWh?.quantity || 0,
+            availableStock: stock?.quantity || 0,
         }]);
         setShowProductPicker(false);
         setProductSearch('');
+        setSearchResults([]);
     };
 
     const updateItem = (idx: number, field: string, value: any) => {
         setItems(items.map((item, i) => {
             if (i !== idx) return item;
             const updated = { ...item, [field]: value };
-
-            // When changing warehouse, update available stock
-            if (field === 'warehouseId') {
-                const product = products.find(p => p.id === item.productId);
-                const stock = product?.productStocks.find(ps => ps.warehouseId === value);
-                updated.availableStock = stock?.quantity || 0;
-                updated.warehouseName = stock?.warehouse.name || warehouses.find(w => w.id === value)?.name || '';
-            }
             return updated;
         }));
     };
@@ -192,15 +199,19 @@ export default function NewFactoryReturnPage() {
                         {showProductPicker && (
                             <div className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 max-h-96 overflow-hidden">
                                 <div className="p-3 border-b">
-                                    <input type="text" autoFocus placeholder="ค้นหาสินค้า..." value={productSearch}
-                                        onChange={e => setProductSearch(e.target.value)}
+                                    <input type="text" autoFocus placeholder="พิมพ์ค้นหาสินค้า..." value={productSearch}
+                                        onChange={e => handleProductSearch(e.target.value)}
                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
                                 </div>
                                 <div className="max-h-72 overflow-y-auto">
-                                    {filteredProducts.length === 0 ? (
+                                    {!productSearch.trim() ? (
+                                        <p className="px-4 py-6 text-center text-sm text-gray-400">พิมพ์ชื่อหรือรหัสสินค้าเพื่อค้นหา</p>
+                                    ) : searching ? (
+                                        <p className="px-4 py-6 text-center text-sm text-gray-400">⏳ กำลังค้นหา...</p>
+                                    ) : searchResults.length === 0 ? (
                                         <p className="px-4 py-6 text-center text-sm text-gray-400">ไม่พบสินค้า</p>
                                     ) : (
-                                        filteredProducts.map(p => (
+                                        searchResults.map((p: Product) => (
                                             <button key={p.id} onClick={() => addProduct(p)}
                                                 className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-50 last:border-0">
                                                 <p className="text-sm font-medium text-gray-800">{p.name}</p>
@@ -209,7 +220,7 @@ export default function NewFactoryReturnPage() {
                                         ))
                                     )}
                                 </div>
-                                <button onClick={() => setShowProductPicker(false)}
+                                <button onClick={() => { setShowProductPicker(false); setProductSearch(''); setSearchResults([]); }}
                                     className="w-full px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 border-t">ปิด</button>
                             </div>
                         )}
