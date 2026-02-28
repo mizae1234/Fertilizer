@@ -47,11 +47,11 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         table { border-collapse: collapse; width: 100%; }
         th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 12px; }
-        th { background: #ea580c; color: #fff; font-weight: 700; text-align: center; font-size: 11px; }
+        th { background: #374151; color: #fff; font-weight: 700; text-align: center; font-size: 11px; }
         .right { text-align: right; }
         .center { text-align: center; }
         .bold { font-weight: 700; }
-        .footer-row td { background: #fff7ed; font-weight: 700; font-size: 13px; border-top: 2px solid #ea580c; }
+        .footer-row td { background: #f3f4f6; font-weight: 700; font-size: 13px; border-top: 2px solid #374151; }
     </style>
 
     <h1 style="text-align:center;font-size:20px;margin-bottom:8px;font-weight:700;">ใบเคลมสินค้าคืนโรงงาน</h1>
@@ -97,7 +97,7 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
         <tfoot>
             <tr class="footer-row">
                 <td colspan="6" class="right" style="font-size:13px;">ยอดรวมทั้งหมด</td>
-                <td class="right" style="font-size:14px;color:#ea580c;">${formatNum(Number(data.totalAmount))}</td>
+                <td class="right" style="font-size:14px;font-weight:700;">${formatNum(Number(data.totalAmount))}</td>
             </tr>
         </tfoot>
     </table>
