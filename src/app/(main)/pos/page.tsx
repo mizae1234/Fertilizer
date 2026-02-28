@@ -694,10 +694,7 @@ export default function POSPage() {
     );
 
 
-    const desktopSearchRef = useRef<HTMLDivElement>(null);
-    const mobileSearchRef = useRef<HTMLDivElement>(null);
-    // const searchInputRef = useRef<HTMLInputElement>(null); // Already declared above
-    // const searchInputMobileRef = useRef<HTMLInputElement>(null); // Already declared above
+    const [showSearchResults, setShowSearchResults] = useState(false);
 
     // Close search dropdown when clicking outside
     useEffect(() => {
