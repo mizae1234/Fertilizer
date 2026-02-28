@@ -37,16 +37,24 @@ export default function NewProductPage() {
     const [units, setUnits] = useState<{ unitName: string; conversionRate: number; sellingPrice: number; isBaseUnit: boolean }[]>([]);
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
     const [brands, setBrands] = useState<string[]>([]);
+    const [packagings, setPackagings] = useState<string[]>([]);
+    const [unitNames, setUnitNames] = useState<string[]>([]);
+    const [imageUrl, setImageUrl] = useState('');
+    const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
         Promise.all([
             fetch('/api/customer-groups').then(r => r.json()),
             fetch('/api/product-groups').then(r => r.json()),
             fetch('/api/products/brands').then(r => r.json()),
-        ]).then(([cg, pg, br]) => {
+            fetch('/api/products/packagings').then(r => r.json()),
+            fetch('/api/products/unit-names').then(r => r.json()),
+        ]).then(([cg, pg, br, pk, un]) => {
             setCustomerGroups(cg);
             setProductGroups(pg);
             setBrands(Array.isArray(br) ? br : []);
+            setPackagings(Array.isArray(pk) ? pk : []);
+            setUnitNames(Array.isArray(un) ? un : []);
         });
     }, []);
 
@@ -56,6 +64,7 @@ export default function NewProductPage() {
         try {
             await createProduct({
                 ...form,
+                imageUrl: imageUrl || undefined,
                 productGroupId: form.productGroupId || undefined,
                 prices: prices.filter((p) => p.price > 0),
                 units: units.filter((u) => u.unitName.trim() !== ''),
@@ -68,11 +77,50 @@ export default function NewProductPage() {
         }
     };
 
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await fetch('/api/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'อัปโหลดล้มเหลว');
+            setImageUrl(data.url);
+        } catch (error) {
+            setAlertModal({ open: true, message: (error as Error).message });
+        } finally {
+            setUploading(false);
+        }
+    };
+
     return (
         <div className="max-w-2xl mx-auto animate-fade-in">
             <h1 className="text-2xl font-bold text-gray-800 mb-6">เพิ่มสินค้าใหม่</h1>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Image Upload */}
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
+                    <h2 className="font-semibold text-gray-800 mb-3">🖼️ รูปสินค้า</h2>
+                    <div className="flex items-center gap-4">
+                        {imageUrl ? (
+                            <img src={imageUrl} alt="Preview" className="w-24 h-24 object-cover rounded-xl border border-gray-200" />
+                        ) : (
+                            <div className="w-24 h-24 bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-xs">
+                                ไม่มีรูป
+                            </div>
+                        )}
+                        <div>
+                            <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium cursor-pointer transition-colors ${uploading ? 'bg-gray-200 text-gray-500' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>
+                                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+                                {uploading ? '⏳ กำลังอัปโหลด...' : (imageUrl ? '🔄 เปลี่ยนรูป' : '📷 อัปโหลดรูป')}
+                            </label>
+                            <p className="text-xs text-gray-400 mt-1">JPEG, PNG, WebP (สูงสุด 5MB)</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 space-y-4">
                     <h2 className="font-semibold text-gray-800">ข้อมูลสินค้า</h2>
 
@@ -131,9 +179,13 @@ export default function NewProductPage() {
                                 type="text"
                                 value={form.packaging}
                                 onChange={(e) => setForm({ ...form, packaging: e.target.value })}
+                                list="packaging-suggestions-new"
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                placeholder="เช่น ถุง 50 กก., กระสอบ 25 กก..."
+                                placeholder="พิมพ์เพื่อค้นหาหรือเพิ่มใหม่"
                             />
+                            <datalist id="packaging-suggestions-new">
+                                {packagings.map(p => <option key={p} value={p} />)}
+                            </datalist>
                         </div>
                     </div>
 
@@ -166,14 +218,18 @@ export default function NewProductPage() {
 
                     <div className="grid grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1.5">หน่วย</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-1.5">หน่วยนับ</label>
                             <input
                                 type="text"
                                 value={form.unit}
                                 onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                                list="unit-suggestions-new"
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                                 placeholder="เช่น ถุง, ขวด, กก., ตัน..."
                             />
+                            <datalist id="unit-suggestions-new">
+                                {unitNames.map(u => <option key={u} value={u} />)}
+                            </datalist>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">แต้ม/หน่วย</label>
@@ -267,7 +323,7 @@ export default function NewProductPage() {
                     ) : (
                         <div className="space-y-3">
                             {units.map((u, idx) => (
-                                <div key={idx} className={`flex items-center gap-3 p-3 rounded-xl border ${u.isBaseUnit ? 'border-emerald-200 bg-emerald-50/50' : 'border-gray-200 bg-gray-50/50'}`}>
+                                <div key={idx} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50">
                                     <div className="flex-1 min-w-0">
                                         <input
                                             type="text"
@@ -277,6 +333,7 @@ export default function NewProductPage() {
                                                 newUnits[idx] = { ...newUnits[idx], unitName: e.target.value };
                                                 setUnits(newUnits);
                                             }}
+                                            list="unit-name-suggestions-new"
                                             className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                                             placeholder="ชื่อหน่วย (เช่น ถุง, ลัง)"
                                         />
@@ -290,9 +347,8 @@ export default function NewProductPage() {
                                                 newUnits[idx] = { ...newUnits[idx], conversionRate: parseFloat(e.target.value) || 0 };
                                                 setUnits(newUnits);
                                             }}
-                                            disabled={u.isBaseUnit}
-                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm disabled:bg-gray-100 disabled:text-gray-400"
-                                            placeholder="อัตรา"
+                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                            placeholder="จำนวน"
                                             min={0.0001}
                                             step="0.0001"
                                         />
@@ -312,27 +368,14 @@ export default function NewProductPage() {
                                             min={0}
                                         />
                                     </div>
-                                    <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={u.isBaseUnit}
-                                            onChange={(e) => {
-                                                const checked = e.target.checked;
-                                                setUnits(prev => prev.map((uu, i) => ({
-                                                    ...uu,
-                                                    isBaseUnit: i === idx ? checked : (checked ? false : uu.isBaseUnit),
-                                                    conversionRate: i === idx && checked ? 1 : uu.conversionRate,
-                                                })));
-                                            }}
-                                            className="accent-emerald-500 w-3.5 h-3.5"
-                                        />
-                                        <span className="text-[10px] text-gray-500">หลัก</span>
-                                    </label>
                                     <button type="button" onClick={() => setUnits(prev => prev.filter((_, i) => i !== idx))}
                                         className="text-red-400 hover:text-red-600 text-sm px-1 shrink-0">✕</button>
                                 </div>
                             ))}
-                            <p className="text-[10px] text-gray-400">* หน่วยหลัก (Base) มี conversion rate = 1 | หน่วยอื่นระบุจำนวน base unit ต่อ 1 หน่วยนี้</p>
+                            <datalist id="unit-name-suggestions-new">
+                                {unitNames.map(u => <option key={u} value={u} />)}
+                            </datalist>
+                            <p className="text-[10px] text-gray-400">* ระบุจำนวน base unit ต่อ 1 หน่วยนี้</p>
                         </div>
                     )}
                 </div>

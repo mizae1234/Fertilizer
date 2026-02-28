@@ -97,6 +97,11 @@ export async function updateUser(
 }
 
 export async function deleteUser(id: string) {
+    // ป้องกันลบ user admin
+    const user = await prisma.user.findUnique({ where: { id }, select: { username: true } });
+    if (user?.username === 'admin') {
+        throw new Error('ไม่สามารถลบผู้ใช้ admin ได้');
+    }
     await prisma.user.update({
         where: { id },
         data: { deletedAt: new Date() },

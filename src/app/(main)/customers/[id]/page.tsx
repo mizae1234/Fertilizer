@@ -163,6 +163,7 @@ export default function CustomerDetailPage() {
                                 <label className="text-xs text-gray-500 mb-1 block">กลุ่มลูกค้า</label>
                                 <select value={editGroupId} onChange={e => setEditGroupId(e.target.value)}
                                     className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+                                    <option value="" disabled>-- เลือกกลุ่มลูกค้า --</option>
                                     {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                                 </select>
                             </div>

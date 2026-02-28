@@ -13,8 +13,8 @@ async function getDashboardData() {
         recentGRs,
         recentSales,
     ] = await Promise.all([
-        prisma.productStock.aggregate({
-            _sum: { quantity: true },
+        prisma.product.count({
+            where: { deletedAt: null, isActive: true },
         }),
         prisma.productStock.count({
             where: {
@@ -52,7 +52,7 @@ async function getDashboardData() {
     ]);
 
     return {
-        totalStock: stockValue._sum.quantity || 0,
+        totalStock: stockValue,
         lowStockCount,
         todaySalesAmount: todaySales._sum.totalAmount || 0,
         todaySalesCount: todaySales._count || 0,
@@ -76,11 +76,11 @@ export default async function DashboardPage() {
             {/* Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 <DashboardCard
-                    title="จำนวน Stock รวม"
+                    title="จำนวนสินค้า"
                     value={data.totalStock.toLocaleString()}
                     icon="📦"
                     color="blue"
-                    subtitle="หน่วย"
+                    subtitle="รายการ"
                 />
                 <DashboardCard
                     title="สินค้าใกล้หมด"
@@ -97,7 +97,7 @@ export default async function DashboardPage() {
                     subtitle={`${data.todaySalesCount} รายการ`}
                 />
                 <DashboardCard
-                    title="GR รอตรวจสอบ"
+                    title="รายการรับเข้ารอตรวจสอบ"
                     value={data.pendingGRs}
                     icon="📥"
                     color="purple"

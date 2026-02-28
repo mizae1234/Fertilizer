@@ -234,6 +234,7 @@ export async function approveGoodsReceive(id: string) {
                     quantity: item.quantity,
                     unitCost: Number(item.unitCost),
                     reference: gr.grNumber,
+                    lotNo: item.lotNo || null,
                     notes: `รับสินค้าจาก GR ${gr.grNumber}`,
                 },
             });

@@ -99,6 +99,7 @@ export default async function ProductsPage({ searchParams }: Props) {
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ชื่อสินค้า</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">หมวดหมู่</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ยี่ห้อ</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">บรรจุภัณฑ์</th>
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ต้นทุน</th>
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ราคาขาย</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">หน่วย</th>
@@ -110,7 +111,7 @@ export default async function ProductsPage({ searchParams }: Props) {
                         <tbody className="divide-y divide-gray-50">
                             {products.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="px-4 py-12 text-center text-gray-400">ไม่พบสินค้า</td>
+                                    <td colSpan={9} className="px-4 py-12 text-center text-gray-400">ไม่พบสินค้า</td>
                                 </tr>
                             ) : (
                                 products.map((product) => {
@@ -139,6 +140,7 @@ export default async function ProductsPage({ searchParams }: Props) {
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-600">{product.brand || <span className="text-gray-300">-</span>}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-600">{product.packaging || <span className="text-gray-300">-</span>}</td>
                                             <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatCurrency(Number(product.cost))}</td>
                                             <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(product.price))}</td>
                                             <td className="px-4 py-3 text-sm text-gray-600">{product.unit}</td>

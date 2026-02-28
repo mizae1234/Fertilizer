@@ -45,7 +45,7 @@ export async function PATCH(
     // Only allow known Product scalar fields
     const allowedFields = [
         'name', 'description', 'unit', 'cost', 'price', 'brand',
-        'packaging', 'productGroupId', 'pointsPerUnit', 'minStock', 'isActive', 'code'
+        'packaging', 'productGroupId', 'pointsPerUnit', 'minStock', 'isActive', 'code', 'imageUrl'
     ];
     const data: Record<string, any> = {};
     for (const key of allowedFields) {

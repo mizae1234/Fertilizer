@@ -37,6 +37,8 @@ export async function getStockAdjustments(page = 1, search = '') {
 }
 
 export async function createStockAdjustment(data: {
+    adjustmentType: 'increase' | 'decrease';
+    note?: string;
     items: {
         productId: string;
         warehouseId: string;
@@ -53,7 +55,6 @@ export async function createStockAdjustment(data: {
         for (const item of data.items) {
             if (item.quantity <= 0) throw new Error('จำนวนต้องมากกว่า 0');
 
-            // Check current stock
             const stock = await tx.productStock.findUnique({
                 where: {
                     productId_warehouseId: {
@@ -63,29 +64,60 @@ export async function createStockAdjustment(data: {
                 },
             });
 
-            if (!stock || stock.quantity < item.quantity) {
-                const product = await tx.product.findUnique({ where: { id: item.productId }, select: { name: true } });
-                throw new Error(`สินค้า "${product?.name || item.productId}" มี stock ไม่พอ (คงเหลือ ${stock?.quantity || 0}, ต้องการตัด ${item.quantity})`);
+            const noteText = [item.reason, data.note].filter(Boolean).join(' — ');
+
+            if (data.adjustmentType === 'decrease') {
+                // Decrease mode — deduct stock
+                if (!stock || stock.quantity < item.quantity) {
+                    const product = await tx.product.findUnique({ where: { id: item.productId }, select: { name: true } });
+                    throw new Error(`สินค้า "${product?.name || item.productId}" มี stock ไม่พอ (คงเหลือ ${stock?.quantity || 0}, ต้องการตัด ${item.quantity})`);
+                }
+
+                await tx.productStock.update({
+                    where: { id: stock.id },
+                    data: { quantity: { decrement: item.quantity } },
+                });
+
+                await tx.stockTransaction.create({
+                    data: {
+                        productId: item.productId,
+                        warehouseId: item.warehouseId,
+                        type: 'ADJUSTMENT',
+                        quantity: -item.quantity,
+                        unitCost: Number(stock.avgCost),
+                        reference: adjNumber,
+                        notes: noteText,
+                    },
+                });
+            } else {
+                // Increase mode — add stock
+                if (stock) {
+                    await tx.productStock.update({
+                        where: { id: stock.id },
+                        data: { quantity: { increment: item.quantity } },
+                    });
+                } else {
+                    await tx.productStock.create({
+                        data: {
+                            productId: item.productId,
+                            warehouseId: item.warehouseId,
+                            quantity: item.quantity,
+                        },
+                    });
+                }
+
+                await tx.stockTransaction.create({
+                    data: {
+                        productId: item.productId,
+                        warehouseId: item.warehouseId,
+                        type: 'ADJUSTMENT',
+                        quantity: item.quantity,
+                        unitCost: stock ? Number(stock.avgCost) : 0,
+                        reference: adjNumber,
+                        notes: noteText,
+                    },
+                });
             }
-
-            // Deduct stock
-            await tx.productStock.update({
-                where: { id: stock.id },
-                data: { quantity: { decrement: item.quantity } },
-            });
-
-            // Record transaction
-            await tx.stockTransaction.create({
-                data: {
-                    productId: item.productId,
-                    warehouseId: item.warehouseId,
-                    type: 'ADJUSTMENT',
-                    quantity: -item.quantity,
-                    unitCost: Number(stock.avgCost),
-                    reference: adjNumber,
-                    notes: item.reason,
-                },
-            });
         }
     });
 

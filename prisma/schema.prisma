@@ -109,6 +109,7 @@ model Product {
   productGroupId String?
   pointsPerUnit  Int       @default(0)
   minStock       Int       @default(10)
+  imageUrl       String?
   isActive       Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -365,6 +366,7 @@ model StockTransaction {
   quantity    Int
   unitCost    Decimal         @default(0) @db.Decimal(12, 2)
   reference   String?         // PO id, Sale id, Transfer id
+  lotNo       String?
   notes       String?
   createdAt   DateTime        @default(now())
 

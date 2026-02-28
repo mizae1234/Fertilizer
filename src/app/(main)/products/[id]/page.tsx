@@ -22,6 +22,7 @@ interface StockTransaction {
     quantity: number;
     unitCost: number | string;
     reference: string | null;
+    lotNo: string | null;
     notes: string | null;
     createdAt: string;
     warehouse: { name: string };
@@ -52,6 +53,7 @@ interface ProductDetail {
     price: number | string;
     brand: string | null;
     packaging: string | null;
+    imageUrl: string | null;
     productGroupId: string | null;
     productGroup: { name: string } | null;
     pointsPerUnit: number;
@@ -82,33 +84,29 @@ export default function ProductDetailPage() {
     const [activeTab, setActiveTab] = useState<'stock' | 'log'>('stock');
 
     // Cost editing (product-level)
-    const [editingCost, setEditingCost] = useState(false);
     const [costType, setCostType] = useState<'avg' | 'last' | 'custom'>('avg');
     const [customCost, setCustomCost] = useState('0');
     const [savingCost, setSavingCost] = useState(false);
 
     // Points editing
-    const [editingPoints, setEditingPoints] = useState(false);
     const [pointsValue, setPointsValue] = useState('0');
-    const [savingPoints, setSavingPoints] = useState(false);
 
     // Price editing
-    const [editingSellingPrice, setEditingSellingPrice] = useState(false);
     const [sellingPriceValue, setSellingPriceValue] = useState('0');
-    const [savingSellingPrice, setSavingSellingPrice] = useState(false);
 
     // Unit editing
-    const [editingUnit, setEditingUnit] = useState(false);
     const [unitValue, setUnitValue] = useState('');
-    const [savingUnit, setSavingUnit] = useState(false);
 
     // Product info editing
-    const [editingInfo, setEditingInfo] = useState(false);
     const [infoForm, setInfoForm] = useState({ name: '', description: '', brand: '', packaging: '', productGroupId: '', minStock: 10 });
     const [savingInfo, setSavingInfo] = useState(false);
     const [productGroups, setProductGroups] = useState<{ id: string; name: string }[]>([]);
     const [brands, setBrands] = useState<string[]>([]);
+    const [packagings, setPackagings] = useState<string[]>([]);
+    const [unitNames, setUnitNames] = useState<string[]>([]);
 
+    // Image upload
+    const [uploading, setUploading] = useState(false);
 
     // Inline editing
     const [savingId, setSavingId] = useState<string | null>(null);
@@ -136,6 +134,12 @@ export default function ProductDetailPage() {
         fetch('/api/products/brands')
             .then(r => r.json())
             .then(data => setBrands(Array.isArray(data) ? data : []));
+        fetch('/api/products/packagings')
+            .then(r => r.json())
+            .then(data => setPackagings(Array.isArray(data) ? data : []));
+        fetch('/api/products/unit-names')
+            .then(r => r.json())
+            .then(data => setUnitNames(Array.isArray(data) ? data : []));
     }, [id]);
 
     // Initialize form values when product loads
@@ -185,71 +189,37 @@ export default function ProductDetailPage() {
         ? (product.productStocks.length > 0 ? Math.max(...product.productStocks.map(st => Number(st.lastCost))) : 0)
         : 0;
 
-    const handleSaveCost = async () => {
-        if (!product) return;
-        setSavingCost(true);
-        try {
-            await updateProductCost(product.id, costType, costType === 'custom' ? parseFloat(customCost) || 0 : undefined);
-            showAlert('บันทึกต้นทุนเรียบร้อย', 'success', 'สำเร็จ');
-            const data = await fetch(`/api/products/${id}`).then(r => r.json());
-            setProduct(data);
-            setEditingCost(false);
-        } catch (error) {
-            showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
-        } finally {
-            setSavingCost(false);
-        }
-    };
-
-    const startEditingCost = () => {
-        setEditingCost(true);
-        setCostType('avg');
-        setCustomCost(String(Number(product?.cost || 0)));
-    };
-
     const refreshProduct = async () => {
         const data = await fetch(`/api/products/${id}`).then(r => r.json());
         setProduct(data);
     };
 
-    const handleSavePoints = async () => {
-        setSavingPoints(true);
+    // Image upload handler
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploading(true);
         try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+            const uploadData = await uploadRes.json();
+            if (!uploadRes.ok) throw new Error(uploadData.error || 'อัปโหลดล้มเหลว');
+
             const res = await fetch(`/api/products/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pointsPerUnit: pointsValue }),
+                body: JSON.stringify({ imageUrl: uploadData.url }),
             });
-            if (!res.ok) throw new Error('เกิดข้อผิดพลาด');
-            showAlert('บันทึกแต้มเรียบร้อย', 'success', 'สำเร็จ');
-            setEditingPoints(false);
+            if (!res.ok) throw new Error('บันทึกรูปล้มเหลว');
             await refreshProduct();
+            showAlert('อัปโหลดรูปสำเร็จ', 'success', 'สำเร็จ');
         } catch (error) {
             showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
         } finally {
-            setSavingPoints(false);
+            setUploading(false);
         }
     };
-
-    const handleSaveSellingPrice = async () => {
-        setSavingSellingPrice(true);
-        try {
-            const res = await fetch(`/api/products/${id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ price: sellingPriceValue }),
-            });
-            if (!res.ok) throw new Error('เกิดข้อผิดพลาด');
-            showAlert('บันทึกราคาขายเรียบร้อย', 'success', 'สำเร็จ');
-            setEditingSellingPrice(false);
-            await refreshProduct();
-        } catch (error) {
-            showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
-        } finally {
-            setSavingSellingPrice(false);
-        }
-    };
-
 
     // Price inline CRUD
     const handleSaveExistingPrice = async (pp: ProductPrice) => {
@@ -347,7 +317,6 @@ export default function ProductDetailPage() {
     };
 
     const handleDeleteUnit = async (unit: ProductUnit) => {
-        if (unit.isBaseUnit) { showAlert('ไม่สามารถลบหน่วยหลักได้', 'warning', 'แจ้งเตือน'); return; }
         if (!confirm(`ลบหน่วย "${unit.unitName}" ?`)) return;
         try {
             const res = await fetch(`/api/products/${id}/units/${unit.id}`, { method: 'DELETE' });
@@ -417,6 +386,27 @@ export default function ProductDetailPage() {
                 </button>
             </div>
 
+            {/* Product Image */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
+                <h2 className="font-bold text-gray-800 mb-3">🖼️ รูปสินค้า</h2>
+                <div className="flex items-center gap-4">
+                    {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.name} className="w-32 h-32 object-cover rounded-xl border border-gray-200" />
+                    ) : (
+                        <div className="w-32 h-32 bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-sm">
+                            ไม่มีรูป
+                        </div>
+                    )}
+                    <div>
+                        <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium cursor-pointer transition-colors ${uploading ? 'bg-gray-200 text-gray-500' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>
+                            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+                            {uploading ? '⏳ กำลังอัปโหลด...' : (product.imageUrl ? '🔄 เปลี่ยนรูป' : '📷 อัปโหลดรูป')}
+                        </label>
+                        <p className="text-xs text-gray-400 mt-2">รองรับ JPEG, PNG, WebP (สูงสุด 5MB)</p>
+                    </div>
+                </div>
+            </div>
+
             {/* Product Info Form Card */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
                 <h2 className="font-bold text-gray-800 mb-4">ข้อมูลสินค้า</h2>
@@ -464,8 +454,12 @@ export default function ProductDetailPage() {
                 <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">บรรจุภัณฑ์</label>
                     <input type="text" value={infoForm.packaging} onChange={e => setInfoForm({ ...infoForm, packaging: e.target.value })}
+                        list="packaging-suggestions"
                         className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm sm:w-1/2"
                         placeholder="เช่น ถุง 50 กก., กระสอบ 25 กก..." />
+                    <datalist id="packaging-suggestions">
+                        {packagings.map(p => <option key={p} value={p} />)}
+                    </datalist>
                 </div>
 
                 {/* Cost with 3 options */}
@@ -521,10 +515,14 @@ export default function ProductDetailPage() {
 
                 <div className="grid grid-cols-3 gap-4 mb-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1.5">หน่วย</label>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">หน่วยนับ</label>
                         <input type="text" value={unitValue || product.unit} onChange={e => setUnitValue(e.target.value)}
+                            list="unit-suggestions"
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                             placeholder="เช่น ถุง, ขวด, กก..." />
+                        <datalist id="unit-suggestions">
+                            {unitNames.map(u => <option key={u} value={u} />)}
+                        </datalist>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">แต้ม/หน่วย</label>
@@ -697,31 +695,30 @@ export default function ProductDetailPage() {
                     <h2 className="font-semibold text-gray-800">📦 หน่วยขาย</h2>
                     <button type="button"
                         onClick={() => {
-                            const hasBase = (product?.productUnits?.some(u => u.isBaseUnit) || false) || newUnitRows.some(u => u.isBaseUnit);
-                            setNewUnitRows(prev => [...prev, { unitName: '', conversionRate: hasBase ? 1 : 1, sellingPrice: 0, isBaseUnit: !hasBase }]);
+                            setNewUnitRows(prev => [...prev, { unitName: '', conversionRate: 1, sellingPrice: 0, isBaseUnit: false }]);
                         }}
                         className="text-xs text-emerald-600 font-medium hover:underline">
                         + เพิ่มหน่วย
                     </button>
                 </div>
                 {((!product.productUnits || product.productUnits.length === 0) && newUnitRows.length === 0) ? (
-                    <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีหน่วยขาย — กดปุ่ม "+ เพิ่มหน่วย" เพื่อเริ่มต้น</p>
+                    <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีหน่วยขาย — กดปุ่ม &quot;+ เพิ่มหน่วย&quot; เพื่อเริ่มต้น</p>
                 ) : (
                     <div className="space-y-3">
                         {product.productUnits.map(unit => (
-                            <div key={unit.id} className={`flex items-center gap-3 p-3 rounded-xl border ${unit.isBaseUnit ? 'border-emerald-200 bg-emerald-50/50' : 'border-gray-200 bg-gray-50/50'}`}>
+                            <div key={unit.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50">
                                 <div className="flex-1 min-w-0">
                                     <input type="text" value={unit.unitName}
                                         onChange={e => updateExistingUnit(unit.id, { unitName: e.target.value })}
+                                        list="unit-name-suggestions"
                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                                         placeholder="ชื่อหน่วย" />
                                 </div>
                                 <div className="w-24">
                                     <input type="number" value={Number(unit.conversionRate) || ''}
                                         onChange={e => updateExistingUnit(unit.id, { conversionRate: parseFloat(e.target.value) || 0 })}
-                                        disabled={unit.isBaseUnit}
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm disabled:bg-gray-100 disabled:text-gray-400"
-                                        placeholder="อัตรา" min={0.0001} step="0.0001" />
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                        placeholder="จำนวน" min={0.0001} step="0.0001" />
                                 </div>
                                 <div className="w-28">
                                     <input type="number" value={Number(unit.sellingPrice) || ''}
@@ -729,36 +726,29 @@ export default function ProductDetailPage() {
                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                                         placeholder="ราคา" step="0.01" min={0} />
                                 </div>
-                                <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                                    <input type="checkbox" checked={unit.isBaseUnit} disabled
-                                        className="accent-emerald-500 w-3.5 h-3.5" />
-                                    <span className="text-[10px] text-gray-500">หลัก</span>
-                                </label>
                                 <button type="button" onClick={() => handleSaveExistingUnit(unit)}
                                     disabled={savingId === unit.id}
                                     className="text-blue-500 hover:text-blue-700 text-xs font-medium px-1 disabled:opacity-50">
                                     {savingId === unit.id ? '...' : '💾'}
                                 </button>
-                                {!unit.isBaseUnit && (
-                                    <button type="button" onClick={() => handleDeleteUnit(unit)}
-                                        className="text-red-400 hover:text-red-600 text-sm px-1 shrink-0">✕</button>
-                                )}
+                                <button type="button" onClick={() => handleDeleteUnit(unit)}
+                                    className="text-red-400 hover:text-red-600 text-sm px-1 shrink-0">✕</button>
                             </div>
                         ))}
                         {newUnitRows.map((u, idx) => (
-                            <div key={`new-${idx}`} className={`flex items-center gap-3 p-3 rounded-xl border ${u.isBaseUnit ? 'border-emerald-200 bg-emerald-50/50' : 'border-blue-200 bg-blue-50/30'}`}>
+                            <div key={`new-${idx}`} className="flex items-center gap-3 p-3 rounded-xl border border-blue-200 bg-blue-50/30">
                                 <div className="flex-1 min-w-0">
                                     <input type="text" value={u.unitName}
                                         onChange={e => { const nr = [...newUnitRows]; nr[idx] = { ...nr[idx], unitName: e.target.value }; setNewUnitRows(nr); }}
+                                        list="unit-name-suggestions"
                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                                         placeholder="ชื่อหน่วย (เช่น ถุง, ลัง)" />
                                 </div>
                                 <div className="w-24">
                                     <input type="number" value={u.conversionRate || ''}
                                         onChange={e => { const nr = [...newUnitRows]; nr[idx] = { ...nr[idx], conversionRate: parseFloat(e.target.value) || 0 }; setNewUnitRows(nr); }}
-                                        disabled={u.isBaseUnit}
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm disabled:bg-gray-100 disabled:text-gray-400"
-                                        placeholder="อัตรา" min={0.0001} step="0.0001" />
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                        placeholder="จำนวน" min={0.0001} step="0.0001" />
                                 </div>
                                 <div className="w-28">
                                     <input type="number" value={u.sellingPrice || ''}
@@ -766,19 +756,6 @@ export default function ProductDetailPage() {
                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                                         placeholder="ราคา" step="0.01" min={0} />
                                 </div>
-                                <label className="flex items-center gap-1 shrink-0 cursor-pointer">
-                                    <input type="checkbox" checked={u.isBaseUnit}
-                                        onChange={e => {
-                                            const checked = e.target.checked;
-                                            setNewUnitRows(prev => prev.map((uu, i) => ({
-                                                ...uu,
-                                                isBaseUnit: i === idx ? checked : (checked ? false : uu.isBaseUnit),
-                                                conversionRate: i === idx && checked ? 1 : uu.conversionRate,
-                                            })));
-                                        }}
-                                        className="accent-emerald-500 w-3.5 h-3.5" />
-                                    <span className="text-[10px] text-gray-500">หลัก</span>
-                                </label>
                                 <button type="button" onClick={() => handleSaveNewUnit(u, idx)}
                                     disabled={savingId === `new-unit-${idx}`}
                                     className="text-emerald-500 hover:text-emerald-700 text-xs font-medium px-1 disabled:opacity-50">
@@ -788,7 +765,10 @@ export default function ProductDetailPage() {
                                     className="text-red-400 hover:text-red-600 text-sm px-1 shrink-0">✕</button>
                             </div>
                         ))}
-                        <p className="text-[10px] text-gray-400">* หน่วยหลัก (Base) มี conversion rate = 1 | หน่วยอื่นระบุจำนวน base unit ต่อ 1 หน่วยนี้ | กด 💾 เพื่อบันทึกแต่ละแถว</p>
+                        <datalist id="unit-name-suggestions">
+                            {unitNames.map(u => <option key={u} value={u} />)}
+                        </datalist>
+                        <p className="text-[10px] text-gray-400">* ระบุจำนวน base unit ต่อ 1 หน่วยนี้ | กด 💾 เพื่อบันทึกแต่ละแถว</p>
                     </div>
                 )}
             </div>
@@ -854,6 +834,7 @@ export default function ProductDetailPage() {
                                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
                                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
                                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
                                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">อ้างอิง</th>
                                             </tr>
                                         </thead>
@@ -872,10 +853,13 @@ export default function ProductDetailPage() {
                                                         <td className="px-4 py-3 text-sm text-right">
                                                             <span className={tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}>
                                                                 {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
-                                                                {tx.quantity.toLocaleString()} {product.unit}
+                                                                {Math.abs(tx.quantity).toLocaleString()} {product.unit}
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(tx.unitCost))}</td>
+                                                        <td className="px-4 py-3 text-xs text-gray-500">
+                                                            {tx.lotNo ? <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">{tx.lotNo}</span> : <span className="text-gray-300">-</span>}
+                                                        </td>
                                                         <td className="px-4 py-3 text-xs text-gray-500">
                                                             {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
                                                             {tx.notes && <p className="text-gray-400 mt-0.5">{tx.notes}</p>}
@@ -899,7 +883,7 @@ export default function ProductDetailPage() {
                                                     </span>
                                                     <span className={`text-sm font-bold ${tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}`}>
                                                         {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
-                                                        {tx.quantity.toLocaleString()} {product.unit}
+                                                        {Math.abs(tx.quantity).toLocaleString()} {product.unit}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between text-xs text-gray-500">
@@ -910,6 +894,7 @@ export default function ProductDetailPage() {
                                                     <span>@ {formatCurrency(Number(tx.unitCost))}</span>
                                                     {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
                                                 </div>
+                                                {tx.lotNo && <p className="text-xs text-purple-600 mt-1">📋 Lot: {tx.lotNo}</p>}
                                                 {tx.notes && <p className="text-xs text-gray-400 mt-1">{tx.notes}</p>}
                                             </div>
                                         );

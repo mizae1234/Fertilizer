@@ -52,6 +52,7 @@ export async function createProduct(data: {
     productGroupId?: string;
     pointsPerUnit?: number;
     minStock?: number;
+    imageUrl?: string;
     prices?: { customerGroupId: string; price: number }[];
     units?: { unitName: string; conversionRate: number; sellingPrice: number; isBaseUnit: boolean }[];
 }) {
@@ -75,6 +76,7 @@ export async function createProduct(data: {
             productGroupId: data.productGroupId || null,
             pointsPerUnit: data.pointsPerUnit || 0,
             minStock: data.minStock || 10,
+            imageUrl: data.imageUrl || null,
             productPrices: data.prices
                 ? {
                     create: data.prices.map((p) => ({

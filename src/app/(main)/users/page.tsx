@@ -102,12 +102,14 @@ export default function UsersPage() {
                                 >
                                     ✏️ แก้ไข
                                 </button>
-                                <button
-                                    onClick={() => setConfirmDelete(user.id)}
-                                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-500 hover:bg-red-50 border border-red-200 transition-colors"
-                                >
-                                    🗑️ ลบ
-                                </button>
+                                {user.username !== 'admin' && (
+                                    <button
+                                        onClick={() => setConfirmDelete(user.id)}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-500 hover:bg-red-50 border border-red-200 transition-colors"
+                                    >
+                                        🗑️ ลบ
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}

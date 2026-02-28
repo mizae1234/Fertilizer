@@ -20,7 +20,8 @@ interface AdjustmentItem {
     currentStock: number | null;
 }
 
-const REASONS = ['ชำรุด', 'สูญหาย', 'หมดอายุ', 'เสียหายจากน้ำท่วม', 'ตรวจนับขาด', 'อื่นๆ'];
+const REASONS_DECREASE = ['ชำรุด', 'สูญหาย', 'หมดอายุ', 'เสียหายจากน้ำท่วม', 'ตรวจนับขาด', 'อื่นๆ'];
+const REASONS_INCREASE = ['ตรวจนับเกิน', 'รับคืนจากลูกค้า', 'ปรับปรุงยอด', 'อื่นๆ'];
 
 function ProductSearchSelect({ products, value, onChange }: {
     products: Product[];
@@ -53,7 +54,7 @@ function ProductSearchSelect({ products, value, onChange }: {
                 placeholder="ค้นหาสินค้า..."
                 onFocus={() => { setOpen(true); setSearch(''); }}
                 onChange={e => { setSearch(e.target.value); setOpen(true); }}
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
             />
             {selected && !open && (
                 <button onClick={() => { onChange(''); setSearch(''); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
@@ -67,7 +68,7 @@ function ProductSearchSelect({ products, value, onChange }: {
                             <button
                                 key={p.id}
                                 onClick={() => { onChange(p.id); setOpen(false); setSearch(''); }}
-                                className={`w-full text-left px-3 py-2 text-sm hover:bg-red-50 transition-colors ${p.id === value ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-700'}`}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 transition-colors ${p.id === value ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700'}`}
                             >
                                 <span className="font-mono text-xs text-gray-400 mr-2">{p.code}</span>
                                 {p.name}
@@ -83,6 +84,8 @@ function ProductSearchSelect({ products, value, onChange }: {
 
 export default function NewStockAdjustmentPage() {
     const router = useRouter();
+    const [adjustmentType, setAdjustmentType] = useState<'increase' | 'decrease'>('decrease');
+    const [note, setNote] = useState('');
     const [products, setProducts] = useState<Product[]>([]);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [items, setItems] = useState<AdjustmentItem[]>([{
@@ -106,6 +109,12 @@ export default function NewStockAdjustmentPage() {
         });
     }, []);
 
+    // Reset reasons when switching type
+    useEffect(() => {
+        const defaultReason = adjustmentType === 'decrease' ? 'ชำรุด' : 'ตรวจนับเกิน';
+        setItems(prev => prev.map(item => ({ ...item, reason: defaultReason })));
+    }, [adjustmentType]);
+
     const fetchStock = async (productId: string, warehouseId: string, idx: number) => {
         if (!productId || !warehouseId) return;
         try {
@@ -119,10 +128,11 @@ export default function NewStockAdjustmentPage() {
     };
 
     const addItem = () => {
+        const defaultReason = adjustmentType === 'decrease' ? 'ชำรุด' : 'ตรวจนับเกิน';
         setItems(prev => [...prev, {
             productId: '', productName: '', productCode: '', productUnit: '',
             warehouseId: warehouses[0]?.id || '', warehouseName: warehouses[0]?.name || '',
-            quantity: 1, reason: 'ชำรุด', currentStock: null,
+            quantity: 1, reason: defaultReason, currentStock: null,
         }]);
     };
 
@@ -176,6 +186,8 @@ export default function NewStockAdjustmentPage() {
         try {
             const userId = localStorage.getItem('userId') || '';
             const result = await createStockAdjustment({
+                adjustmentType,
+                note: note.trim() || undefined,
                 items: validItems.map(i => ({
                     productId: i.productId,
                     warehouseId: i.warehouseId,
@@ -197,21 +209,63 @@ export default function NewStockAdjustmentPage() {
         }
     };
 
+    const reasons = adjustmentType === 'decrease' ? REASONS_DECREASE : REASONS_INCREASE;
+    const isDecrease = adjustmentType === 'decrease';
+
     return (
         <div className="animate-fade-in max-w-4xl mx-auto">
             {/* Header */}
             <div className="flex items-center gap-3 mb-6">
                 <button onClick={() => router.push('/stock-adjustments')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
                 <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-800">📉 บันทึกปรับปรุง Stock</h1>
-                    <p className="text-sm text-gray-500 mt-1">ตัด stock สินค้าชำรุด/สูญหาย</p>
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-800">📦 บันทึกปรับปรุง Stock</h1>
+                    <p className="text-sm text-gray-500 mt-1">เพิ่มหรือลด stock สินค้า</p>
                 </div>
+            </div>
+
+            {/* Adjustment Type Toggle */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-6">
+                <label className="text-sm font-medium text-gray-600 mb-2 block">ประเภทการปรับปรุง</label>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setAdjustmentType('increase')}
+                        className={`flex-1 py-3 rounded-xl text-sm font-semibold transition-all ${!isDecrease
+                                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                    >
+                        📈 เพิ่ม Stock
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setAdjustmentType('decrease')}
+                        className={`flex-1 py-3 rounded-xl text-sm font-semibold transition-all ${isDecrease
+                                ? 'bg-red-500 text-white shadow-md shadow-red-200'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                    >
+                        📉 ลด Stock
+                    </button>
+                </div>
+            </div>
+
+            {/* Note */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-6">
+                <label className="text-sm font-medium text-gray-600 mb-1.5 block">หมายเหตุ (Note)</label>
+                <textarea
+                    value={note}
+                    onChange={e => setNote(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                    rows={2}
+                    placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)..."
+                />
             </div>
 
             {/* Items */}
             <div className="space-y-4 mb-6">
                 {items.map((item, idx) => (
-                    <div key={idx} className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-5">
+                    <div key={idx} className={`bg-white rounded-xl shadow-md border p-4 sm:p-5 ${isDecrease ? 'border-red-100' : 'border-emerald-100'}`}>
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-xs font-semibold text-gray-400">รายการ #{idx + 1}</span>
                             {items.length > 1 && (
@@ -234,7 +288,7 @@ export default function NewStockAdjustmentPage() {
                                 <select
                                     value={item.warehouseId}
                                     onChange={e => handleWarehouseChange(idx, e.target.value)}
-                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                 >
                                     <option value="">เลือกคลัง</option>
                                     {warehouses.map(w => (
@@ -245,27 +299,27 @@ export default function NewStockAdjustmentPage() {
                             {/* Quantity */}
                             <div>
                                 <label className="text-xs text-gray-400 mb-1 block">
-                                    จำนวนที่ตัด *
+                                    จำนวน *
                                     {item.currentStock !== null && (
                                         <span className="ml-2 text-emerald-600">(คงเหลือ: {item.currentStock} {item.productUnit})</span>
                                     )}
                                 </label>
                                 <input
-                                    type="number" min={1} max={item.currentStock ?? undefined}
+                                    type="number" min={1} max={isDecrease ? (item.currentStock ?? undefined) : undefined}
                                     value={item.quantity}
                                     onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
-                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                 />
                             </div>
                             {/* Reason */}
                             <div>
                                 <label className="text-xs text-gray-400 mb-1 block">เหตุผล *</label>
                                 <select
-                                    value={REASONS.includes(item.reason) ? item.reason : 'อื่นๆ'}
+                                    value={reasons.includes(item.reason) ? item.reason : 'อื่นๆ'}
                                     onChange={e => updateItem(idx, 'reason', e.target.value)}
-                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                 >
-                                    {REASONS.map(r => (
+                                    {reasons.map(r => (
                                         <option key={r} value={r}>{r}</option>
                                     ))}
                                 </select>
@@ -278,13 +332,13 @@ export default function NewStockAdjustmentPage() {
                                         type="text"
                                         placeholder="ระบุเหตุผล..."
                                         onChange={e => updateItem(idx, 'reason', e.target.value || 'อื่นๆ')}
-                                        className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                                        className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                     />
                                 </div>
                             )}
                         </div>
-                        {/* Warning if over stock */}
-                        {item.currentStock !== null && item.quantity > item.currentStock && (
+                        {/* Warning if over stock (decrease only) */}
+                        {isDecrease && item.currentStock !== null && item.quantity > item.currentStock && (
                             <div className="mt-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600">
                                 ⚠️ จำนวนที่ตัดมากกว่า stock คงเหลือ ({item.currentStock} {item.productUnit})
                             </div>
@@ -294,7 +348,7 @@ export default function NewStockAdjustmentPage() {
             </div>
 
             {/* Add Item Button */}
-            <button onClick={addItem} className="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 text-gray-400 text-sm font-medium hover:border-red-300 hover:text-red-500 transition-colors mb-6">
+            <button onClick={addItem} className="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 text-gray-400 text-sm font-medium hover:border-emerald-300 hover:text-emerald-500 transition-colors mb-6">
                 + เพิ่มรายการ
             </button>
 
@@ -302,9 +356,12 @@ export default function NewStockAdjustmentPage() {
             <button
                 onClick={handleSubmit}
                 disabled={saving}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold text-base hover:from-red-600 hover:to-orange-600 shadow-lg shadow-red-200 disabled:opacity-50 transition-all"
+                className={`w-full py-3.5 rounded-xl text-white font-semibold text-base shadow-lg disabled:opacity-50 transition-all ${isDecrease
+                        ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 shadow-red-200'
+                        : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-emerald-200'
+                    }`}
             >
-                {saving ? '⏳ กำลังบันทึก...' : '📉 บันทึกปรับปรุง Stock'}
+                {saving ? '⏳ กำลังบันทึก...' : (isDecrease ? '📉 บันทึกลด Stock' : '📈 บันทึกเพิ่ม Stock')}
             </button>
 
             <AlertModal
