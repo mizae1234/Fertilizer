@@ -14,7 +14,7 @@ export async function GET(
                 include: { warehouse: { select: { id: true, name: true } } },
             },
             productPrices: {
-                include: { customerGroup: { select: { name: true } } },
+                include: { customerGroup: { select: { name: true } }, productUnit: { select: { id: true, unitName: true } } },
             },
             productUnits: {
                 orderBy: [{ isBaseUnit: 'desc' }, { conversionRate: 'asc' }],

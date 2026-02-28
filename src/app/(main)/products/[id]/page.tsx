@@ -33,6 +33,8 @@ interface ProductPrice {
     price: number | string;
     customerGroupId: string;
     customerGroup: { name: string };
+    productUnitId: string | null;
+    productUnit: { id: string; unitName: string } | null;
 }
 
 interface ProductUnit {
@@ -112,7 +114,7 @@ export default function ProductDetailPage() {
     const [savingId, setSavingId] = useState<string | null>(null);
     const [customerGroups, setCustomerGroups] = useState<{ id: string; name: string }[]>([]);
     // Temp rows for adding new items (not yet saved)
-    const [newPriceRows, setNewPriceRows] = useState<{ customerGroupId: string; price: number }[]>([]);
+    const [newPriceRows, setNewPriceRows] = useState<{ customerGroupId: string; productUnitId: string; price: number }[]>([]);
     const [newUnitRows, setNewUnitRows] = useState<{ unitName: string; conversionRate: number; sellingPrice: number; isBaseUnit: boolean }[]>([]);
 
     // Alert modal
@@ -228,7 +230,7 @@ export default function ProductDetailPage() {
             const res = await fetch(`/api/products/${id}/prices`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ customerGroupId: pp.customerGroupId, price: Number(pp.price) }),
+                body: JSON.stringify({ customerGroupId: pp.customerGroupId, productUnitId: pp.productUnitId || null, price: Number(pp.price) }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
@@ -241,7 +243,7 @@ export default function ProductDetailPage() {
         }
     };
 
-    const handleSaveNewPrice = async (row: { customerGroupId: string; price: number }, idx: number) => {
+    const handleSaveNewPrice = async (row: { customerGroupId: string; productUnitId: string; price: number }, idx: number) => {
         if (!row.customerGroupId) { showAlert('กรุณาเลือกกลุ่มลูกค้า', 'warning', 'แจ้งเตือน'); return; }
         setSavingId(`new-price-${idx}`);
         try {
@@ -606,7 +608,7 @@ export default function ProductDetailPage() {
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="font-semibold text-gray-800">💰 ราคาตามกลุ่มลูกค้า</h2>
                     <button type="button"
-                        onClick={() => setNewPriceRows(prev => [...prev, { customerGroupId: '', price: 0 }])}
+                        onClick={() => setNewPriceRows(prev => [...prev, { customerGroupId: '', productUnitId: '', price: 0 }])}
                         className="text-xs text-blue-600 font-medium hover:underline">
                         + เพิ่มราคา
                     </button>
@@ -616,19 +618,27 @@ export default function ProductDetailPage() {
                 ) : (
                     <div className="space-y-3">
                         {product.productPrices.map(pp => (
-                            <div key={pp.id} className="flex items-center gap-3">
+                            <div key={pp.id} className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                                 <select
                                     value={pp.customerGroupId}
                                     disabled
-                                    className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 outline-none text-sm bg-gray-100 text-gray-500"
+                                    className="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl border border-gray-200 outline-none text-sm bg-gray-100 text-gray-500"
                                 >
                                     <option>{pp.customerGroup.name}</option>
+                                </select>
+                                <select
+                                    value={pp.productUnitId || ''}
+                                    disabled
+                                    className="w-28 px-3 py-2.5 rounded-xl border border-gray-200 outline-none text-sm bg-gray-100 text-gray-500"
+                                >
+                                    <option value="">{product.unit} (หลัก)</option>
+                                    {pp.productUnit && <option value={pp.productUnit.id}>{pp.productUnit.unitName}</option>}
                                 </select>
                                 <input
                                     type="number"
                                     value={Number(pp.price) || ''}
                                     onChange={e => updateExistingPrice(pp.id, 'price', parseFloat(e.target.value) || 0)}
-                                    className="w-32 px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                                    className="w-28 px-3 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
                                     placeholder="0.00"
                                     step="0.01"
                                     min={0}
@@ -644,7 +654,7 @@ export default function ProductDetailPage() {
                             </div>
                         ))}
                         {newPriceRows.map((p, idx) => (
-                            <div key={`new-${idx}`} className="flex items-center gap-3">
+                            <div key={`new-${idx}`} className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                                 <select
                                     value={p.customerGroupId}
                                     onChange={e => {
@@ -652,14 +662,27 @@ export default function ProductDetailPage() {
                                         newRows[idx] = { ...newRows[idx], customerGroupId: e.target.value };
                                         setNewPriceRows(newRows);
                                     }}
-                                    className="flex-1 px-4 py-2.5 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm bg-blue-50/50"
+                                    className="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm bg-blue-50/50"
                                 >
-                                    <option value="">-- เลือกกลุ่มลูกค้า --</option>
+                                    <option value="">-- กลุ่มลูกค้า --</option>
                                     {customerGroups.map(g => (
-                                        <option key={g.id} value={g.id}
-                                            disabled={product.productPrices.some(pp => pp.customerGroupId === g.id)}>
+                                        <option key={g.id} value={g.id}>
                                             {g.name}
                                         </option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={p.productUnitId}
+                                    onChange={e => {
+                                        const newRows = [...newPriceRows];
+                                        newRows[idx] = { ...newRows[idx], productUnitId: e.target.value };
+                                        setNewPriceRows(newRows);
+                                    }}
+                                    className="w-28 px-3 py-2.5 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm bg-blue-50/50"
+                                >
+                                    <option value="">{product.unit} (หลัก)</option>
+                                    {product.productUnits.map(u => (
+                                        <option key={u.id} value={u.id}>{u.unitName}</option>
                                     ))}
                                 </select>
                                 <input
@@ -670,7 +693,7 @@ export default function ProductDetailPage() {
                                         newRows[idx] = { ...newRows[idx], price: parseFloat(e.target.value) || 0 };
                                         setNewPriceRows(newRows);
                                     }}
-                                    className="w-32 px-4 py-2.5 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm bg-blue-50/50"
+                                    className="w-28 px-3 py-2.5 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm bg-blue-50/50"
                                     placeholder="0.00"
                                     step="0.01"
                                     min={0}

@@ -146,14 +146,16 @@ model ProductPrice {
   id              String        @id @default(cuid())
   productId       String
   customerGroupId String
+  productUnitId   String?
   price           Decimal       @db.Decimal(12, 2)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
   product       Product       @relation(fields: [productId], references: [id])
   customerGroup CustomerGroup @relation(fields: [customerGroupId], references: [id])
+  productUnit   ProductUnit?  @relation(fields: [productUnitId], references: [id])
 
-  @@unique([productId, customerGroupId])
+  @@unique([productId, customerGroupId, productUnitId])
 }
 
 // ============ Product Units (Multi Unit Pricing) ============
@@ -168,6 +170,7 @@ model ProductUnit {
   updatedAt       DateTime @updatedAt
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productPrices ProductPrice[]
 
   @@unique([productId, unitName])
 }

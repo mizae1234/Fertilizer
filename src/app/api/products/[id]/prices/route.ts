@@ -7,19 +7,34 @@ export async function POST(
 ) {
     const { id } = await params;
     const body = await request.json();
-    const { customerGroupId, price } = body;
+    const { customerGroupId, price, productUnitId } = body;
 
     if (!customerGroupId || price === undefined) {
         return NextResponse.json({ error: 'กรุณาเลือกกลุ่มลูกค้าและกรอกราคา' }, { status: 400 });
     }
 
+    const unitId = productUnitId || null;
+
     try {
-        const pp = await prisma.productPrice.upsert({
-            where: { productId_customerGroupId: { productId: id, customerGroupId } },
-            update: { price },
-            create: { productId: id, customerGroupId, price },
-            include: { customerGroup: { select: { name: true } } },
+        // Check if this exact combo exists
+        const existing = await prisma.productPrice.findFirst({
+            where: { productId: id, customerGroupId, productUnitId: unitId },
         });
+
+        let pp;
+        if (existing) {
+            pp = await prisma.productPrice.update({
+                where: { id: existing.id },
+                data: { price },
+                include: { customerGroup: { select: { name: true } }, productUnit: { select: { id: true, unitName: true } } },
+            });
+        } else {
+            pp = await prisma.productPrice.create({
+                data: { productId: id, customerGroupId, productUnitId: unitId, price },
+                include: { customerGroup: { select: { name: true } }, productUnit: { select: { id: true, unitName: true } } },
+            });
+        }
+
         return NextResponse.json(JSON.parse(JSON.stringify(pp)), { status: 201 });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
