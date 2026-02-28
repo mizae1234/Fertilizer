@@ -103,6 +103,7 @@ export async function createSaleFromPOS(data: {
                     quantity: -stockToDeduct,
                     unitCost: item.unitPrice,
                     reference: saleNumber,
+                    userId: data.userId,
                     notes: `ขายสินค้า ${saleNumber}${(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
                 },
             });

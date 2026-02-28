@@ -100,6 +100,7 @@ export async function approveSale(id: string) {
                     quantity: -item.quantity,
                     unitCost: item.unitPrice,
                     reference: sale.saleNumber,
+                    userId: sale.createdById,
                     notes: `ขายสินค้า ${sale.saleNumber}`,
                 },
             });
@@ -210,6 +211,7 @@ export async function updateSale(id: string, data: {
                         quantity: -item.quantity,
                         unitCost: item.unitPrice,
                         reference: existing.saleNumber,
+                        userId: existing.createdById,
                         notes: `ขายสินค้า ${existing.saleNumber} (แก้ไข)`,
                     },
                 });

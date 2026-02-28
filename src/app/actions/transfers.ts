@@ -144,6 +144,7 @@ export async function approveTransfer(id: string) {
                     type: 'TRANSFER_OUT',
                     quantity: -item.quantity,
                     reference: transfer.transferNumber,
+                    userId: transfer.createdById,
                     notes: `โอนออกไปยัง ${transfer.toWarehouseId}`,
                 },
             });
@@ -156,6 +157,7 @@ export async function approveTransfer(id: string) {
                     type: 'TRANSFER_IN',
                     quantity: item.quantity,
                     reference: transfer.transferNumber,
+                    userId: transfer.createdById,
                     notes: `รับโอนจาก ${transfer.fromWarehouseId}`,
                 },
             });

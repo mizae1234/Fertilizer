@@ -87,6 +87,7 @@ export async function createStockAdjustment(data: {
                         quantity: -item.quantity,
                         unitCost: Number(stock.avgCost),
                         reference: adjNumber,
+                        userId: data.userId,
                         notes: noteText,
                     },
                 });
@@ -115,6 +116,7 @@ export async function createStockAdjustment(data: {
                         quantity: item.quantity,
                         unitCost: stock ? Number(stock.avgCost) : 0,
                         reference: adjNumber,
+                        userId: data.userId,
                         notes: noteText,
                     },
                 });
