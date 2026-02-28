@@ -202,25 +202,27 @@ export default function OwnerDashboardPage() {
                             {data.dailySales.length === 0 ? (
                                 <p className="text-center text-gray-400 py-8">ไม่มีข้อมูลยอดขายในช่วงนี้</p>
                             ) : (
-                                <div className="flex items-end gap-1 h-48 overflow-x-auto pb-2">
-                                    {data.dailySales.map((d, i) => {
-                                        const h = Math.max((d.amount / maxDailySales) * 100, 2);
-                                        const dayLabel = new Date(d.date).getDate().toString();
-                                        return (
-                                            <div key={i} className="flex flex-col items-center flex-1 min-w-[16px] group relative">
-                                                {/* Tooltip */}
-                                                <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                                                    {new Date(d.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                                                    <br />{formatCurrency(d.amount)}
+                                <div className="relative" style={{ height: 200 }}>
+                                    <div className="flex items-end gap-1 h-full overflow-x-auto">
+                                        {data.dailySales.map((d, i) => {
+                                            const barH = Math.max(Math.round((d.amount / maxDailySales) * 170), d.amount > 0 ? 4 : 2);
+                                            const dayLabel = new Date(d.date + 'T12:00:00').getDate().toString();
+                                            return (
+                                                <div key={i} className="flex flex-col items-center justify-end flex-1 min-w-[16px] h-full group relative">
+                                                    {/* Tooltip */}
+                                                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
+                                                        {new Date(d.date + 'T12:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                                                        <br />{formatCurrency(d.amount)}
+                                                    </div>
+                                                    <div
+                                                        className="w-full rounded-t-md bg-gradient-to-t from-teal-500 to-emerald-400 hover:from-teal-600 hover:to-emerald-500 transition-all cursor-pointer"
+                                                        style={{ height: barH }}
+                                                    />
+                                                    <span className="text-[9px] text-gray-400 mt-1 shrink-0">{dayLabel}</span>
                                                 </div>
-                                                <div
-                                                    className="w-full rounded-t-md bg-gradient-to-t from-teal-500 to-emerald-400 hover:from-teal-600 hover:to-emerald-500 transition-all cursor-pointer"
-                                                    style={{ height: `${h}%` }}
-                                                />
-                                                <span className="text-[9px] text-gray-400 mt-1">{dayLabel}</span>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
                         </div>
