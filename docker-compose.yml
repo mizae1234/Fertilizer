@@ -6,6 +6,8 @@ services:
       - .env
     expose:
       - "3000"
+    volumes:
+      - uploads_data:/app/uploads
 
   caddy:
     image: caddy:2-alpine
@@ -23,3 +25,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  uploads_data:
