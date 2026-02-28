@@ -105,14 +105,19 @@ export async function approveTransfer(id: string) {
 
         for (const item of transfer.items) {
             // Deduct from source warehouse
-            await tx.productStock.update({
+            await tx.productStock.upsert({
                 where: {
                     productId_warehouseId: {
                         productId: item.productId,
                         warehouseId: transfer.fromWarehouseId,
                     },
                 },
-                data: { quantity: { decrement: item.quantity } },
+                update: { quantity: { decrement: item.quantity } },
+                create: {
+                    productId: item.productId,
+                    warehouseId: transfer.fromWarehouseId,
+                    quantity: -item.quantity,
+                },
             });
 
             // Add to destination warehouse

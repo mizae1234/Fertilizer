@@ -22,8 +22,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'ไฟล์ขนาดใหญ่เกินไป (สูงสุด 5MB)' }, { status: 400 });
         }
 
-        // Create uploads directory
-        const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+        // Create uploads directory (root level, not public/)
+        const uploadsDir = path.join(process.cwd(), 'uploads');
         await mkdir(uploadsDir, { recursive: true });
 
         // Generate unique filename
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         const buffer = Buffer.from(await file.arrayBuffer());
         await writeFile(filepath, buffer);
 
-        const url = `/uploads/${filename}`;
+        const url = `/api/uploads/${filename}`;
         return NextResponse.json({ url });
     } catch (error: any) {
         console.error('Upload error:', error);
