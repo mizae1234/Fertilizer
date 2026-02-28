@@ -406,26 +406,25 @@ export default function POSPage() {
         const warehouseId = defaultWarehouseId;
         const stock = getStock(product, warehouseId);
 
-        // Determine base unit from productUnits
-        const baseUnit = product.productUnits?.find(u => u.isBaseUnit);
-        const selectedUnit = baseUnit || null;
-        const convRate = selectedUnit ? Number(selectedUnit.conversionRate) : 1;
-        const unitName = selectedUnit ? selectedUnit.unitName : product.unit;
+        // Always default to the base product unit initially, instead of a secondary unit
+        const selectedUnit: { id: string; sellingPrice: number | string } | null = null;
+        const convRate = 1;
+        const unitName = product.unit;
 
-        const existing = cart.find(c => c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === (selectedUnit?.id || ''));
+        const existing = cart.find(c => c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === '');
         if (existing) {
             setCart(cart.map(c =>
-                c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === (selectedUnit?.id || '')
+                c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === ''
                     ? { ...c, quantity: c.quantity + 1, points: (c.quantity + 1) * c.pointsPerUnit }
                     : c
             ));
             triggerPulse(product.id);
         } else {
             // Auto-determine price based on customer group + unit
-            let price = selectedUnit ? Number(selectedUnit.sellingPrice) : getPrice(product);
+            let price = getPrice(product);
             const priceTier = 'custom';
             if (selectedCustomer) {
-                const unitId = selectedUnit?.id || null;
+                const unitId = null;
                 const gp = product.productPrices.find(p =>
                     p.customerGroup.id === selectedCustomer.customerGroup.id && p.productUnitId === unitId
                 );
@@ -438,7 +437,7 @@ export default function POSPage() {
                 pointsPerUnit: product.pointsPerUnit,
                 priceTier,
                 productPrices: product.productPrices.map(pp => ({ customerGroupId: pp.customerGroup.id, productUnitId: pp.productUnitId, price: Number(pp.price) })),
-                selectedUnitId: selectedUnit?.id || '',
+                selectedUnitId: '',
                 selectedUnitName: unitName,
                 conversionRate: convRate,
                 productUnits: product.productUnits || [],
@@ -1028,14 +1027,12 @@ export default function POSPage() {
                                                         {item.productUnits && item.productUnits.length > 0 && (
                                                             <select value={item.selectedUnitId || '__default__'} onChange={e => updateCartUnit(idx, e.target.value)}
                                                                 className="px-1.5 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-[11px] outline-none font-medium">
-                                                                {!item.productUnits.some(u => u.isBaseUnit) && (
-                                                                    <option value="__default__">
-                                                                        {products.find(p => p.id === item.productId)?.unit || item.unit} (ปกติ)
-                                                                    </option>
-                                                                )}
+                                                                <option value="__default__">
+                                                                    {products.find(p => p.id === item.productId)?.unit || item.unit} (ปกติ)
+                                                                </option>
                                                                 {item.productUnits.map(u => (
                                                                     <option key={u.id} value={u.id}>
-                                                                        {u.unitName} {u.isBaseUnit ? '(หลัก)' : `(×${Number(u.conversionRate)})`}
+                                                                        {u.unitName} (×{Number(u.conversionRate)})
                                                                     </option>
                                                                 ))}
                                                             </select>

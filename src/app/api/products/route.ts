@@ -21,7 +21,7 @@ export async function GET(request: Request) {
             },
             select: {
                 id: true, code: true, name: true, price: true, cost: true, unit: true,
-                pointsPerUnit: true, minStock: true,
+                imageUrl: true, pointsPerUnit: true, minStock: true,
                 productStocks: warehouseId
                     ? { where: { warehouseId }, select: { warehouseId: true, quantity: true } }
                     : { select: { warehouseId: true, quantity: true } },
