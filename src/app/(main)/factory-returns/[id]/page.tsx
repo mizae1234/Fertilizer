@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { notFound } from 'next/navigation';
+import PrintFactoryReturnButton from './PrintFactoryReturnButton';
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -30,9 +31,12 @@ export default async function FactoryReturnDetailPage({ params }: Props) {
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{fr.returnNumber}</h1>
                     <p className="text-sm text-gray-500 mt-1">ใบเคลมคืนโรงงาน</p>
                 </div>
-                <Link href="/factory-returns" className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
-                    ← กลับ
-                </Link>
+                <div className="flex items-center gap-2">
+                    <PrintFactoryReturnButton id={id} />
+                    <Link href="/factory-returns" className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+                        ← กลับ
+                    </Link>
+                </div>
             </div>
 
             {/* Summary */}
