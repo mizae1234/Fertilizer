@@ -1,21 +1,24 @@
 import { getStockAdjustments } from '@/app/actions/stock-adjustments';
 import Link from 'next/link';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { Suspense } from 'react';
-import AdjustmentFilter from './AdjustmentFilter';
+import DateRangeFilter from '@/components/DateRangeFilter';
 
-interface Props { searchParams: Promise<{ page?: string; search?: string }> }
+interface Props { searchParams: Promise<{ page?: string; search?: string; from?: string; to?: string }> }
 
 export default async function StockAdjustmentsPage({ searchParams }: Props) {
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
     const search = sp.search || '';
+    const defaultFrom = () => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); };
+    const from = sp.from || defaultFrom();
+    const to = sp.to || '';
 
-    const { records, totalPages, total } = await getStockAdjustments(page, search);
+    const { records, totalPages, total } = await getStockAdjustments(page, search, from, to);
 
     const buildUrl = (params: Record<string, string>) => {
         const p = new URLSearchParams();
-        const vals = { page: String(page), search, ...params };
+        const vals = { page: String(page), search, from, to, ...params };
         Object.entries(vals).forEach(([k, v]) => { if (v) p.set(k, v); });
         return `/stock-adjustments?${p.toString()}`;
     };
@@ -32,9 +35,23 @@ export default async function StockAdjustmentsPage({ searchParams }: Props) {
                 </Link>
             </div>
 
-            <Suspense fallback={<div className="mb-4 h-11 bg-gray-100 rounded-xl animate-pulse" />}>
-                <AdjustmentFilter />
-            </Suspense>
+            {/* Filters */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">
+                <div className="flex flex-wrap items-end gap-3">
+                    <form method="get" action="/stock-adjustments" className="flex gap-2">
+                        <input type="hidden" name="from" value={from} />
+                        <input type="hidden" name="to" value={to} />
+                        <input type="text" name="search" defaultValue={search}
+                            placeholder="🔍 ค้นหาเลขที่, เหตุผล, สินค้า..."
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-48" />
+                        <button type="submit" className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600">ค้นหา</button>
+                        {search && <a href={buildUrl({ search: '', page: '1' })} className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200">ล้าง</a>}
+                    </form>
+                    <Suspense fallback={<div className="ml-auto h-9 w-64 bg-gray-100 rounded-lg animate-pulse" />}>
+                        <DateRangeFilter />
+                    </Suspense>
+                </div>
+            </div>
 
             {/* Desktop Table */}
             <div className="hidden md:block bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
@@ -47,12 +64,13 @@ export default async function StockAdjustmentsPage({ searchParams }: Props) {
                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">จำนวน</th>
                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">มูลค่า</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เหตุผล</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้ทำรายการ</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">วันที่</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {records.length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
+                            <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
                         ) : (
                             records.map(r => (
                                 <tr key={r.id} className="hover:bg-gray-50">
@@ -65,7 +83,8 @@ export default async function StockAdjustmentsPage({ searchParams }: Props) {
                                     <td className={`px-4 py-3 text-sm font-semibold text-right ${r.quantity >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{r.quantity >= 0 ? '+' : ''}{r.quantity} {r.product.unit}</td>
                                     <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatCurrency(Math.abs(r.quantity) * Number(r.unitCost))}</td>
                                     <td className="px-4 py-3 text-sm text-gray-600 max-w-[200px] truncate">{r.notes || '-'}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-500">{formatDate(r.createdAt)}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-600">{r.user?.name || '-'}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(r.createdAt)}</td>
                                 </tr>
                             ))
                         )}
@@ -98,8 +117,8 @@ export default async function StockAdjustmentsPage({ searchParams }: Props) {
                             <p className="text-xs text-gray-400 mb-2">{r.product.code} · {r.warehouse.name}</p>
                             {r.notes && <p className="text-xs text-gray-500 mb-2">💬 {r.notes}</p>}
                             <div className="flex items-center justify-between text-xs text-gray-400">
-                                <span>{formatDate(r.createdAt)}</span>
-                                <span className="text-gray-600">{formatCurrency(Math.abs(r.quantity) * Number(r.unitCost))}</span>
+                                <span>{formatDateTime(r.createdAt)}</span>
+                                <span className="text-gray-600">{r.user?.name || '-'} · {formatCurrency(Math.abs(r.quantity) * Number(r.unitCost))}</span>
                             </div>
                         </div>
                     ))

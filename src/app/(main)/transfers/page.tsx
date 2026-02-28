@@ -1,20 +1,28 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { formatDate } from '@/lib/utils';
+import { formatDateTime } from '@/lib/utils';
 import StatusBadge from '@/components/StatusBadge';
+import { Suspense } from 'react';
+import DateRangeFilter from '@/components/DateRangeFilter';
 
-interface Props { searchParams: Promise<{ page?: string; status?: string }> }
+interface Props { searchParams: Promise<{ page?: string; status?: string; from?: string; to?: string }> }
 
 export default async function TransfersPage({ searchParams }: Props) {
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
     const status = sp.status || '';
+    const defaultFrom = () => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); };
+    const from = sp.from || defaultFrom();
+    const to = sp.to || '';
     const perPage = 10;
 
-    const where = {
-        deletedAt: null,
-        ...(status ? { status: status as 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' } : {}),
-    };
+    const where: Record<string, unknown> = { deletedAt: null };
+    if (status) where.status = status;
+    if (from || to) {
+        where.createdAt = {};
+        if (from) (where.createdAt as Record<string, unknown>).gte = new Date(from);
+        if (to) (where.createdAt as Record<string, unknown>).lte = new Date(to + 'T23:59:59');
+    }
 
     const [transfers, total] = await Promise.all([
         prisma.stockTransfer.findMany({
@@ -34,6 +42,13 @@ export default async function TransfersPage({ searchParams }: Props) {
 
     const totalPages = Math.ceil(total / perPage);
 
+    const buildUrl = (params: Record<string, string>) => {
+        const p = new URLSearchParams();
+        const vals = { page: String(page), status, from, to, ...params };
+        Object.entries(vals).forEach(([k, v]) => { if (v) p.set(k, v); });
+        return `/transfers?${p.toString()}`;
+    };
+
     return (
         <div className="animate-fade-in">
             <div className="flex items-center justify-between mb-6">
@@ -46,13 +61,21 @@ export default async function TransfersPage({ searchParams }: Props) {
                 </Link>
             </div>
 
-            <div className="flex gap-2 mb-4">
-                {[{ v: '', l: 'ทั้งหมด' }, { v: 'PENDING', l: 'รออนุมัติ' }, { v: 'APPROVED', l: 'อนุมัติแล้ว' }, { v: 'REJECTED', l: 'ปฏิเสธ' }].map(f => (
-                    <Link key={f.v} href={`/transfers?status=${f.v}`}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium ${status === f.v || (!status && !f.v) ? 'bg-emerald-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                        {f.l}
-                    </Link>
-                ))}
+            {/* Filters */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">
+                <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex gap-2">
+                        {[{ v: '', l: 'ทั้งหมด' }, { v: 'PENDING', l: 'รออนุมัติ' }, { v: 'APPROVED', l: 'อนุมัติแล้ว' }, { v: 'REJECTED', l: 'ปฏิเสธ' }].map(f => (
+                            <Link key={f.v} href={buildUrl({ status: f.v, page: '1' })}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${status === f.v || (!status && !f.v) ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                {f.l}
+                            </Link>
+                        ))}
+                    </div>
+                    <Suspense fallback={<div className="ml-auto h-9 w-64 bg-gray-100 rounded-lg animate-pulse" />}>
+                        <DateRangeFilter />
+                    </Suspense>
+                </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
@@ -80,7 +103,7 @@ export default async function TransfersPage({ searchParams }: Props) {
                                     <td className="px-4 py-3 text-sm text-gray-600">{tf._count.items} รายการ</td>
                                     <td className="px-4 py-3"><StatusBadge status={tf.status} /></td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{tf.createdBy.name}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-500">{formatDate(tf.createdAt)}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(tf.createdAt)}</td>
                                 </tr>
                             ))
                         )}
@@ -91,8 +114,8 @@ export default async function TransfersPage({ searchParams }: Props) {
                     <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
                         <p className="text-sm text-gray-500">หน้า {page} จาก {totalPages}</p>
                         <div className="flex gap-1">
-                            {page > 1 && <Link href={`/transfers?page=${page - 1}&status=${status}`} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ก่อนหน้า</Link>}
-                            {page < totalPages && <Link href={`/transfers?page=${page + 1}&status=${status}`} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ถัดไป</Link>}
+                            {page > 1 && <Link href={buildUrl({ page: String(page - 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ก่อนหน้า</Link>}
+                            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ถัดไป</Link>}
                         </div>
                     </div>
                 )}

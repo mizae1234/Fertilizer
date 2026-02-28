@@ -1,20 +1,28 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
 import StatusBadge from '@/components/StatusBadge';
+import { Suspense } from 'react';
+import DateRangeFilter from '@/components/DateRangeFilter';
 
-interface Props { searchParams: Promise<{ page?: string; status?: string }> }
+interface Props { searchParams: Promise<{ page?: string; status?: string; from?: string; to?: string }> }
 
 export default async function GoodsReceivePage({ searchParams }: Props) {
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
     const status = sp.status || '';
+    const defaultFrom = () => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); };
+    const from = sp.from || defaultFrom();
+    const to = sp.to || '';
     const perPage = 10;
 
-    const where = {
-        deletedAt: null,
-        ...(status ? { status: status as 'PENDING' | 'APPROVED' | 'REJECTED' } : {}),
-    };
+    const where: Record<string, unknown> = { deletedAt: null };
+    if (status) where.status = status;
+    if (from || to) {
+        where.createdAt = {};
+        if (from) (where.createdAt as Record<string, unknown>).gte = new Date(from);
+        if (to) (where.createdAt as Record<string, unknown>).lte = new Date(to + 'T23:59:59');
+    }
 
     const [records, total] = await Promise.all([
         prisma.goodsReceive.findMany({
@@ -33,6 +41,13 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
 
     const totalPages = Math.ceil(total / perPage);
 
+    const buildUrl = (params: Record<string, string>) => {
+        const p = new URLSearchParams();
+        const vals = { page: String(page), status, from, to, ...params };
+        Object.entries(vals).forEach(([k, v]) => { if (v) p.set(k, v); });
+        return `/goods-receive?${p.toString()}`;
+    };
+
     return (
         <div className="animate-fade-in">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
@@ -45,14 +60,23 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                 </Link>
             </div>
 
-            {/* Status Filter */}
-            <div className="flex flex-wrap gap-2 mb-4">
-                {[{ v: '', l: 'ทั้งหมด' }, { v: 'PENDING', l: 'รอตรวจสอบ' }, { v: 'APPROVED', l: 'รับแล้ว' }, { v: 'REJECTED', l: 'ปฏิเสธ' }].map(f => (
-                    <Link key={f.v} href={`/goods-receive?status=${f.v}`}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium ${status === f.v || (!status && !f.v) ? 'bg-emerald-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                        {f.l}
-                    </Link>
-                ))}
+            {/* Filters */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">
+                <div className="flex flex-wrap items-end gap-3">
+                    {/* Status Filter */}
+                    <div className="flex flex-wrap gap-2">
+                        {[{ v: '', l: 'ทั้งหมด' }, { v: 'PENDING', l: 'รอตรวจสอบ' }, { v: 'APPROVED', l: 'รับแล้ว' }, { v: 'REJECTED', l: 'ปฏิเสธ' }].map(f => (
+                            <Link key={f.v} href={buildUrl({ status: f.v, page: '1' })}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${status === f.v || (!status && !f.v) ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                {f.l}
+                            </Link>
+                        ))}
+                    </div>
+                    {/* Date Range */}
+                    <Suspense fallback={<div className="ml-auto h-9 w-64 bg-gray-100 rounded-lg animate-pulse" />}>
+                        <DateRangeFilter />
+                    </Suspense>
+                </div>
             </div>
 
             {/* Desktop Table */}
@@ -81,7 +105,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                                     <td className="px-4 py-3 text-sm font-semibold text-gray-800">{formatCurrency(Number(gr.totalAmount))}</td>
                                     <td className="px-4 py-3"><StatusBadge status={gr.status} /></td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{gr.createdBy.name}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-500">{formatDate(gr.createdAt)}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(gr.createdAt)}</td>
                                 </tr>
                             ))
                         )}
@@ -92,8 +116,8 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                     <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
                         <p className="text-sm text-gray-500">หน้า {page} จาก {totalPages}</p>
                         <div className="flex gap-1">
-                            {page > 1 && <Link href={`/goods-receive?page=${page - 1}&status=${status}`} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ก่อนหน้า</Link>}
-                            {page < totalPages && <Link href={`/goods-receive?page=${page + 1}&status=${status}`} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ถัดไป</Link>}
+                            {page > 1 && <Link href={buildUrl({ page: String(page - 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ก่อนหน้า</Link>}
+                            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ถัดไป</Link>}
                         </div>
                     </div>
                 )}
@@ -116,7 +140,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                                 <span>{gr._count.items} รายการ · {gr.createdBy.name}</span>
                                 <span className="font-semibold text-gray-800 text-sm">{formatCurrency(Number(gr.totalAmount))}</span>
                             </div>
-                            <p className="text-xs text-gray-400 mt-1">{formatDate(gr.createdAt)}</p>
+                            <p className="text-xs text-gray-400 mt-1">{formatDateTime(gr.createdAt)}</p>
                         </Link>
                     ))
                 )}
@@ -124,8 +148,8 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                     <div className="flex items-center justify-between pt-2">
                         <p className="text-sm text-gray-500">หน้า {page}/{totalPages}</p>
                         <div className="flex gap-1">
-                            {page > 1 && <Link href={`/goods-receive?page=${page - 1}&status=${status}`} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ก่อนหน้า</Link>}
-                            {page < totalPages && <Link href={`/goods-receive?page=${page + 1}&status=${status}`} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ถัดไป</Link>}
+                            {page > 1 && <Link href={buildUrl({ page: String(page - 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ก่อนหน้า</Link>}
+                            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ถัดไป</Link>}
                         </div>
                     </div>
                 )}

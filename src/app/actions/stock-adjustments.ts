@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { generateNumber } from '@/lib/utils';
 
-export async function getStockAdjustments(page = 1, search = '') {
+export async function getStockAdjustments(page = 1, search = '', from = '', to = '') {
     const perPage = 15;
     const where: Record<string, unknown> = {
         type: 'ADJUSTMENT',
@@ -18,6 +18,12 @@ export async function getStockAdjustments(page = 1, search = '') {
         ];
     }
 
+    if (from || to) {
+        where.createdAt = {};
+        if (from) (where.createdAt as Record<string, unknown>).gte = new Date(from);
+        if (to) (where.createdAt as Record<string, unknown>).lte = new Date(to + 'T23:59:59');
+    }
+
     const [records, total] = await Promise.all([
         prisma.stockTransaction.findMany({
             where,
@@ -25,6 +31,7 @@ export async function getStockAdjustments(page = 1, search = '') {
                 id: true, quantity: true, unitCost: true, reference: true, notes: true, createdAt: true,
                 product: { select: { name: true, code: true, unit: true } },
                 warehouse: { select: { name: true } },
+                user: { select: { name: true } },
             },
             skip: (page - 1) * perPage,
             take: perPage,

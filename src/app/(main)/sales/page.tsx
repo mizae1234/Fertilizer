@@ -1,9 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
 import StatusBadge from '@/components/StatusBadge';
 import { Suspense } from 'react';
-import SalesDateFilter from './SalesDateFilter';
+import DateRangeFilter from '@/components/DateRangeFilter';
 
 interface Props { searchParams: Promise<{ page?: string; status?: string; from?: string; to?: string; search?: string }> }
 
@@ -11,7 +11,8 @@ export default async function SalesPage({ searchParams }: Props) {
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
     const status = sp.status || '';
-    const from = sp.from || '';
+    const defaultFrom = () => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); };
+    const from = sp.from || defaultFrom();
     const to = sp.to || '';
     const searchQuery = sp.search || '';
     const perPage = 15;
@@ -86,7 +87,7 @@ export default async function SalesPage({ searchParams }: Props) {
 
                     {/* Date Range */}
                     <Suspense fallback={<div className="ml-auto h-9 w-64 bg-gray-100 rounded-lg animate-pulse" />}>
-                        <SalesDateFilter />
+                        <DateRangeFilter />
                     </Suspense>
                 </div>
             </div>
@@ -141,7 +142,7 @@ export default async function SalesPage({ searchParams }: Props) {
                                     </td>
                                     <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(sale.totalAmount))}</td>
                                     <td className="px-4 py-3"><StatusBadge status={sale.status} /></td>
-                                    <td className="px-4 py-3 text-sm text-gray-500">{formatDate(sale.createdAt)}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(sale.createdAt)}</td>
                                 </tr>
                             ))
                         )}
