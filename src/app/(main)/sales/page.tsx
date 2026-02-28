@@ -41,7 +41,7 @@ export default async function SalesPage({ searchParams }: Props) {
                 _count: { select: { items: true } },
                 items: {
                     take: 3,
-                    select: { quantity: true, unitName: true, product: { select: { name: true, unit: true } } },
+                    select: { quantity: true, unitName: true, product: { select: { name: true, unit: true, productUnits: { select: { unitName: true, conversionRate: true } } } } },
                 },
             },
             skip: (page - 1) * perPage,
@@ -133,6 +133,10 @@ export default async function SalesPage({ searchParams }: Props) {
                                             {sale.items.map((item, i) => (
                                                 <p key={i} className="text-xs text-gray-500">
                                                     {item.product.name} x{item.quantity} {item.unitName || item.product.unit}
+                                                    {item.unitName && item.unitName !== item.product.unit && (() => {
+                                                        const pu = (item.product as any).productUnits?.find((u: any) => u.unitName === item.unitName);
+                                                        return pu ? ` (×${Number(pu.conversionRate)})` : '';
+                                                    })()}
                                                 </p>
                                             ))}
                                             {sale._count.items > 3 && (

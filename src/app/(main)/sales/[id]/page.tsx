@@ -304,10 +304,7 @@ export default function SaleDetailPage() {
                                             {item.quantity} {item.unitName || item.product.unit}
                                             {item.unitName && item.unitName !== item.product.unit && (() => {
                                                 const pu = item.product.productUnits?.find(u => u.unitName === item.unitName);
-                                                if (pu) {
-                                                    const conv = Number(pu.conversionRate);
-                                                    return <span className="text-xs text-gray-400 ml-1">({item.quantity * conv} {item.product.unit})</span>;
-                                                }
+                                                if (pu) return <span className="text-xs text-gray-400 ml-1">(×{Number(pu.conversionRate)})</span>;
                                                 return null;
                                             })()}
                                         </td>
