@@ -55,8 +55,11 @@ export default function Sidebar({ onCollapsedChange }: { onCollapsedChange?: (co
         onCollapsedChange?.(collapsed);
     }, [collapsed, onCollapsedChange]);
 
-    const handleLogout = () => {
-        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    const handleLogout = async () => {
+        // Clear client-side cookie (fallback)
+        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0';
+        // Clear server-side cookie via API (reliable on mobile Safari/iOS)
+        try { await fetch('/api/auth/logout', { method: 'POST' }); } catch { /* ignore */ }
         router.push('/login');
     };
 
