@@ -36,6 +36,7 @@ export const MENU_GROUPS = [
     {
         label: 'รายงาน',
         items: [
+            { name: 'Owner Dashboard', href: '/owner-dashboard', icon: '🔮' },
             { name: 'รายงาน (Reports)', href: '/reports', icon: '📈' },
         ],
     },
