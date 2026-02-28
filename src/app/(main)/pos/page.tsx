@@ -44,6 +44,8 @@ interface CartItem {
     bundleId?: string;
     bundleName?: string;
     bundleItems?: BundleSubItem[];
+    // Discount
+    itemDiscount: number;
 }
 
 interface PaymentLine { method: string; amount: number; dueDate: string; bankAccountId?: string }
@@ -269,6 +271,18 @@ export default function POSPage() {
     // Track last added item index for slide-in animation
     const [lastAddedId, setLastAddedId] = useState<string | null>(null);
     const cartEndRef = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const searchInputMobileRef = useRef<HTMLInputElement>(null);
+    const [highlightedIndex, setHighlightedIndex] = useState(-1);
+
+    // Bill-level discount
+    const [billDiscount, setBillDiscount] = useState(0);
+    const [showBillDiscount, setShowBillDiscount] = useState(false);
+
+    // Cart persistence via sessionStorage
+    const CART_STORAGE_KEY = 'pos_cart';
+    const CUSTOMER_STORAGE_KEY = 'pos_customer';
+    const cartInitialized = useRef(false);
 
     useEffect(() => {
         try {
@@ -289,6 +303,15 @@ export default function POSPage() {
             setBundles(b);
             if (w.length > 0) setDefaultWarehouseId(w[0].id);
         });
+
+        // Restore cart + customer from sessionStorage
+        try {
+            const savedCart = sessionStorage.getItem(CART_STORAGE_KEY);
+            if (savedCart) setCart(JSON.parse(savedCart));
+            const savedCustomer = sessionStorage.getItem(CUSTOMER_STORAGE_KEY);
+            if (savedCustomer) setSelectedCustomer(JSON.parse(savedCustomer));
+        } catch { /* ignore */ }
+        cartInitialized.current = true;
     }, []);
 
     const loadProducts = useCallback(async (warehouseId: string) => {
@@ -306,6 +329,19 @@ export default function POSPage() {
             fetch(`/api/customers?search=${customerSearch}`).then(r => r.json()).then(setCustomers);
         }
     }, [customerSearch]);
+
+    // Persist cart to sessionStorage
+    useEffect(() => {
+        if (!cartInitialized.current) return;
+        try { sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart)); } catch { /* ignore */ }
+    }, [cart]);
+    useEffect(() => {
+        if (!cartInitialized.current) return;
+        try {
+            if (selectedCustomer) sessionStorage.setItem(CUSTOMER_STORAGE_KEY, JSON.stringify(selectedCustomer));
+            else sessionStorage.removeItem(CUSTOMER_STORAGE_KEY);
+        } catch { /* ignore */ }
+    }, [selectedCustomer]);
 
 
 
@@ -403,6 +439,7 @@ export default function POSPage() {
                 selectedUnitName: unitName,
                 conversionRate: convRate,
                 productUnits: product.productUnits || [],
+                itemDiscount: 0,
             }]);
             setLastAddedId(product.id);
             setTimeout(() => setLastAddedId(null), 400);
@@ -470,6 +507,7 @@ export default function POSPage() {
                 bundleId: bundle.id,
                 bundleName: bundle.name,
                 bundleItems: subItems,
+                itemDiscount: 0,
             }]);
         }
         setLastAddedId(bundle.id);
@@ -551,7 +589,9 @@ export default function POSPage() {
         }));
     };
 
-    const total = cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+    const subtotal = cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+    const itemDiscountsTotal = cart.reduce((s, i) => s + (i.itemDiscount || 0), 0);
+    const total = subtotal - itemDiscountsTotal - billDiscount;
     const totalPoints = cart.reduce((s, i) => s + i.points, 0);
     const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 
@@ -602,6 +642,8 @@ export default function POSPage() {
             });
             setShowPaymentModal(false);
             setCart([]);
+            setBillDiscount(0);
+            setShowBillDiscount(false);
             setSaleNotes('');
             setShowNotes(false);
 
@@ -668,6 +710,45 @@ export default function POSPage() {
         ...filteredBundles.map(b => ({ type: 'bundle' as const, data: b }))]
         : [];
 
+    // Keyboard handler for search: Arrow keys + Enter
+    const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+        if (!showSearchResults || searchResults.length === 0) {
+            // Global shortcuts when not in dropdown
+            if (e.key === '+' && cart.length > 0) { e.preventDefault(); openPaymentModal(); return; }
+            if (e.key === '-') { e.preventDefault(); setShowBillDiscount(true); return; }
+            return;
+        }
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setHighlightedIndex(prev => (prev + 1) % searchResults.length);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setHighlightedIndex(prev => (prev <= 0 ? searchResults.length - 1 : prev - 1));
+        } else if (e.key === 'Enter' && highlightedIndex >= 0 && highlightedIndex < searchResults.length) {
+            e.preventDefault();
+            const r = searchResults[highlightedIndex];
+            if (r.type === 'product') { addToCart(r.data as Product); }
+            else { addBundleToCart(r.data as BundleInfo); }
+            setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1);
+        }
+    };
+
+    // Global keyboard shortcuts
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            const tag = (e.target as HTMLElement).tagName;
+            const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+            // Only handle shortcuts when not typing in inputs (except search)
+            const isSearchInput = e.target === searchInputRef.current || e.target === searchInputMobileRef.current;
+            if (!isSearchInput && isInput) return;
+            if (e.key === '+' && !isInput && cart.length > 0) { e.preventDefault(); openPaymentModal(); }
+            if (e.key === '-' && !isInput) { e.preventDefault(); setShowBillDiscount(true); }
+        };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cart]);
+
     return (
         <div className="animate-fade-in -m-4 lg:-m-6">
             <div className="flex flex-col h-[calc(100dvh-3.5rem)] lg:h-screen bg-white">
@@ -723,14 +804,16 @@ export default function POSPage() {
                                     )}
                                 </div>
                                 <div ref={searchRef} className="relative w-80 shrink-0">
-                                    <input type="text" value={search}
-                                        onChange={e => { setSearch(e.target.value); setShowSearchResults(true); }}
+                                    <input ref={searchInputRef} type="text" value={search}
+                                        onChange={e => { setSearch(e.target.value); setShowSearchResults(true); setHighlightedIndex(-1); }}
                                         onFocus={() => { if (search) setShowSearchResults(true); }}
+                                        onKeyDown={handleSearchKeyDown}
                                         placeholder="🔍 ค้นหาสินค้า..."
                                         className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm bg-emerald-50/50"
                                     />
                                     {showSearchResults && searchResults.length > 0 && (
-                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-[400px] overflow-y-auto">
+                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-[400px] overflow-y-auto"
+                                            onMouseDown={e => e.preventDefault()}>
                                             {searchResults.map((result, i) => {
                                                 if (result.type === 'product') {
                                                     const p = result.data as Product;
@@ -738,8 +821,9 @@ export default function POSPage() {
                                                     const price = getPrice(p);
                                                     const inCart = cart.find(c => c.productId === p.id);
                                                     return (
-                                                        <button key={p.id} onClick={() => { addToCart(p); setSearch(''); setShowSearchResults(false); }}
-                                                            className={`w-full text-left px-4 py-3 hover:bg-emerald-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0 ${inCart ? 'bg-emerald-50/50' : ''}`}>
+                                                        <button key={p.id}
+                                                            onClick={() => { addToCart(p); setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1); }}
+                                                            className={`w-full text-left px-4 py-3 hover:bg-emerald-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0 ${i === highlightedIndex ? 'bg-emerald-100' : inCart ? 'bg-emerald-50/50' : ''}`}>
                                                             <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-mono text-gray-400 shrink-0">📦</div>
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
@@ -755,8 +839,9 @@ export default function POSPage() {
                                                 } else {
                                                     const b = result.data as BundleInfo;
                                                     return (
-                                                        <button key={b.id} onClick={() => { addBundleToCart(b); setSearch(''); setShowSearchResults(false); }}
-                                                            className="w-full text-left px-4 py-3 hover:bg-purple-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0">
+                                                        <button key={b.id}
+                                                            onClick={() => { addBundleToCart(b); setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1); }}
+                                                            className={`w-full text-left px-4 py-3 hover:bg-purple-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0 ${i === highlightedIndex ? 'bg-purple-100' : ''}`}>
                                                             <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-sm shrink-0">🎁</div>
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-sm font-medium text-purple-800 truncate">{b.name}</p>
@@ -811,14 +896,16 @@ export default function POSPage() {
                                 </div>
                             </div>
                             <div ref={searchRef} className="relative">
-                                <input type="text" value={search}
-                                    onChange={e => { setSearch(e.target.value); setShowSearchResults(true); }}
+                                <input ref={searchInputMobileRef} type="text" value={search}
+                                    onChange={e => { setSearch(e.target.value); setShowSearchResults(true); setHighlightedIndex(-1); }}
                                     onFocus={() => { if (search) setShowSearchResults(true); }}
+                                    onKeyDown={handleSearchKeyDown}
                                     placeholder="🔍 ค้นหาสินค้า..."
                                     className="w-full px-3 py-2 rounded-lg border border-emerald-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm bg-emerald-50/50"
                                 />
                                 {showSearchResults && searchResults.length > 0 && (
-                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-[60vh] overflow-y-auto">
+                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-[60vh] overflow-y-auto"
+                                        onMouseDown={e => e.preventDefault()}>
                                         {searchResults.map((result, i) => {
                                             if (result.type === 'product') {
                                                 const p = result.data as Product;
@@ -826,8 +913,9 @@ export default function POSPage() {
                                                 const price = getPrice(p);
                                                 const inCart = cart.find(c => c.productId === p.id);
                                                 return (
-                                                    <button key={p.id} onClick={() => { addToCart(p); setSearch(''); setShowSearchResults(false); }}
-                                                        className={`w-full text-left px-3 py-2.5 hover:bg-emerald-50 flex items-center gap-2 transition-colors border-b border-gray-50 last:border-0 ${inCart ? 'bg-emerald-50/50' : ''}`}>
+                                                    <button key={p.id}
+                                                        onClick={() => { addToCart(p); setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1); }}
+                                                        className={`w-full text-left px-3 py-2.5 hover:bg-emerald-50 flex items-center gap-2 transition-colors border-b border-gray-50 last:border-0 ${i === highlightedIndex ? 'bg-emerald-100' : inCart ? 'bg-emerald-50/50' : ''}`}>
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
                                                             <p className="text-[10px] text-gray-400">{p.code} · {p.unit} · คงเหลือ {stock}</p>
@@ -839,8 +927,9 @@ export default function POSPage() {
                                             } else {
                                                 const b = result.data as BundleInfo;
                                                 return (
-                                                    <button key={b.id} onClick={() => { addBundleToCart(b); setSearch(''); setShowSearchResults(false); }}
-                                                        className="w-full text-left px-3 py-2.5 hover:bg-purple-50 flex items-center gap-2 transition-colors border-b border-gray-50 last:border-0">
+                                                    <button key={b.id}
+                                                        onClick={() => { addBundleToCart(b); setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1); }}
+                                                        className={`w-full text-left px-3 py-2.5 hover:bg-purple-50 flex items-center gap-2 transition-colors border-b border-gray-50 last:border-0 ${i === highlightedIndex ? 'bg-purple-100' : ''}`}>
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-medium text-purple-800 truncate">🎁 {b.name}</p>
                                                             <p className="text-[10px] text-purple-400">{b.code} · {b.items.length} สินค้า</p>
@@ -964,6 +1053,15 @@ export default function POSPage() {
                                                     <p className="text-xs lg:text-sm font-bold text-emerald-600 shrink-0 min-w-[60px] lg:min-w-[80px] text-right">{formatCurrency(item.quantity * item.unitPrice)}</p>
                                                     <button onClick={() => removeFromCart(idx)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
                                                 </div>
+                                                {/* Item discount row */}
+                                                <div className="hidden lg:flex items-center gap-2 mt-1">
+                                                    <span className="text-[10px] text-gray-400">ส่วนลด:</span>
+                                                    <input type="number" value={item.itemDiscount || ''}
+                                                        onChange={e => setCart(prev => prev.map((c, ci) => ci === idx ? { ...c, itemDiscount: parseFloat(e.target.value) || 0 } : c))}
+                                                        className="w-20 px-1.5 py-0.5 rounded border border-gray-200 text-xs outline-none text-right"
+                                                        placeholder="0" step="0.01" min={0} />
+                                                    <span className="text-[10px] text-gray-400">บาท</span>
+                                                </div>
                                                 {/* Mobile-only Row 2: controls */}
                                                 <div className="flex lg:hidden items-center gap-2 mt-1.5 flex-wrap text-[10px]">
                                                     <select value={item.warehouseId} onChange={e => updateCartWarehouse(idx, e.target.value)}
@@ -995,6 +1093,14 @@ export default function POSPage() {
                                                         />
                                                         <span className="text-gray-400">/{item.unit}</span>
                                                     </div>
+                                                    {/* Mobile item discount */}
+                                                    <div className="flex items-center gap-0.5">
+                                                        <span className="text-gray-400">ลด:</span>
+                                                        <input type="number" value={item.itemDiscount || ''}
+                                                            onChange={e => setCart(prev => prev.map((c, ci) => ci === idx ? { ...c, itemDiscount: parseFloat(e.target.value) || 0 } : c))}
+                                                            className="w-12 px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none text-right"
+                                                            placeholder="0" step="0.01" min={0} />
+                                                    </div>
                                                 </div>
                                             </>
                                         )}
@@ -1013,10 +1119,15 @@ export default function POSPage() {
                             <div>
                                 <span className="text-sm opacity-80">รวมทั้งหมด ({cartCount} ชิ้น)</span>
                                 {totalPoints > 0 && <span className="text-xs opacity-70 ml-2">+{totalPoints} แต้ม</span>}
+                                {(itemDiscountsTotal > 0 || billDiscount > 0) && <span className="text-xs opacity-70 ml-2">ส่วนลด -{formatCurrency(itemDiscountsTotal + billDiscount)}</span>}
                             </div>
-                            <p className="text-2xl font-black tracking-tight">{formatCurrency(total)}</p>
+                            <p className="text-2xl font-black tracking-tight">{formatCurrency(Math.max(0, total))}</p>
                         </div>
                         <div className="flex gap-2">
+                            <button type="button" onClick={() => setShowBillDiscount(!showBillDiscount)}
+                                className={`shrink-0 px-3 py-2.5 rounded-lg text-xs transition-colors ${billDiscount > 0 ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
+                                🏷️ ส่วนลด{billDiscount > 0 ? ` -${formatCurrency(billDiscount)}` : ''}
+                            </button>
                             <button type="button" onClick={() => setShowNotes(!showNotes)}
                                 className={`shrink-0 px-3 py-2.5 rounded-lg text-xs transition-colors ${saleNotes ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
                                 📝 Note
@@ -1033,6 +1144,16 @@ export default function POSPage() {
                             <textarea value={saleNotes} onChange={e => setSaleNotes(e.target.value)}
                                 rows={2} placeholder="หมายเหตุสำหรับบิลนี้..."
                                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-1 focus:ring-emerald-500 resize-none" />
+                        )}
+                        {showBillDiscount && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-600">🏷️ ส่วนลดทั้งบิล:</span>
+                                <input type="number" value={billDiscount || ''}
+                                    onChange={e => setBillDiscount(parseFloat(e.target.value) || 0)}
+                                    className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-1 focus:ring-red-400 text-right font-semibold"
+                                    placeholder="0.00" step="0.01" min={0} autoFocus />
+                                <span className="text-sm text-gray-500">บาท</span>
+                            </div>
                         )}
                     </div>
                 </div>
