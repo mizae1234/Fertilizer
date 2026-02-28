@@ -12,6 +12,7 @@ interface ProductUnitInfo {
 interface Product {
     id: string; code: string; name: string; unit: string; price: string;
     pointsPerUnit: number;
+    imageUrl?: string | null;
     productStocks: { warehouseId: string; quantity: number }[];
     productPrices: { customerGroupId: string; price: string; productUnitId: string | null; customerGroup: { id: string; name: string } }[];
     productUnits: ProductUnitInfo[];
@@ -271,6 +272,8 @@ export default function POSPage() {
     // Track last added item index for slide-in animation
     const [lastAddedId, setLastAddedId] = useState<string | null>(null);
     const cartEndRef = useRef<HTMLDivElement>(null);
+    const desktopSearchRef = useRef<HTMLDivElement>(null);
+    const mobileSearchRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const searchInputMobileRef = useRef<HTMLInputElement>(null);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -691,18 +694,23 @@ export default function POSPage() {
     );
 
 
-    const searchRef = useRef<HTMLDivElement>(null);
-    const [showSearchResults, setShowSearchResults] = useState(false);
+    const desktopSearchRef = useRef<HTMLDivElement>(null);
+    const mobileSearchRef = useRef<HTMLDivElement>(null);
+    // const searchInputRef = useRef<HTMLInputElement>(null); // Already declared above
+    // const searchInputMobileRef = useRef<HTMLInputElement>(null); // Already declared above
 
     // Close search dropdown when clicking outside
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
-            if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+            const insideDesktop = desktopSearchRef.current?.contains(e.target as Node);
+            const insideMobile = mobileSearchRef.current?.contains(e.target as Node);
+            if (!insideDesktop && !insideMobile) {
                 setShowSearchResults(false);
             }
         };
         document.addEventListener('mousedown', handleClick);
         return () => document.removeEventListener('mousedown', handleClick);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const searchResults = search.length > 0
@@ -803,7 +811,7 @@ export default function POSPage() {
                                         </div>
                                     )}
                                 </div>
-                                <div ref={searchRef} className="relative w-80 shrink-0">
+                                <div ref={desktopSearchRef} className="relative w-80 shrink-0">
                                     <input ref={searchInputRef} type="text" value={search}
                                         onChange={e => { setSearch(e.target.value); setShowSearchResults(true); setHighlightedIndex(-1); }}
                                         onFocus={() => { if (search) setShowSearchResults(true); }}
@@ -824,7 +832,11 @@ export default function POSPage() {
                                                         <button key={p.id}
                                                             onClick={() => { addToCart(p); setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1); }}
                                                             className={`w-full text-left px-4 py-3 hover:bg-emerald-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0 ${i === highlightedIndex ? 'bg-emerald-100' : inCart ? 'bg-emerald-50/50' : ''}`}>
-                                                            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-mono text-gray-400 shrink-0">📦</div>
+                                                            {p.imageUrl ? (
+                                                                <img src={p.imageUrl} alt={p.name} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-200" />
+                                                            ) : (
+                                                                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-mono text-gray-400 shrink-0">📦</div>
+                                                            )}
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
                                                                 <p className="text-xs text-gray-400">{p.code} · {p.unit}</p>
@@ -895,7 +907,7 @@ export default function POSPage() {
                                     )}
                                 </div>
                             </div>
-                            <div ref={searchRef} className="relative">
+                            <div ref={mobileSearchRef} className="relative">
                                 <input ref={searchInputMobileRef} type="text" value={search}
                                     onChange={e => { setSearch(e.target.value); setShowSearchResults(true); setHighlightedIndex(-1); }}
                                     onFocus={() => { if (search) setShowSearchResults(true); }}
@@ -916,6 +928,11 @@ export default function POSPage() {
                                                     <button key={p.id}
                                                         onClick={() => { addToCart(p); setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1); }}
                                                         className={`w-full text-left px-3 py-2.5 hover:bg-emerald-50 flex items-center gap-2 transition-colors border-b border-gray-50 last:border-0 ${i === highlightedIndex ? 'bg-emerald-100' : inCart ? 'bg-emerald-50/50' : ''}`}>
+                                                        {p.imageUrl ? (
+                                                            <img src={p.imageUrl} alt={p.name} className="w-8 h-8 rounded-md object-cover shrink-0 border border-gray-200" />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center text-[10px] font-mono text-gray-400 shrink-0">📦</div>
+                                                        )}
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
                                                             <p className="text-[10px] text-gray-400">{p.code} · {p.unit} · คงเหลือ {stock}</p>
