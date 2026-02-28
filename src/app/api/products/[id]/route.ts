@@ -6,6 +6,19 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id } = await params;
+    const url = new URL(request.url);
+    const txFrom = url.searchParams.get('txFrom');
+    const txTo = url.searchParams.get('txTo');
+
+    // Build stockTransactions where clause
+    const txWhere: Record<string, unknown> = {};
+    if (txFrom) txWhere.createdAt = { ...(txWhere.createdAt as object || {}), gte: new Date(txFrom) };
+    if (txTo) {
+        const toDate = new Date(txTo);
+        toDate.setHours(23, 59, 59, 999);
+        txWhere.createdAt = { ...(txWhere.createdAt as object || {}), lte: toDate };
+    }
+
     try {
         const product = await prisma.product.findUnique({
             where: { id },
@@ -21,12 +34,13 @@ export async function GET(
                     orderBy: [{ isBaseUnit: 'desc' }, { conversionRate: 'asc' }],
                 },
                 stockTransactions: {
+                    where: Object.keys(txWhere).length > 0 ? txWhere : undefined,
                     include: {
                         warehouse: { select: { name: true } },
                         user: { select: { name: true } },
                     },
                     orderBy: { createdAt: 'desc' },
-                    take: 50,
+                    take: 200,
                 },
                 productLogs: {
                     include: { user: { select: { name: true } } },

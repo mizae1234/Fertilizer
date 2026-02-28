@@ -99,6 +99,17 @@ export default function ProductDetailPage() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'stock' | 'log' | 'editLog'>('stock');
 
+    // Transaction date filter (default 7 days back)
+    const getDefaultFrom = () => {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        return d.toISOString().slice(0, 10);
+    };
+    const getDefaultTo = () => new Date().toISOString().slice(0, 10);
+    const [txDateFrom, setTxDateFrom] = useState(getDefaultFrom);
+    const [txDateTo, setTxDateTo] = useState(getDefaultTo);
+    const [txLoading, setTxLoading] = useState(false);
+
     // Cost editing (product-level)
     const [costType, setCostType] = useState<'avg' | 'last' | 'custom'>('avg');
     const [customCost, setCustomCost] = useState('0');
@@ -137,8 +148,27 @@ export default function ProductDetailPage() {
         setAlertModal({ open: true, message, type, title });
     }, []);
 
+    const refetchTransactions = useCallback(async (from?: string, to?: string) => {
+        if (!id) return;
+        setTxLoading(true);
+        try {
+            const params = new URLSearchParams();
+            if (from) params.set('txFrom', from);
+            if (to) params.set('txTo', to);
+            const res = await fetch(`/api/products/${id}?${params.toString()}`);
+            const data = await res.json();
+            if (data.stockTransactions) {
+                setProduct(prev => prev ? { ...prev, stockTransactions: data.stockTransactions } : prev);
+            }
+        } catch { /* ignore */ }
+        setTxLoading(false);
+    }, [id]);
+
     useEffect(() => {
-        fetch(`/api/products/${id}`)
+        const params = new URLSearchParams();
+        params.set('txFrom', getDefaultFrom());
+        params.set('txTo', getDefaultTo());
+        fetch(`/api/products/${id}?${params.toString()}`)
             .then(r => r.json())
             .then(data => { setProduct(data); setLoading(false); });
         fetch('/api/customer-groups')
@@ -865,94 +895,143 @@ export default function ProductDetailPage() {
             {/* Log Tab */}
             {
                 activeTab === 'log' && (
-                    <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-                        {product.stockTransactions.length === 0 ? (
-                            <div className="p-8 text-center text-gray-400">ยังไม่มีประวัติสินค้า</div>
-                        ) : (
-                            <>
-                                {/* Desktop Table */}
-                                <div className="hidden sm:block">
-                                    <table className="w-full">
-                                        <thead>
-                                            <tr className="bg-gray-50 border-b border-gray-100">
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">วันที่</th>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ประเภท</th>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
-                                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
-                                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">อ้างอิง</th>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ผู้ทำรายการ</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {product.stockTransactions.map(tx => {
-                                                const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
-                                                return (
-                                                    <tr key={tx.id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-sm text-gray-600">{formatDateTime(tx.createdAt)}</td>
-                                                        <td className="px-4 py-3">
-                                                            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
-                                                                {info.icon} {info.label}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm text-gray-600">{tx.warehouse.name}</td>
-                                                        <td className="px-4 py-3 text-sm text-right">
-                                                            <span className={tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}>
-                                                                {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
-                                                                {Math.abs(tx.quantity).toLocaleString()} {product.unit}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(tx.unitCost))}</td>
-                                                        <td className="px-4 py-3 text-xs text-gray-500">
-                                                            {tx.lotNo ? <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">{tx.lotNo}</span> : <span className="text-gray-300">-</span>}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-xs text-gray-500">
-                                                            {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
-                                                            {tx.notes && <p className="text-gray-400 mt-0.5">{tx.notes}</p>}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-xs text-gray-600">
-                                                            {tx.user?.name || <span className="text-gray-300">-</span>}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
+                    <div className="space-y-3">
+                        {/* Date Filter */}
+                        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4">
+                            <div className="flex flex-wrap items-end gap-3">
+                                <div>
+                                    <label className="text-xs text-gray-400 mb-1 block">จากวันที่</label>
+                                    <input type="date" value={txDateFrom} onChange={e => setTxDateFrom(e.target.value)}
+                                        className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
                                 </div>
-
-                                {/* Mobile Cards */}
-                                <div className="sm:hidden divide-y divide-gray-50">
-                                    {product.stockTransactions.map(tx => {
-                                        const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
+                                <div>
+                                    <label className="text-xs text-gray-400 mb-1 block">ถึงวันที่</label>
+                                    <input type="date" value={txDateTo} onChange={e => setTxDateTo(e.target.value)}
+                                        className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                </div>
+                                <button onClick={() => refetchTransactions(txDateFrom, txDateTo)}
+                                    disabled={txLoading}
+                                    className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 disabled:opacity-50 transition-colors">
+                                    {txLoading ? '…' : '🔍 ค้นหา'}
+                                </button>
+                                <div className="flex gap-1 ml-auto">
+                                    {[{ label: '7 วัน', days: 7 }, { label: '30 วัน', days: 30 }, { label: '90 วัน', days: 90 }].map(opt => {
+                                        const from = new Date(); from.setDate(from.getDate() - opt.days);
                                         return (
-                                            <div key={tx.id} className="p-4">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
-                                                        {info.icon} {info.label}
-                                                    </span>
-                                                    <span className={`text-sm font-bold ${tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}`}>
-                                                        {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
-                                                        {Math.abs(tx.quantity).toLocaleString()} {product.unit}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between text-xs text-gray-500">
-                                                    <span>{formatDateTime(tx.createdAt)}</span>
-                                                    <span>{tx.warehouse.name}</span>
-                                                </div>
-                                                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                                    <span>@ {formatCurrency(Number(tx.unitCost))}</span>
-                                                    {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
-                                                </div>
-                                                {tx.lotNo && <p className="text-xs text-purple-600 mt-1">📋 Lot: {tx.lotNo}</p>}
-                                                {tx.notes && <p className="text-xs text-gray-400 mt-1">{tx.notes}</p>}
-                                                {tx.user && <p className="text-xs text-blue-500 mt-1">👤 {tx.user.name}</p>}
-                                            </div>
+                                            <button key={opt.days} onClick={() => {
+                                                const f = from.toISOString().slice(0, 10);
+                                                const t = new Date().toISOString().slice(0, 10);
+                                                setTxDateFrom(f); setTxDateTo(t);
+                                                refetchTransactions(f, t);
+                                            }}
+                                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                                                {opt.label}
+                                            </button>
                                         );
                                     })}
+                                    <button onClick={() => {
+                                        setTxDateFrom(''); setTxDateTo('');
+                                        refetchTransactions('', '');
+                                    }}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                                        ทั้งหมด
+                                    </button>
                                 </div>
-                            </>
-                        )}
+                            </div>
+                            <div className="text-xs text-gray-400 mt-2">
+                                แสดง {product.stockTransactions.length} รายการ
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                            {product.stockTransactions.length === 0 ? (
+                                <div className="p-8 text-center text-gray-400">ยังไม่มีประวัติสินค้า</div>
+                            ) : (
+                                <>
+                                    {/* Desktop Table */}
+                                    <div className="hidden sm:block">
+                                        <table className="w-full">
+                                            <thead>
+                                                <tr className="bg-gray-50 border-b border-gray-100">
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">วันที่</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ประเภท</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">อ้างอิง</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ผู้ทำรายการ</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50">
+                                                {product.stockTransactions.map(tx => {
+                                                    const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
+                                                    return (
+                                                        <tr key={tx.id} className="hover:bg-gray-50">
+                                                            <td className="px-4 py-3 text-sm text-gray-600">{formatDateTime(tx.createdAt)}</td>
+                                                            <td className="px-4 py-3">
+                                                                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
+                                                                    {info.icon} {info.label}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm text-gray-600">{tx.warehouse.name}</td>
+                                                            <td className="px-4 py-3 text-sm text-right">
+                                                                <span className={tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}>
+                                                                    {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
+                                                                    {Math.abs(tx.quantity).toLocaleString()} {product.unit}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(tx.unitCost))}</td>
+                                                            <td className="px-4 py-3 text-xs text-gray-500">
+                                                                {tx.lotNo ? <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">{tx.lotNo}</span> : <span className="text-gray-300">-</span>}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-xs text-gray-500">
+                                                                {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
+                                                                {tx.notes && <p className="text-gray-400 mt-0.5">{tx.notes}</p>}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-xs text-gray-600">
+                                                                {tx.user?.name || <span className="text-gray-300">-</span>}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Mobile Cards */}
+                                    <div className="sm:hidden divide-y divide-gray-50">
+                                        {product.stockTransactions.map(tx => {
+                                            const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
+                                            return (
+                                                <div key={tx.id} className="p-4">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
+                                                            {info.icon} {info.label}
+                                                        </span>
+                                                        <span className={`text-sm font-bold ${tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                            {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
+                                                            {Math.abs(tx.quantity).toLocaleString()} {product.unit}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between text-xs text-gray-500">
+                                                        <span>{formatDateTime(tx.createdAt)}</span>
+                                                        <span>{tx.warehouse.name}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                                        <span>@ {formatCurrency(Number(tx.unitCost))}</span>
+                                                        {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
+                                                    </div>
+                                                    {tx.lotNo && <p className="text-xs text-purple-600 mt-1">📋 Lot: {tx.lotNo}</p>}
+                                                    {tx.notes && <p className="text-xs text-gray-400 mt-1">{tx.notes}</p>}
+                                                    {tx.user && <p className="text-xs text-blue-500 mt-1">👤 {tx.user.name}</p>}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                 )
             }
