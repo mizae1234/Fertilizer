@@ -88,6 +88,7 @@ const txTypeLabels: Record<string, { label: string; color: string; icon: string 
     TRANSFER_IN: { label: 'โอนเข้า', color: 'text-purple-700 bg-purple-50', icon: '⬅️' },
     TRANSFER_OUT: { label: 'โอนออก', color: 'text-orange-700 bg-orange-50', icon: '➡️' },
     ADJUSTMENT: { label: 'ปรับ', color: 'text-gray-700 bg-gray-50', icon: '🔧' },
+    FACTORY_RETURN: { label: 'เคลมคืน', color: 'text-red-700 bg-red-50', icon: '🔙' },
 };
 
 export default function ProductDetailPage() {

@@ -26,6 +26,7 @@ enum TransactionType {
   TRANSFER_IN
   TRANSFER_OUT
   ADJUSTMENT
+  FACTORY_RETURN
 }
 
 // ============ Users ============
@@ -35,7 +36,7 @@ model User {
   password     String
   name         String
   role         UserRole  @default(STAFF)
-  allowedMenus Json?     // string[] of allowed menu hrefs, null = all access
+  allowedMenus Json? // string[] of allowed menu hrefs, null = all access
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
@@ -46,6 +47,7 @@ model User {
   expenses          Expense[]
   stockTransactions StockTransaction[]
   productLogs       ProductLog[]
+  factoryReturns    FactoryReturn[]
 }
 
 // ============ Warehouse ============
@@ -58,36 +60,37 @@ model Warehouse {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  productStocks      ProductStock[]
-  goodsReceiveItems  GoodsReceiveItem[]
-  saleItems          SaleItem[]
-  stockTransactionsFrom StockTransfer[] @relation("FromWarehouse")
-  stockTransactionsTo   StockTransfer[] @relation("ToWarehouse")
-  stockTransactions  StockTransaction[]
-  stockTransferItems StockTransferItem[]
-  receiptTemplates   ReceiptTemplate[]
+  productStocks         ProductStock[]
+  goodsReceiveItems     GoodsReceiveItem[]
+  saleItems             SaleItem[]
+  stockTransactionsFrom StockTransfer[]     @relation("FromWarehouse")
+  stockTransactionsTo   StockTransfer[]     @relation("ToWarehouse")
+  stockTransactions     StockTransaction[]
+  stockTransferItems    StockTransferItem[]
+  receiptTemplates      ReceiptTemplate[]
+  factoryReturnItems    FactoryReturnItem[]
 }
 
 // ============ Receipt Templates ============
 model ReceiptTemplate {
-  id            String   @id @default(cuid())
-  warehouseId   String?
-  name          String   @default("Default")
-  isDefault     Boolean  @default(false)
-  showLogo      Boolean  @default(false)
-  logoUrl       String?  @db.Text
-  headerText    String   @default("")
-  footerText    String   @default("")
-  specialNote   String?  @db.Text  // โน๊ตพิเศษ แสดงเฉพาะใบ A4
-  showBillNo    Boolean  @default(true)
-  showVat       Boolean  @default(false)
-  showQr        Boolean  @default(false)
-  qrCodeUrl     String?  @db.Text
-  showStaff     Boolean  @default(true)
-  showCustomer  Boolean  @default(true)
-  paperSize     String   @default("58mm") // 58mm, 80mm, A4
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  warehouseId  String?
+  name         String   @default("Default")
+  isDefault    Boolean  @default(false)
+  showLogo     Boolean  @default(false)
+  logoUrl      String?  @db.Text
+  headerText   String   @default("")
+  footerText   String   @default("")
+  specialNote  String?  @db.Text // โน๊ตพิเศษ แสดงเฉพาะใบ A4
+  showBillNo   Boolean  @default(true)
+  showVat      Boolean  @default(false)
+  showQr       Boolean  @default(false)
+  qrCodeUrl    String?  @db.Text
+  showStaff    Boolean  @default(true)
+  showCustomer Boolean  @default(true)
+  paperSize    String   @default("58mm") // 58mm, 80mm, A4
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   warehouse Warehouse? @relation(fields: [warehouseId], references: [id])
 }
@@ -120,7 +123,7 @@ model Product {
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
-  productGroup       ProductGroup?    @relation(fields: [productGroupId], references: [id])
+  productGroup       ProductGroup?       @relation(fields: [productGroupId], references: [id])
   productStocks      ProductStock[]
   productPrices      ProductPrice[]
   productUnits       ProductUnit[]
@@ -130,19 +133,20 @@ model Product {
   stockTransactions  StockTransaction[]
   bundleItems        ProductBundleItem[]
   productLogs        ProductLog[]
+  factoryReturnItems FactoryReturnItem[]
 }
 
 // ============ Product Audit Log ============
 model ProductLog {
-  id          String   @id @default(cuid())
-  productId   String
-  userId      String?
-  action      String   // CREATE, UPDATE, DELETE, PRICE_CHANGE, UNIT_CHANGE, etc.
-  field       String?  // which field changed
-  oldValue    String?  // previous value
-  newValue    String?  // new value
-  details     String?  @db.Text // human-readable summary
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  productId String
+  userId    String?
+  action    String // CREATE, UPDATE, DELETE, PRICE_CHANGE, UNIT_CHANGE, etc.
+  field     String? // which field changed
+  oldValue  String? // previous value
+  newValue  String? // new value
+  details   String?  @db.Text // human-readable summary
+  createdAt DateTime @default(now())
 
   product Product @relation(fields: [productId], references: [id])
   user    User?   @relation(fields: [userId], references: [id])
@@ -165,13 +169,13 @@ model ProductStock {
 }
 
 model ProductPrice {
-  id              String        @id @default(cuid())
+  id              String   @id @default(cuid())
   productId       String
   customerGroupId String
   productUnitId   String?
-  price           Decimal       @db.Decimal(12, 2)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  price           Decimal  @db.Decimal(12, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   product       Product       @relation(fields: [productId], references: [id])
   customerGroup CustomerGroup @relation(fields: [customerGroupId], references: [id])
@@ -182,16 +186,16 @@ model ProductPrice {
 
 // ============ Product Units (Multi Unit Pricing) ============
 model ProductUnit {
-  id              String   @id @default(cuid())
-  productId       String
-  unitName        String
-  conversionRate  Decimal  @db.Decimal(12, 4)
-  sellingPrice    Decimal  @db.Decimal(12, 2)
-  isBaseUnit      Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  productId      String
+  unitName       String
+  conversionRate Decimal  @db.Decimal(12, 4)
+  sellingPrice   Decimal  @db.Decimal(12, 2)
+  isBaseUnit     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
   productPrices ProductPrice[]
 
   @@unique([productId, unitName])
@@ -199,10 +203,10 @@ model ProductUnit {
 
 // ============ Customers ============
 model CustomerGroup {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   customers     Customer[]
   productPrices ProductPrice[]
@@ -220,7 +224,7 @@ model Customer {
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  customerGroup    CustomerGroup    @relation(fields: [customerGroupId], references: [id])
+  customerGroup     CustomerGroup      @relation(fields: [customerGroupId], references: [id])
   pointTransactions PointTransaction[]
   sales             Sale[]
 }
@@ -229,9 +233,9 @@ model PointTransaction {
   id          String   @id @default(cuid())
   customerId  String
   points      Int
-  type        String   // "EARN" | "REDEEM"
-  reference   String?  // sale id, etc.
-  description String?  // redeem note / reward detail
+  type        String // "EARN" | "REDEEM"
+  reference   String? // sale id, etc.
+  description String? // redeem note / reward detail
   createdAt   DateTime @default(now())
 
   customer Customer @relation(fields: [customerId], references: [id])
@@ -249,27 +253,28 @@ model Vendor {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  goodsReceives GoodsReceive[]
+  goodsReceives  GoodsReceive[]
+  factoryReturns FactoryReturn[]
 }
 
 // ============ Goods Receive ============
 model GoodsReceive {
-  id          String      @id @default(cuid())
-  grNumber    String      @unique
-  poNumber    String?
-  vendorId    String
-  status      OrderStatus @default(PENDING)
-  totalAmount Decimal     @default(0) @db.Decimal(12, 2)
-  notes       String?
-  receivedDate DateTime   @default(now())
-  createdById String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  deletedAt   DateTime?
+  id           String      @id @default(cuid())
+  grNumber     String      @unique
+  poNumber     String?
+  vendorId     String
+  status       OrderStatus @default(PENDING)
+  totalAmount  Decimal     @default(0) @db.Decimal(12, 2)
+  notes        String?
+  receivedDate DateTime    @default(now())
+  createdById  String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
 
-  vendor     Vendor             @relation(fields: [vendorId], references: [id])
-  createdBy  User               @relation(fields: [createdById], references: [id])
-  items      GoodsReceiveItem[]
+  vendor    Vendor             @relation(fields: [vendorId], references: [id])
+  createdBy User               @relation(fields: [createdById], references: [id])
+  items     GoodsReceiveItem[]
 }
 
 model GoodsReceiveItem {
@@ -289,39 +294,39 @@ model GoodsReceiveItem {
 
 // ============ Sales ============
 model Sale {
-  id             String      @id @default(cuid())
-  saleNumber     String      @unique
-  customerId     String?
-  status         OrderStatus @default(PENDING)
-  totalAmount    Decimal     @default(0) @db.Decimal(12, 2)
-  totalPoints    Int         @default(0)
-  paymentMethod  String      @default("CASH") // CASH, CREDIT_CARD, CREDIT
-  creditDueDate  DateTime?
-  payments       Json?     // [{ method: "CASH", amount: 200 }, { method: "CREDIT", amount: 800, dueDate: "..." }]
-  notes          String?
-  createdById    String
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  deletedAt      DateTime?
+  id            String      @id @default(cuid())
+  saleNumber    String      @unique
+  customerId    String?
+  status        OrderStatus @default(PENDING)
+  totalAmount   Decimal     @default(0) @db.Decimal(12, 2)
+  totalPoints   Int         @default(0)
+  paymentMethod String      @default("CASH") // CASH, CREDIT_CARD, CREDIT
+  creditDueDate DateTime?
+  payments      Json? // [{ method: "CASH", amount: 200 }, { method: "CREDIT", amount: 800, dueDate: "..." }]
+  notes         String?
+  createdById   String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
 
-  createdBy      User           @relation(fields: [createdById], references: [id])
-  customer       Customer?      @relation(fields: [customerId], references: [id])
-  items          SaleItem[]
-  debtPayments   DebtPayment[]
-  debtInterests  DebtInterest[]
+  createdBy     User           @relation(fields: [createdById], references: [id])
+  customer      Customer?      @relation(fields: [customerId], references: [id])
+  items         SaleItem[]
+  debtPayments  DebtPayment[]
+  debtInterests DebtInterest[]
 }
 
 // ============ Debt Management ============
 model DebtPayment {
-  id        String   @id @default(cuid())
-  saleId    String
-  amount    Decimal  @db.Decimal(12, 2)
-  method    String   // CASH, TRANSFER, CREDIT
-  dueDate   DateTime? // new due date if method is CREDIT
-  note      String?
-  paidAt    DateTime @default(now())
+  id      String    @id @default(cuid())
+  saleId  String
+  amount  Decimal   @db.Decimal(12, 2)
+  method  String // CASH, TRANSFER, CREDIT
+  dueDate DateTime? // new due date if method is CREDIT
+  note    String?
+  paidAt  DateTime  @default(now())
 
-  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
 }
 
 model DebtInterest {
@@ -333,7 +338,7 @@ model DebtInterest {
   note       String?
   createdAt  DateTime @default(now())
 
-  sale       Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
 }
 
 model SaleItem {
@@ -365,9 +370,9 @@ model StockTransfer {
   updatedAt       DateTime    @updatedAt
   deletedAt       DateTime?
 
-  createdBy     User        @relation(fields: [createdById], references: [id])
-  fromWarehouse Warehouse   @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
-  toWarehouse   Warehouse   @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
+  createdBy     User                @relation(fields: [createdById], references: [id])
+  fromWarehouse Warehouse           @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse           @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
   items         StockTransferItem[]
 }
 
@@ -391,7 +396,7 @@ model StockTransaction {
   type        TransactionType
   quantity    Int
   unitCost    Decimal         @default(0) @db.Decimal(12, 2)
-  reference   String?         // PO id, Sale id, Transfer id
+  reference   String? // PO id, Sale id, Transfer id
   lotNo       String?
   notes       String?
   userId      String?
@@ -404,16 +409,16 @@ model StockTransaction {
 
 // ============ Expenses ============
 model Expense {
-  id            String   @id @default(cuid())
-  expenseNumber String   @unique
-  category      String   // ค่าขนส่ง, ค่าน้ำมัน, ค่าเช่า, ค่าแรง, อื่นๆ
-  amount        Decimal  @db.Decimal(12, 2)
+  id            String    @id @default(cuid())
+  expenseNumber String    @unique
+  category      String // ค่าขนส่ง, ค่าน้ำมัน, ค่าเช่า, ค่าแรง, อื่นๆ
+  amount        Decimal   @db.Decimal(12, 2)
   description   String?
-  reference     String?  // เลขที่ใบเสร็จ/อ้างอิง
-  expenseDate   DateTime @default(now())
+  reference     String? // เลขที่ใบเสร็จ/อ้างอิง
+  expenseDate   DateTime  @default(now())
   createdById   String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
   createdBy User @relation(fields: [createdById], references: [id])
@@ -458,4 +463,39 @@ model ProductBundleItem {
   product Product       @relation(fields: [productId], references: [id])
 
   @@unique([bundleId, productId])
+}
+
+// ============ Factory Returns (เคลมคืนโรงงาน) ============
+model FactoryReturn {
+  id           String      @id @default(cuid())
+  returnNumber String      @unique
+  vendorId     String
+  status       OrderStatus @default(APPROVED)
+  totalAmount  Decimal     @default(0) @db.Decimal(12, 2)
+  notes        String?
+  returnDate   DateTime    @default(now())
+  senderName   String? // ผู้ส่งสินค้าคืน
+  receiverName String? // ผู้ตรวจนับและรับสินค้าคืน
+  createdById  String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
+
+  vendor    Vendor              @relation(fields: [vendorId], references: [id])
+  createdBy User                @relation(fields: [createdById], references: [id])
+  items     FactoryReturnItem[]
+}
+
+model FactoryReturnItem {
+  id              String  @id @default(cuid())
+  factoryReturnId String
+  productId       String
+  warehouseId     String
+  quantity        Int
+  unitCost        Decimal @db.Decimal(12, 2)
+  totalCost       Decimal @db.Decimal(12, 2)
+
+  factoryReturn FactoryReturn @relation(fields: [factoryReturnId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+  warehouse     Warehouse     @relation(fields: [warehouseId], references: [id])
 }

@@ -29,6 +29,7 @@ export const MENU_GROUPS = [
             { name: 'นำเข้าสินค้า', href: '/goods-receive', icon: '📥' },
             { name: 'โอนย้ายสินค้า', href: '/transfers', icon: '🔄' },
             { name: 'ปรับปรุง Stock', href: '/stock-adjustments', icon: '📉' },
+            { name: 'เคลมคืนโรงงาน', href: '/factory-returns', icon: '🔙' },
             { name: 'บันทึกรายจ่าย', href: '/expenses', icon: '💸' },
         ],
     },
