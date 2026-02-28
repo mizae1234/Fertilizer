@@ -35,14 +35,25 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
             const { default: jsPDF } = await import('jspdf');
             const autoTable = (await import('jspdf-autotable')).default;
 
+            // Helper: ArrayBuffer -> base64 (chunked, safe for large fonts)
+            const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+                const bytes = new Uint8Array(buffer);
+                let binary = '';
+                const chunkSize = 8192;
+                for (let i = 0; i < bytes.length; i += chunkSize) {
+                    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+                }
+                return btoa(binary);
+            };
+
             // Load Sarabun font
             const fontResp = await fetch('/fonts/Sarabun-Regular.ttf');
             const fontBuffer = await fontResp.arrayBuffer();
-            const fontBase64 = btoa(String.fromCharCode(...new Uint8Array(fontBuffer)));
+            const fontBase64 = arrayBufferToBase64(fontBuffer);
 
             const fontBoldResp = await fetch('/fonts/Sarabun-Bold.ttf');
             const fontBoldBuffer = await fontBoldResp.arrayBuffer();
-            const fontBoldBase64 = btoa(String.fromCharCode(...new Uint8Array(fontBoldBuffer)));
+            const fontBoldBase64 = arrayBufferToBase64(fontBoldBuffer);
 
             const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -66,12 +77,12 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
 
             doc.setFontSize(10);
             doc.setFont('Sarabun', 'normal');
-            doc.text(`เลขที่: ${data.returnNumber}`, pageWidth - margin, y, { align: 'right' });
+            doc.text('เลขที่: ' + data.returnNumber, pageWidth - margin, y, { align: 'right' });
             y += 6;
 
             const createdDate = new Date(data.createdAt);
             const dateStr = createdDate.toLocaleString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            doc.text(`วันที่: ${dateStr}`, pageWidth - margin, y, { align: 'right' });
+            doc.text('วันที่: ' + dateStr, pageWidth - margin, y, { align: 'right' });
             y += 8;
 
             // Info box
@@ -107,7 +118,7 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
                 item.product.code,
                 item.product.name,
                 item.warehouse.name,
-                `${item.quantity} ${item.product.unit}`,
+                item.quantity + ' ' + item.product.unit,
                 formatNum(Number(item.unitCost)),
                 formatNum(Number(item.totalCost)),
             ]);
@@ -116,20 +127,20 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
                 startY: y,
                 head: [['#', 'รหัส', 'ชื่อสินค้า', 'คลัง', 'จำนวน', 'ราคาต้นทุน', 'รวม']],
                 body: tableBody,
-                foot: [['', '', '', '', '', 'ยอดรวมทั้งหมด', formatNum(Number(data.totalAmount))]],
+                foot: [[{ content: 'ยอดรวมทั้งหมด', colSpan: 6, styles: { halign: 'right' } }, formatNum(Number(data.totalAmount))]],
                 styles: {
                     font: 'Sarabun',
                     fontSize: 10,
                     cellPadding: 3,
                 },
                 headStyles: {
-                    fillColor: [234, 88, 12], // orange-600
+                    fillColor: [234, 88, 12],
                     textColor: 255,
                     fontStyle: 'bold',
                     halign: 'center',
                 },
                 footStyles: {
-                    fillColor: [255, 247, 237], // orange-50
+                    fillColor: [255, 247, 237],
                     textColor: [0, 0, 0],
                     fontStyle: 'bold',
                     fontSize: 11,
