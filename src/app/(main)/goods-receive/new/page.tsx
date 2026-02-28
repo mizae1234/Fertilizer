@@ -341,6 +341,7 @@ export default function NewGoodsReceivePage() {
                                                     type="number"
                                                     value={item.quantity}
                                                     onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
+                                                    onFocus={(e) => e.target.select()}
                                                     className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
                                                     min="1"
                                                     required
@@ -352,6 +353,7 @@ export default function NewGoodsReceivePage() {
                                                     type="number"
                                                     value={item.unitCost}
                                                     onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
+                                                    onFocus={(e) => e.target.select()}
                                                     className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
                                                     min="0"
                                                     step="0.01"
@@ -414,6 +416,7 @@ export default function NewGoodsReceivePage() {
                                                         type="number"
                                                         value={item.quantity}
                                                         onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
+                                                        onFocus={(e) => e.target.select()}
                                                         className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-white"
                                                         min="1"
                                                         required
@@ -425,6 +428,7 @@ export default function NewGoodsReceivePage() {
                                                         type="number"
                                                         value={item.unitCost}
                                                         onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
+                                                        onFocus={(e) => e.target.select()}
                                                         className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-white"
                                                         min="0"
                                                         step="0.01"
