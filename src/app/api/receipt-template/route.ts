@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
             showBillNo,
             showVat,
             showQr,
+            qrCodeUrl,
             showStaff,
             showCustomer,
             paperSize,
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
             showBillNo: showBillNo ?? true,
             showVat: showVat ?? false,
             showQr: showQr ?? false,
+            qrCodeUrl: qrCodeUrl || null,
             showStaff: showStaff ?? true,
             showCustomer: showCustomer ?? true,
             paperSize: paperSize || '58mm',
@@ -67,9 +69,9 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json(template);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Receipt template save error:', error);
-        return NextResponse.json({ error: 'Failed to save template' }, { status: 500 });
+        return NextResponse.json({ error: error?.message || 'Failed to save template' }, { status: 500 });
     }
 }
 

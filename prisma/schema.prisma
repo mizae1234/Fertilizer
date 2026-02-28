@@ -72,12 +72,13 @@ model ReceiptTemplate {
   name          String   @default("Default")
   isDefault     Boolean  @default(false)
   showLogo      Boolean  @default(false)
-  logoUrl       String?
+  logoUrl       String?  @db.Text
   headerText    String   @default("")
   footerText    String   @default("")
   showBillNo    Boolean  @default(true)
   showVat       Boolean  @default(false)
   showQr        Boolean  @default(false)
+  qrCodeUrl     String?  @db.Text
   showStaff     Boolean  @default(true)
   showCustomer  Boolean  @default(true)
   paperSize     String   @default("58mm") // 58mm, 80mm, A4

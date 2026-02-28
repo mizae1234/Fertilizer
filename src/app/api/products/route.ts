@@ -26,7 +26,7 @@ export async function GET(request: Request) {
                     ? { where: { warehouseId }, select: { warehouseId: true, quantity: true } }
                     : { select: { warehouseId: true, quantity: true } },
                 productPrices: {
-                    select: { price: true, customerGroup: { select: { name: true, id: true } } },
+                    select: { price: true, productUnitId: true, customerGroup: { select: { name: true, id: true } } },
                 },
                 productUnits: {
                     select: { id: true, unitName: true, conversionRate: true, sellingPrice: true, isBaseUnit: true },

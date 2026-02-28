@@ -15,6 +15,7 @@ interface TemplateData {
     showBillNo: boolean;
     showVat: boolean;
     showQr: boolean;
+    qrCodeUrl: string | null;
     showStaff: boolean;
     showCustomer: boolean;
     paperSize: string;
@@ -30,6 +31,7 @@ const NEW_TEMPLATE = (): TemplateData => ({
     showBillNo: true,
     showVat: false,
     showQr: false,
+    qrCodeUrl: null,
     showStaff: true,
     showCustomer: true,
     paperSize: '58mm',
@@ -84,11 +86,14 @@ export default function ReceiptTemplatePage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(editing),
             });
-            if (!res.ok) throw new Error('Failed');
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to save');
+            }
             setAlertModal({ open: true, message: 'บันทึก Template สำเร็จ', type: 'success', title: 'สำเร็จ' });
             await loadTemplates();
-        } catch {
-            setAlertModal({ open: true, message: 'ไม่สามารถบันทึกได้', type: 'error', title: 'เกิดข้อผิดพลาด' });
+        } catch (e: any) {
+            setAlertModal({ open: true, message: e.message || 'ไม่สามารถบันทึกได้', type: 'error', title: 'เกิดข้อผิดพลาด' });
         } finally { setSaving(false); }
     };
 
@@ -135,6 +140,35 @@ export default function ReceiptTemplatePage() {
                 }
                 ctx.putImageData(imageData, 0, 0);
                 setEditing(prev => prev ? { ...prev, showLogo: true, logoUrl: canvas.toDataURL('image/png') } : prev);
+            };
+            img.src = reader.result as string;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!['image/png', 'image/jpeg'].includes(file.type)) {
+            setAlertModal({ open: true, message: 'รองรับเฉพาะ PNG/JPG', type: 'error', title: 'ไฟล์ไม่ถูกต้อง' });
+            return;
+        }
+        if (file.size > 500 * 1024) {
+            setAlertModal({ open: true, message: 'ขนาดไม่เกิน 500KB', type: 'error', title: 'ไฟล์ใหญ่เกินไป' });
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const maxW = 300;
+                const scale = Math.min(1, maxW / img.width);
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                const ctx = canvas.getContext('2d')!;
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                setEditing(prev => prev ? { ...prev, showQr: true, qrCodeUrl: canvas.toDataURL('image/png') } : prev);
             };
             img.src = reader.result as string;
         };
@@ -284,7 +318,6 @@ export default function ReceiptTemplatePage() {
                                         { key: 'showBillNo' as const, label: 'แสดงเลขที่บิล' },
                                         { key: 'showStaff' as const, label: 'แสดงชื่อพนักงานขาย' },
                                         { key: 'showVat' as const, label: 'แสดง VAT' },
-                                        { key: 'showQr' as const, label: 'แสดง QR PromptPay' },
                                         { key: 'showCustomer' as const, label: 'แสดงข้อมูลลูกค้า' },
                                     ].map(opt => (
                                         <label key={opt.key} className="flex items-center gap-2 cursor-pointer py-1.5">
@@ -294,6 +327,33 @@ export default function ReceiptTemplatePage() {
                                             <span className="text-sm text-gray-600">{opt.label}</span>
                                         </label>
                                     ))}
+                                </div>
+                            </div>
+
+                            {/* QR Code Upload */}
+                            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5">
+                                <h3 className="text-sm font-semibold text-gray-700 mb-3">📱 QR Code พร้อมเพย์</h3>
+                                <div className="flex items-start gap-4">
+                                    <div className="flex-1 space-y-3">
+                                        <input type="file" accept="image/png,image/jpeg" onChange={handleQrUpload}
+                                            className="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100" />
+                                        <p className="text-[10px] text-gray-400">PNG/JPG ไม่เกิน 500KB · รูป QR พร้อมเพย์ / โอนเงิน</p>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" checked={editing.showQr}
+                                                onChange={e => updateField('showQr', e.target.checked)}
+                                                className="w-4 h-4 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500" />
+                                            <span className="text-sm text-gray-600">แสดง QR Code บนบิล</span>
+                                        </label>
+                                        {editing.qrCodeUrl && (
+                                            <button onClick={() => setEditing(prev => prev ? { ...prev, qrCodeUrl: null, showQr: false } : prev)}
+                                                className="text-xs text-red-500 hover:text-red-700">ลบรูป QR Code</button>
+                                        )}
+                                    </div>
+                                    {editing.qrCodeUrl && (
+                                        <div className="w-24 h-24 rounded-lg border border-gray-200 bg-white flex items-center justify-center overflow-hidden p-1">
+                                            <img src={editing.qrCodeUrl} alt="QR Code" className="max-w-full max-h-full object-contain" />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -417,7 +477,11 @@ export default function ReceiptTemplatePage() {
                                                 )}
                                                 {editing.showQr && (
                                                     <div className="mt-3 flex flex-col items-center">
-                                                        <div className="w-20 h-20 bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-[9px] text-gray-400">QR Code<br />PromptPay</div>
+                                                        {editing.qrCodeUrl ? (
+                                                            <img src={editing.qrCodeUrl} alt="QR Code" className="w-24 h-24 object-contain" />
+                                                        ) : (
+                                                            <div className="w-20 h-20 bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-[9px] text-gray-400">QR Code<br />PromptPay</div>
+                                                        )}
                                                     </div>
                                                 )}
                                                 {editing.footerText && (

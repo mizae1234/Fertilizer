@@ -13,7 +13,7 @@ interface Product {
     id: string; code: string; name: string; unit: string; price: string;
     pointsPerUnit: number;
     productStocks: { warehouseId: string; quantity: number }[];
-    productPrices: { customerGroupId: string; price: string; customerGroup: { id: string; name: string } }[];
+    productPrices: { customerGroupId: string; price: string; productUnitId: string | null; customerGroup: { id: string; name: string } }[];
     productUnits: ProductUnitInfo[];
 }
 interface Warehouse { id: string; name: string; }
@@ -33,7 +33,7 @@ interface CartItem {
     warehouseId: string; quantity: number; unitPrice: number; points: number;
     availableStock: number; pointsPerUnit: number;
     priceTier: string;
-    productPrices: { customerGroupId: string; price: number }[];
+    productPrices: { customerGroupId: string; productUnitId: string | null; price: number }[];
     // Multi-unit fields
     selectedUnitId: string;
     selectedUnitName: string;
@@ -262,9 +262,7 @@ export default function POSPage() {
     const [customerSearch, setCustomerSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const [showCustomerPicker, setShowCustomerPicker] = useState(false);
-    const [showCart, setShowCart] = useState(false);
-    const [reviewMode, setReviewMode] = useState(false);
-    const [posTab, setPosTab] = useState<'products' | 'bundles'>('products');
+
 
     // Track which items just had quantity changes (for pulse animation)
     const [pulsingItems, setPulsingItems] = useState<Set<string>>(new Set());
@@ -309,14 +307,7 @@ export default function POSPage() {
         }
     }, [customerSearch]);
 
-    useEffect(() => {
-        if (showCart) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
-        return () => { document.body.style.overflow = ''; };
-    }, [showCart]);
+
 
     const getPrice = (product: Product): number => {
         if (selectedCustomer) {
@@ -346,6 +337,32 @@ export default function POSPage() {
         }, 600);
     };
 
+    // Auto-reprice cart items when customer changes
+    useEffect(() => {
+        if (cart.length === 0) return;
+        setCart(prev => prev.map(c => {
+            if (c.isBundle) return c;
+            const product = products.find(p => p.id === c.productId);
+            if (!product) return c;
+
+            if (selectedCustomer) {
+                // Find price for this customer group + current unit
+                const unitId = c.selectedUnitId || null;
+                const gp = c.productPrices.find(pp =>
+                    pp.customerGroupId === selectedCustomer.customerGroup.id && pp.productUnitId === unitId
+                );
+                if (gp) return { ...c, unitPrice: gp.price };
+            }
+            // No customer or no group price → revert to normal price
+            if (c.selectedUnitId) {
+                const unit = product.productUnits?.find(u => u.id === c.selectedUnitId);
+                if (unit) return { ...c, unitPrice: Number(unit.sellingPrice) };
+            }
+            return { ...c, unitPrice: getPrice(product) };
+        }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedCustomer]);
+
     const addToCart = (product: Product) => {
         const warehouseId = defaultWarehouseId;
         const stock = getStock(product, warehouseId);
@@ -365,15 +382,15 @@ export default function POSPage() {
             ));
             triggerPulse(product.id);
         } else {
-            // Use unit selling price if available, otherwise fallback to product price
+            // Auto-determine price based on customer group + unit
             let price = selectedUnit ? Number(selectedUnit.sellingPrice) : getPrice(product);
-            let priceTier = 'custom';
-            if (!selectedUnit) {
-                if (selectedCustomer) {
-                    const gp = product.productPrices.find(p => p.customerGroup.id === selectedCustomer.customerGroup.id);
-                    if (gp) priceTier = selectedCustomer.customerGroup.id;
-                }
-                // ลูกค้าทั่วไป (no selectedCustomer) → priceTier stays 'custom', uses product.price
+            const priceTier = 'custom';
+            if (selectedCustomer) {
+                const unitId = selectedUnit?.id || null;
+                const gp = product.productPrices.find(p =>
+                    p.customerGroup.id === selectedCustomer.customerGroup.id && p.productUnitId === unitId
+                );
+                if (gp) price = Number(gp.price);
             }
             setCart([...cart, {
                 productId: product.id, productName: product.name, productCode: product.code,
@@ -381,7 +398,7 @@ export default function POSPage() {
                 points: product.pointsPerUnit, availableStock: stock,
                 pointsPerUnit: product.pointsPerUnit,
                 priceTier,
-                productPrices: product.productPrices.map(pp => ({ customerGroupId: pp.customerGroup.id, price: Number(pp.price) })),
+                productPrices: product.productPrices.map(pp => ({ customerGroupId: pp.customerGroup.id, productUnitId: pp.productUnitId, price: Number(pp.price) })),
                 selectedUnitId: selectedUnit?.id || '',
                 selectedUnitName: unitName,
                 conversionRate: convRate,
@@ -480,14 +497,7 @@ export default function POSPage() {
         setCart(cart.map((c, i) => i === idx ? { ...c, unitPrice: price, priceTier: 'custom' } : c));
     };
 
-    const updateCartPriceTier = (idx: number, tier: string) => {
-        setCart(cart.map((c, i) => {
-            if (i !== idx) return c;
-            if (tier === 'custom') return { ...c, priceTier: 'custom' };
-            const groupPrice = c.productPrices.find(pp => pp.customerGroupId === tier);
-            return { ...c, priceTier: tier, unitPrice: groupPrice?.price || c.unitPrice };
-        }));
-    };
+    // updateCartPriceTier removed — price is auto-determined by customer group + unit
 
     const updateCartUnit = (idx: number, unitId: string) => {
         setCart(cart.map((c, i) => {
@@ -497,7 +507,14 @@ export default function POSPage() {
 
             // "default" = product's original unit (no productUnit record)
             if (unitId === '__default__') {
-                const price = product ? getPrice(product) : c.unitPrice;
+                let price = product ? getPrice(product) : c.unitPrice;
+                // Auto-lookup group price for base unit
+                if (selectedCustomer) {
+                    const gp = c.productPrices.find(pp =>
+                        pp.customerGroupId === selectedCustomer.customerGroup.id && pp.productUnitId === null
+                    );
+                    if (gp) price = gp.price;
+                }
                 return {
                     ...c,
                     selectedUnitId: '',
@@ -513,12 +530,20 @@ export default function POSPage() {
             const unit = c.productUnits.find(u => u.id === unitId);
             if (!unit) return c;
             const convRate = Number(unit.conversionRate);
+            // Auto-lookup group price for this specific unit
+            let unitPrice = Number(unit.sellingPrice);
+            if (selectedCustomer) {
+                const gp = c.productPrices.find(pp =>
+                    pp.customerGroupId === selectedCustomer.customerGroup.id && pp.productUnitId === unit.id
+                );
+                if (gp) unitPrice = gp.price;
+            }
             return {
                 ...c,
                 selectedUnitId: unit.id,
                 selectedUnitName: unit.unitName,
                 conversionRate: convRate,
-                unitPrice: Number(unit.sellingPrice),
+                unitPrice,
                 unit: unit.unitName,
                 availableStock: baseStock,
                 priceTier: 'custom',
@@ -577,8 +602,6 @@ export default function POSPage() {
             });
             setShowPaymentModal(false);
             setCart([]);
-            setShowCart(false);
-            setReviewMode(false);
             setSaleNotes('');
             setShowNotes(false);
 
@@ -625,182 +648,283 @@ export default function POSPage() {
         !search || b.name.toLowerCase().includes(search.toLowerCase()) || b.code.toLowerCase().includes(search.toLowerCase())
     );
 
-    // ─── Cart Panel Content ─── (render function, NOT a component)
-    const renderCartContent = (isMobile = false) => {
-        const isReview = !isMobile && reviewMode;
-        const isDesktop = !isMobile;
 
-        return (
-            <>
-                {/* Customer Selection */}
-                <div className={`border-b border-gray-100 ${isDesktop ? 'p-5' : 'p-4'}`}>
-                    <div className="flex items-center justify-between mb-2">
-                        <label className={`font-medium text-gray-600 ${isDesktop ? 'text-base' : 'text-sm'}`}>ลูกค้า</label>
-                        <button onClick={() => setShowCustomerPicker(!showCustomerPicker)}
-                            className={`text-emerald-600 hover:underline ${isDesktop ? 'text-sm' : 'text-xs'}`}>
-                            {selectedCustomer ? 'เปลี่ยน' : 'เลือกลูกค้า'}
-                        </button>
+    const searchRef = useRef<HTMLDivElement>(null);
+    const [showSearchResults, setShowSearchResults] = useState(false);
+
+    // Close search dropdown when clicking outside
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+                setShowSearchResults(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, []);
+
+    const searchResults = search.length > 0
+        ? [...filteredProducts.map(p => ({ type: 'product' as const, data: p })),
+        ...filteredBundles.map(b => ({ type: 'bundle' as const, data: b }))]
+        : [];
+
+    return (
+        <div className="animate-fade-in -m-4 lg:-m-6">
+            <div className="flex flex-col h-[calc(100dvh-3.5rem)] lg:h-screen bg-white">
+
+                {/* ══════ Top Bar ══════ */}
+                <div className="bg-white border-b border-gray-200 px-3 py-2 lg:p-4 lg:pt-6">
+                    <div className="max-w-5xl mx-auto">
+                        {/* Row 1: POS title + warehouse */}
+                        <div className="flex items-center gap-2 mb-2 lg:mb-0">
+                            <h1 className="text-base lg:text-lg font-bold text-gray-800 shrink-0">🛒 POS</h1>
+                            <div className="flex items-center gap-1 shrink-0">
+                                <label className="text-[10px] lg:text-xs text-gray-500">คลัง:</label>
+                                <select
+                                    value={defaultWarehouseId}
+                                    onChange={e => setDefaultWarehouseId(e.target.value)}
+                                    className="px-1.5 py-1 rounded-lg border border-gray-200 text-xs lg:text-sm outline-none font-medium"
+                                >
+                                    {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex-1" />
+                            {/* Desktop: Customer + Search inline */}
+                            <div className="hidden lg:flex items-center gap-3">
+                                <div className="relative shrink-0">
+                                    {selectedCustomer ? (
+                                        <div className="flex items-center gap-2 bg-emerald-50 rounded-xl px-3 py-1.5">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-gray-800 truncate">{selectedCustomer.name}</p>
+                                                <p className="text-[10px] text-gray-500">{selectedCustomer.customerGroup.name} · {selectedCustomer.phone}</p>
+                                            </div>
+                                            <button onClick={() => setShowCustomerPicker(!showCustomerPicker)} className="text-xs text-emerald-600 px-1">เปลี่ยน</button>
+                                            <button onClick={() => setSelectedCustomer(null)} className="text-red-400 hover:text-red-600 text-sm">✕</button>
+                                        </div>
+                                    ) : (
+                                        <button onClick={() => setShowCustomerPicker(!showCustomerPicker)}
+                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-dashed border-gray-300 text-sm text-gray-400 hover:border-emerald-400 hover:text-emerald-600">
+                                            👤 เลือกลูกค้า
+                                        </button>
+                                    )}
+                                    {showCustomerPicker && (
+                                        <div className="absolute right-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                                            <input type="text" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
+                                                placeholder="ค้นหาชื่อหรือเบอร์โทร..." className="w-full px-3 py-2.5 text-sm border-b border-gray-100 outline-none" autoFocus />
+                                            <div className="max-h-48 overflow-y-auto">
+                                                {customers.map(c => (
+                                                    <button key={c.id} onClick={() => { setSelectedCustomer(c); setShowCustomerPicker(false); }}
+                                                        className="w-full text-left px-3 py-2.5 hover:bg-emerald-50 text-sm transition-colors">
+                                                        {c.name} · {c.phone} <span className="text-xs text-gray-400 ml-1">({c.customerGroup.name})</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div ref={searchRef} className="relative w-80 shrink-0">
+                                    <input type="text" value={search}
+                                        onChange={e => { setSearch(e.target.value); setShowSearchResults(true); }}
+                                        onFocus={() => { if (search) setShowSearchResults(true); }}
+                                        placeholder="🔍 ค้นหาสินค้า..."
+                                        className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm bg-emerald-50/50"
+                                    />
+                                    {showSearchResults && searchResults.length > 0 && (
+                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-[400px] overflow-y-auto">
+                                            {searchResults.map((result, i) => {
+                                                if (result.type === 'product') {
+                                                    const p = result.data as Product;
+                                                    const stock = getStock(p, defaultWarehouseId);
+                                                    const price = getPrice(p);
+                                                    const inCart = cart.find(c => c.productId === p.id);
+                                                    return (
+                                                        <button key={p.id} onClick={() => { addToCart(p); setSearch(''); setShowSearchResults(false); }}
+                                                            className={`w-full text-left px-4 py-3 hover:bg-emerald-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0 ${inCart ? 'bg-emerald-50/50' : ''}`}>
+                                                            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-mono text-gray-400 shrink-0">📦</div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                                                                <p className="text-xs text-gray-400">{p.code} · {p.unit}</p>
+                                                            </div>
+                                                            <div className="text-right shrink-0">
+                                                                <p className="text-sm font-bold text-emerald-600">{formatCurrency(price)}</p>
+                                                                <p className={`text-xs ${stock <= 0 ? 'text-red-500' : stock < 10 ? 'text-orange-500' : 'text-gray-400'}`}>คงเหลือ {stock}</p>
+                                                            </div>
+                                                            {inCart && <span className="bg-emerald-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0">{inCart.quantity}</span>}
+                                                        </button>
+                                                    );
+                                                } else {
+                                                    const b = result.data as BundleInfo;
+                                                    return (
+                                                        <button key={b.id} onClick={() => { addBundleToCart(b); setSearch(''); setShowSearchResults(false); }}
+                                                            className="w-full text-left px-4 py-3 hover:bg-purple-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0">
+                                                            <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-sm shrink-0">🎁</div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-medium text-purple-800 truncate">{b.name}</p>
+                                                                <p className="text-xs text-purple-400">{b.code} · {b.items.length} สินค้า</p>
+                                                            </div>
+                                                            <p className="text-sm font-bold text-purple-600 shrink-0">{formatCurrency(Number(b.bundlePrice))}</p>
+                                                        </button>
+                                                    );
+                                                }
+                                            })}
+                                        </div>
+                                    )}
+                                    {showSearchResults && search.length > 0 && searchResults.length === 0 && (
+                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-6 text-center text-gray-400 text-sm">ไม่พบสินค้าที่ค้นหา</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        {/* Mobile: Customer + Search stacked */}
+                        <div className="lg:hidden space-y-1.5">
+                            <div className="flex items-center gap-2">
+                                <div className="relative flex-1">
+                                    {selectedCustomer ? (
+                                        <div className="flex items-center gap-1.5 bg-emerald-50 rounded-lg px-2 py-1">
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-xs font-medium text-gray-800 truncate block">{selectedCustomer.name}</span>
+                                                <span className="text-[9px] text-gray-500">{selectedCustomer.customerGroup.name}</span>
+                                            </div>
+                                            <button onClick={() => setShowCustomerPicker(!showCustomerPicker)} className="text-[10px] text-emerald-600">เปลี่ยน</button>
+                                            <button onClick={() => setSelectedCustomer(null)} className="text-red-400 text-xs">✕</button>
+                                        </div>
+                                    ) : (
+                                        <button onClick={() => setShowCustomerPicker(!showCustomerPicker)}
+                                            className="w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border border-dashed border-gray-300 text-xs text-gray-400">
+                                            👤 เลือกลูกค้า
+                                        </button>
+                                    )}
+                                    {showCustomerPicker && (
+                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                                            <input type="text" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
+                                                placeholder="ค้นหาชื่อหรือเบอร์โทร..." className="w-full px-3 py-2 text-sm border-b border-gray-100 outline-none" autoFocus />
+                                            <div className="max-h-48 overflow-y-auto">
+                                                {customers.map(c => (
+                                                    <button key={c.id} onClick={() => { setSelectedCustomer(c); setShowCustomerPicker(false); }}
+                                                        className="w-full text-left px-3 py-2 hover:bg-emerald-50 text-sm transition-colors">
+                                                        {c.name} · {c.phone} <span className="text-xs text-gray-400">({c.customerGroup.name})</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div ref={searchRef} className="relative">
+                                <input type="text" value={search}
+                                    onChange={e => { setSearch(e.target.value); setShowSearchResults(true); }}
+                                    onFocus={() => { if (search) setShowSearchResults(true); }}
+                                    placeholder="🔍 ค้นหาสินค้า..."
+                                    className="w-full px-3 py-2 rounded-lg border border-emerald-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm bg-emerald-50/50"
+                                />
+                                {showSearchResults && searchResults.length > 0 && (
+                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-[60vh] overflow-y-auto">
+                                        {searchResults.map((result, i) => {
+                                            if (result.type === 'product') {
+                                                const p = result.data as Product;
+                                                const stock = getStock(p, defaultWarehouseId);
+                                                const price = getPrice(p);
+                                                const inCart = cart.find(c => c.productId === p.id);
+                                                return (
+                                                    <button key={p.id} onClick={() => { addToCart(p); setSearch(''); setShowSearchResults(false); }}
+                                                        className={`w-full text-left px-3 py-2.5 hover:bg-emerald-50 flex items-center gap-2 transition-colors border-b border-gray-50 last:border-0 ${inCart ? 'bg-emerald-50/50' : ''}`}>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
+                                                            <p className="text-[10px] text-gray-400">{p.code} · {p.unit} · คงเหลือ {stock}</p>
+                                                        </div>
+                                                        <p className="text-sm font-bold text-emerald-600 shrink-0">{formatCurrency(price)}</p>
+                                                        {inCart && <span className="bg-emerald-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center shrink-0">{inCart.quantity}</span>}
+                                                    </button>
+                                                );
+                                            } else {
+                                                const b = result.data as BundleInfo;
+                                                return (
+                                                    <button key={b.id} onClick={() => { addBundleToCart(b); setSearch(''); setShowSearchResults(false); }}
+                                                        className="w-full text-left px-3 py-2.5 hover:bg-purple-50 flex items-center gap-2 transition-colors border-b border-gray-50 last:border-0">
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium text-purple-800 truncate">🎁 {b.name}</p>
+                                                            <p className="text-[10px] text-purple-400">{b.code} · {b.items.length} สินค้า</p>
+                                                        </div>
+                                                        <p className="text-sm font-bold text-purple-600 shrink-0">{formatCurrency(Number(b.bundlePrice))}</p>
+                                                    </button>
+                                                );
+                                            }
+                                        })}
+                                    </div>
+                                )}
+                                {showSearchResults && search.length > 0 && searchResults.length === 0 && (
+                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-4 text-center text-gray-400 text-sm">ไม่พบสินค้าที่ค้นหา</div>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    {selectedCustomer ? (
-                        <div className={`flex items-center justify-between bg-emerald-50 rounded-xl ${isDesktop ? 'p-4' : 'p-3'}`}>
-                            <div>
-                                <p className={`font-medium text-gray-800 ${isDesktop ? 'text-base' : 'text-sm'}`}>{selectedCustomer.name}</p>
-                                <p className={`text-gray-500 ${isDesktop ? 'text-sm' : 'text-xs'}`}>{selectedCustomer.customerGroup.name} · {selectedCustomer.phone}</p>
-                            </div>
-                            <button onClick={() => setSelectedCustomer(null)} className="text-red-400 hover:text-red-600 text-sm">✕</button>
-                        </div>
-                    ) : (
-                        <p className={`text-gray-400 ${isDesktop ? 'text-base' : 'text-sm'}`}>ลูกค้าทั่วไป</p>
-                    )}
-
-                    {showCustomerPicker && (
-                        <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden">
-                            <input
-                                type="text" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
-                                placeholder="ค้นหาชื่อหรือเบอร์โทร..."
-                                className="w-full px-3 py-2 text-sm border-b border-gray-100 outline-none"
-                            />
-                            <div className="max-h-40 overflow-y-auto">
-                                {customers.map(c => (
-                                    <button key={c.id} onClick={() => { setSelectedCustomer(c); setShowCustomerPicker(false); }}
-                                        className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">
-                                        {c.name} · {c.phone}
-                                        <span className="text-xs text-gray-400 ml-1">({c.customerGroup.name})</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
 
-                {/* Cart Items */}
-                <div className={`flex-1 overflow-y-auto space-y-2 ${isDesktop ? 'p-4' : 'p-3'}`}>
-                    {cart.length === 0 ? (
-                        <div className="text-center py-12 text-gray-400">
-                            <p className="text-4xl mb-3">🛒</p>
-                            <p className="text-sm">ยังไม่มีสินค้าในตะกร้า</p>
-                            <p className="text-xs text-gray-300 mt-1">กดสินค้าทางซ้ายเพื่อเพิ่ม</p>
-                        </div>
-                    ) : (
-                        <>
-                            {cart.map((item, idx) => (
-                                <div
-                                    key={item.productId + (item.bundleId || '')}
-                                    className={`rounded-lg transition-all ${pulsingItems.has(item.productId) ? 'animate-cart-pulse' : ''
-                                        } ${lastAddedId === item.productId ? 'animate-cart-slide-in' : ''
-                                        } ${isDesktop
-                                            ? item.isBundle ? 'bg-purple-50 border border-purple-200 p-3 shadow-sm' : 'bg-white border border-gray-100 p-3 shadow-sm'
-                                            : item.isBundle ? 'bg-purple-50 p-2.5' : 'bg-gray-50 p-2.5'
-                                        }`}
-                                >
-                                    {item.isBundle ? (
-                                        /* ── Bundle: single non-editable row ── */
-                                        <>
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-semibold text-purple-800 truncate">🎁 {item.productName}</p>
-                                                    <p className="text-[11px] text-purple-400">
-                                                        {item.productCode} · {item.quantity} ชุด × {formatCurrency(item.unitPrice)}
-                                                    </p>
+                {/* ══════ Cart Content — Full Width ══════ */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className="max-w-5xl mx-auto p-3 lg:p-4">
+                        {cart.length === 0 ? (
+                            <div className="text-center py-20 text-gray-400">
+                                <p className="text-5xl mb-4">🛒</p>
+                                <p className="text-lg font-medium text-gray-500 mb-1">ยังไม่มีสินค้าในตะกร้า</p>
+                                <p className="text-sm">ใช้ช่องค้นหาด้านบนเพื่อเพิ่มสินค้า</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-1.5 lg:space-y-2">
+                                {cart.map((item, idx) => (
+                                    <div
+                                        key={item.productId + (item.bundleId || '')}
+                                        className={`rounded-lg lg:rounded-xl transition-all ${pulsingItems.has(item.productId) ? 'animate-cart-pulse' : ''
+                                            } ${lastAddedId === item.productId ? 'animate-cart-slide-in' : ''
+                                            } ${item.isBundle
+                                                ? 'bg-purple-50 border border-purple-200 p-2.5 lg:p-4 shadow-sm'
+                                                : 'bg-white border border-gray-100 p-2.5 lg:p-4 shadow-sm'
+                                            }`}
+                                    >
+                                        {item.isBundle ? (
+                                            <>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs lg:text-sm font-semibold text-purple-800 truncate">🎁 {item.productName}</p>
+                                                        <p className="text-[10px] lg:text-xs text-purple-400">{item.productCode} · {formatCurrency(item.unitPrice)}/ชุด</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <button onClick={() => updateCartQty(idx, item.quantity - 1)}
+                                                            className="w-6 h-6 lg:w-8 lg:h-8 rounded bg-purple-100 border border-purple-200 text-purple-600 text-xs flex items-center justify-center">−</button>
+                                                        <span className="font-bold text-xs lg:text-sm w-6 text-center text-purple-700">{item.quantity}</span>
+                                                        <button onClick={() => updateCartQty(idx, item.quantity + 1)}
+                                                            className="w-6 h-6 lg:w-8 lg:h-8 rounded bg-purple-100 border border-purple-200 text-purple-600 text-xs flex items-center justify-center">+</button>
+                                                    </div>
+                                                    <p className="text-xs lg:text-sm font-bold text-purple-600 shrink-0">{formatCurrency(item.quantity * item.unitPrice)}</p>
+                                                    <button onClick={() => removeFromCart(idx)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                    <button
-                                                        onClick={() => updateCartQty(idx, item.quantity - 1)}
-                                                        className="w-7 h-7 rounded-md bg-purple-100 border border-purple-200 text-purple-600 hover:bg-purple-200 flex items-center justify-center text-sm"
-                                                    >−</button>
-                                                    <span className="font-bold text-sm text-center w-8 text-purple-700">{item.quantity}</span>
-                                                    <button
-                                                        onClick={() => updateCartQty(idx, item.quantity + 1)}
-                                                        className="w-7 h-7 rounded-md bg-purple-100 border border-purple-200 text-purple-600 hover:bg-purple-200 flex items-center justify-center text-sm"
-                                                    >+</button>
-                                                </div>
-                                                <p className="text-sm font-bold text-purple-600 shrink-0 w-24 text-right">
-                                                    {formatCurrency(item.quantity * item.unitPrice)}
-                                                </p>
-                                                <button onClick={() => removeFromCart(idx)}
-                                                    className="text-red-300 hover:text-red-500 text-xs shrink-0 ml-1">✕</button>
-                                            </div>
-                                            {/* Sub-items list */}
-                                            {!isReview && item.bundleItems && (
-                                                <div className="mt-1.5 pl-2 border-l-2 border-purple-200 space-y-0.5">
-                                                    {item.bundleItems.map(si => (
-                                                        <p key={si.productId} className="text-[10px] text-purple-400">
-                                                            {si.productName} ×{si.quantity * item.quantity} {si.unit}
-                                                        </p>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </>
-                                    ) : (
-                                        /* ── Normal product row (unchanged) ── */
-                                        <>
-                                            {/* Row 1: Product name + qty controls + line total */}
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-semibold text-gray-800 truncate">{item.productName}</p>
-                                                    <p className="text-[11px] text-gray-400">
-                                                        {item.productCode} · {item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}
-                                                    </p>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                    <button
-                                                        onClick={() => updateCartQty(idx, item.quantity - 1)}
-                                                        className="w-7 h-7 rounded-md bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm"
-                                                    >−</button>
-                                                    <input
-                                                        type="number"
-                                                        value={item.quantity}
-                                                        onChange={e => {
-                                                            const val = parseInt(e.target.value) || 0;
-                                                            if (val >= 0 && val <= item.availableStock) {
-                                                                updateCartQty(idx, val);
-                                                            }
-                                                        }}
-                                                        onBlur={e => {
-                                                            const val = parseInt(e.target.value) || 1;
-                                                            updateCartQty(idx, Math.max(1, Math.min(val, item.availableStock)));
-                                                        }}
-                                                        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                                                        className="font-bold text-sm text-center w-10 rounded-md border border-gray-200 py-0.5 outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                        min={1}
-                                                        max={item.availableStock}
-                                                    />
-                                                    <button
-                                                        onClick={() => updateCartQty(idx, item.quantity + 1)}
-                                                        disabled={item.quantity >= item.availableStock}
-                                                        className="w-7 h-7 rounded-md bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    >+</button>
-                                                </div>
-                                                <p className="text-sm font-bold text-emerald-600 shrink-0 w-24 text-right">
-                                                    {formatCurrency(item.quantity * item.unitPrice)}
-                                                </p>
-                                                <button onClick={() => removeFromCart(idx)}
-                                                    className="text-red-300 hover:text-red-500 text-xs shrink-0 ml-1">✕</button>
-                                            </div>
-
-                                            {/* Row 2: Selectors — hidden in review mode */}
-                                            {!isReview && (
-                                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                                    <div className="flex items-center gap-1">
-                                                        <label className="text-[10px] text-gray-400 shrink-0">คลัง:</label>
-                                                        <select
-                                                            value={item.warehouseId}
-                                                            onChange={e => updateCartWarehouse(idx, e.target.value)}
-                                                            className="px-1.5 py-0.5 rounded border border-gray-200 text-[11px] outline-none"
-                                                        >
+                                                {item.bundleItems && (
+                                                    <div className="mt-1 pl-2 border-l-2 border-purple-200 space-y-0">
+                                                        {item.bundleItems.map(si => (
+                                                            <p key={si.productId} className="text-[10px] text-purple-400 leading-tight">{si.productName} ×{si.quantity * item.quantity}</p>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <>
+                                                {/* Single row on desktop, 2 rows on mobile */}
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs lg:text-sm font-semibold text-gray-800 truncate">{item.productName}</p>
+                                                        <p className="text-[10px] lg:hidden text-gray-400">{item.productCode} · {formatCurrency(item.unitPrice)}/{item.unit}</p>
+                                                        <p className="text-xs text-gray-400 hidden lg:block">{item.productCode}</p>
+                                                    </div>
+                                                    {/* Desktop inline controls */}
+                                                    <div className="hidden lg:flex items-center gap-2 shrink-0 text-[11px]">
+                                                        <select value={item.warehouseId} onChange={e => updateCartWarehouse(idx, e.target.value)}
+                                                            className="px-1.5 py-0.5 rounded border border-gray-200 text-[11px] outline-none">
                                                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                                                         </select>
-                                                        <span className="text-[10px] text-gray-400">({item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock})</span>
-                                                    </div>
-                                                    {item.productUnits && item.productUnits.length > 0 && (
-                                                        <div className="flex items-center gap-1">
-                                                            <label className="text-[10px] text-gray-400 shrink-0">หน่วย:</label>
-                                                            <select
-                                                                value={item.selectedUnitId || '__default__'}
-                                                                onChange={e => updateCartUnit(idx, e.target.value)}
-                                                                className="px-1.5 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-[11px] outline-none font-medium"
-                                                            >
-                                                                {/* Always show product's default unit if no base unit in productUnits */}
+                                                        <span className="text-gray-400 text-[10px]">({item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock})</span>
+                                                        {item.productUnits && item.productUnits.length > 0 && (
+                                                            <select value={item.selectedUnitId || '__default__'} onChange={e => updateCartUnit(idx, e.target.value)}
+                                                                className="px-1.5 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-[11px] outline-none font-medium">
                                                                 {!item.productUnits.some(u => u.isBaseUnit) && (
                                                                     <option value="__default__">
                                                                         {products.find(p => p.id === item.productId)?.unit || item.unit} (ปกติ)
@@ -812,359 +936,107 @@ export default function POSPage() {
                                                                     </option>
                                                                 ))}
                                                             </select>
+                                                        )}
+                                                        <div className="flex items-center gap-0.5">
+                                                            <span className="text-gray-400">฿</span>
+                                                            <input type="number" value={item.unitPrice}
+                                                                onChange={e => updateCartPrice(idx, parseFloat(e.target.value) || 0)}
+                                                                className="w-20 px-1 py-0.5 rounded border border-gray-200 text-[11px] outline-none text-right font-semibold"
+                                                                step="0.01" min={0}
+                                                            />
+                                                            <span className="text-gray-400">/{item.unit}</span>
                                                         </div>
-                                                    )}
-                                                    <div className="flex items-center gap-1">
-                                                        <label className="text-[10px] text-gray-400 shrink-0">ราคา:</label>
-                                                        <select
-                                                            value={item.priceTier}
-                                                            onChange={e => updateCartPriceTier(idx, e.target.value)}
-                                                            className="px-1.5 py-0.5 rounded border border-gray-200 text-[11px] outline-none"
-                                                        >
-                                                            {item.productPrices.map(pp => {
-                                                                const grp = customerGroups.find(g => g.id === pp.customerGroupId);
-                                                                return <option key={pp.customerGroupId} value={pp.customerGroupId}>{grp?.name || 'กลุ่ม'} ({formatCurrency(pp.price)})</option>;
-                                                            })}
-                                                            <option value="custom">กำหนดเอง</option>
-                                                        </select>
                                                     </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <label className="text-[10px] text-gray-400 shrink-0">฿</label>
-                                                        <input
-                                                            type="number"
-                                                            value={item.unitPrice}
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <button onClick={() => updateCartQty(idx, item.quantity - 1)}
+                                                            className="w-6 h-6 lg:w-7 lg:h-7 rounded bg-gray-50 border border-gray-200 text-gray-600 text-xs flex items-center justify-center">−</button>
+                                                        <input type="number" value={item.quantity}
+                                                            onChange={e => { const val = parseInt(e.target.value) || 0; if (val >= 0 && val <= item.availableStock) updateCartQty(idx, val); }}
+                                                            onBlur={e => { const val = parseInt(e.target.value) || 1; updateCartQty(idx, Math.max(1, Math.min(val, item.availableStock))); }}
+                                                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                                            className="font-bold text-xs lg:text-sm text-center w-8 lg:w-10 rounded border border-gray-200 py-0.5 outline-none focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                            min={1} max={item.availableStock}
+                                                        />
+                                                        <button onClick={() => updateCartQty(idx, item.quantity + 1)}
+                                                            disabled={item.quantity >= item.availableStock}
+                                                            className="w-6 h-6 lg:w-7 lg:h-7 rounded bg-gray-50 border border-gray-200 text-gray-600 text-xs flex items-center justify-center disabled:opacity-50">+</button>
+                                                    </div>
+                                                    <p className="text-xs lg:text-sm font-bold text-emerald-600 shrink-0 min-w-[60px] lg:min-w-[80px] text-right">{formatCurrency(item.quantity * item.unitPrice)}</p>
+                                                    <button onClick={() => removeFromCart(idx)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
+                                                </div>
+                                                {/* Mobile-only Row 2: controls */}
+                                                <div className="flex lg:hidden items-center gap-2 mt-1.5 flex-wrap text-[10px]">
+                                                    <select value={item.warehouseId} onChange={e => updateCartWarehouse(idx, e.target.value)}
+                                                        className="px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none">
+                                                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                                    </select>
+                                                    <span className="text-gray-400">({item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock})</span>
+                                                    {item.productUnits && item.productUnits.length > 0 && (
+                                                        <select value={item.selectedUnitId || '__default__'} onChange={e => updateCartUnit(idx, e.target.value)}
+                                                            className="px-1 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-[10px] outline-none font-medium">
+                                                            {!item.productUnits.some(u => u.isBaseUnit) && (
+                                                                <option value="__default__">
+                                                                    {products.find(p => p.id === item.productId)?.unit || item.unit} (ปกติ)
+                                                                </option>
+                                                            )}
+                                                            {item.productUnits.map(u => (
+                                                                <option key={u.id} value={u.id}>
+                                                                    {u.unitName} {u.isBaseUnit ? '(หลัก)' : `(×${Number(u.conversionRate)})`}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    )}
+                                                    <div className="flex items-center gap-0.5">
+                                                        <span className="text-gray-400">฿</span>
+                                                        <input type="number" value={item.unitPrice}
                                                             onChange={e => updateCartPrice(idx, parseFloat(e.target.value) || 0)}
-                                                            className="w-16 px-1.5 py-0.5 rounded border border-gray-200 text-[11px] outline-none text-right font-semibold"
+                                                            className="w-16 px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none text-right font-semibold"
                                                             step="0.01" min={0}
                                                         />
-                                                        <span className="text-[10px] text-gray-400">/{item.unit}</span>
+                                                        <span className="text-gray-400">/{item.unit}</span>
                                                     </div>
                                                 </div>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            ))}
-                            <div ref={cartEndRef} />
-                        </>
-                    )}
-                </div>
-
-                {/* Cart Summary — Sticky Bottom */}
-                <div className="border-t border-emerald-100 bg-gray-50/80 p-3 space-y-2">
-                    {/* Grand Total — compact green bar */}
-                    <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2.5">
-                        <div>
-                            <span className="text-xs opacity-80">รวมทั้งหมด ({cartCount} ชิ้น)</span>
-                            {totalPoints > 0 && <span className="text-[10px] opacity-70 ml-2">+{totalPoints} แต้ม</span>}
-                        </div>
-                        <p className="text-2xl font-black tracking-tight">{formatCurrency(total)}</p>
-                    </div>
-
-                    {/* Notes toggle + Checkout in one row */}
-                    <div className="flex gap-2">
-                        <button type="button" onClick={() => setShowNotes(!showNotes)}
-                            className={`shrink-0 px-2.5 py-2 rounded-lg text-xs transition-colors ${saleNotes ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
-                            📝 {showNotes ? '▲' : '▼'}
-                        </button>
-                        <button
-                            onClick={openPaymentModal}
-                            disabled={cart.length === 0 || loading}
-                            className="flex-1 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all py-2.5 text-sm"
-                        >
-                            💳 ชำระเงิน
-                        </button>
-                    </div>
-                    {showNotes && (
-                        <textarea value={saleNotes} onChange={e => setSaleNotes(e.target.value)}
-                            rows={2} placeholder="หมายเหตุสำหรับบิลนี้..."
-                            className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:ring-1 focus:ring-emerald-500 resize-none" />
-                    )}
-                </div>
-            </>
-        );
-    };
-
-    return (
-        <div className="animate-fade-in -m-4 lg:-m-6">
-            <div className="flex h-[calc(100dvh-3.5rem)] lg:h-screen">
-                {/* ══════ Left: Products ══════ */}
-                <div
-                    className="flex-1 flex flex-col bg-gray-50 overflow-hidden"
-                    style={{
-                        transition: 'flex 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                    }}
-                >
-                    {/* Top bar */}
-                    <div className="bg-white border-b border-gray-200 p-3 sm:p-4 lg:pt-6">
-                        <div className="flex items-center gap-2 sm:gap-4">
-                            <h1 className="text-base sm:text-lg font-bold text-gray-800 shrink-0">🛒 POS</h1>
-                            <div className="flex-1" />
-                            <div className="flex items-center gap-1.5 sm:gap-2">
-                                <label className="text-xs sm:text-sm text-gray-500 hidden sm:inline">คลัง:</label>
-                                <select
-                                    value={defaultWarehouseId}
-                                    onChange={e => setDefaultWarehouseId(e.target.value)}
-                                    className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl border border-gray-200 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-medium max-w-[120px] sm:max-w-none"
-                                >
-                                    {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="mt-2 sm:mt-3">
-                            <input
-                                type="text" value={search} onChange={e => setSearch(e.target.value)}
-                                placeholder={posTab === 'bundles' ? '🔍 ค้นหาชุดสินค้า...' : '🔍 ค้นหาสินค้า...'}
-                                className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                            />
-                        </div>
-
-                        {/* Tab Switcher: สินค้า / ชุดสินค้า */}
-                        {bundles.length > 0 && (
-                            <div className="mt-2 flex bg-gray-100 rounded-xl p-1">
-                                <button
-                                    onClick={() => setPosTab('products')}
-                                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${posTab === 'products'
-                                        ? 'bg-white text-emerald-700 shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                >
-                                    📦 สินค้า ({filteredProducts.length})
-                                </button>
-                                <button
-                                    onClick={() => setPosTab('bundles')}
-                                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${posTab === 'bundles'
-                                        ? 'bg-purple-500 text-white shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                >
-                                    🎁 ชุดสินค้า ({filteredBundles.length})
-                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                                <div ref={cartEndRef} />
                             </div>
                         )}
-
-                        {/* Mobile: Customer Selector */}
-                        <div className="lg:hidden mt-2">
-                            {selectedCustomer ? (
-                                <div className="flex items-center justify-between bg-emerald-50 rounded-xl px-3 py-2">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <span className="text-xs">👤</span>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium text-gray-800 truncate">{selectedCustomer.name}</p>
-                                            <p className="text-xs text-gray-500">{selectedCustomer.customerGroup.name} · {selectedCustomer.phone}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                        <button onClick={() => setShowCustomerPicker(!showCustomerPicker)} className="text-xs text-emerald-600 px-2 py-1">เปลี่ยน</button>
-                                        <button onClick={() => setSelectedCustomer(null)} className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <button onClick={() => setShowCustomerPicker(!showCustomerPicker)}
-                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-gray-300 text-sm text-gray-400 hover:border-emerald-400 hover:text-emerald-600">
-                                    <span>👤</span> เลือกลูกค้า
-                                </button>
-                            )}
-                            {showCustomerPicker && (
-                                <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden bg-white shadow-lg">
-                                    <input
-                                        type="text" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
-                                        placeholder="ค้นหาชื่อหรือเบอร์โทร..."
-                                        className="w-full px-3 py-2 text-sm border-b border-gray-100 outline-none"
-                                    />
-                                    <div className="max-h-40 overflow-y-auto">
-                                        {customers.map(c => (
-                                            <button key={c.id} onClick={() => { setSelectedCustomer(c); setShowCustomerPicker(false); }}
-                                                className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm">
-                                                {c.name} · {c.phone}
-                                                <span className="text-xs text-gray-400 ml-1">({c.customerGroup.name})</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Product Grid — centered */}
-                    <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-                        <div className="max-w-5xl mx-auto">
-                            {posTab === 'products' ? (
-                                <div className={`grid gap-2 sm:gap-3 ${reviewMode
-                                    ? 'grid-cols-2 lg:grid-cols-2'
-                                    : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
-                                    }`}>
-                                    {filteredProducts.map(product => {
-                                        const stock = getStock(product, defaultWarehouseId);
-                                        const price = getPrice(product);
-                                        const outOfStock = stock <= 0;
-                                        const inCart = cart.find(c => c.productId === product.id);
-                                        return (
-                                            <button
-                                                key={product.id}
-                                                onClick={() => addToCart(product)}
-                                                className={`rounded-xl text-left transition-all relative ${reviewMode ? 'p-2.5' : 'p-3 sm:p-4'
-                                                    } ${inCart
-                                                        ? 'bg-emerald-50 border-2 border-emerald-300 shadow-sm'
-                                                        : outOfStock
-                                                            ? 'bg-orange-50 border border-orange-200 shadow-sm hover:shadow-md active:scale-[0.97]'
-                                                            : 'bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 active:scale-[0.97]'
-                                                    }`}
-                                            >
-                                                {inCart && (
-                                                    <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">
-                                                        {inCart.quantity}
-                                                    </span>
-                                                )}
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <span className={`font-mono text-gray-400 ${reviewMode ? 'text-[9px]' : 'text-[10px] sm:text-xs'}`}>{product.code}</span>
-                                                    <span className={`font-semibold ${reviewMode ? 'text-[9px]' : 'text-[10px] sm:text-xs'} ${outOfStock ? 'text-red-500' : stock < 10 ? 'text-orange-500' : 'text-emerald-600'}`}>
-                                                        {stock}
-                                                    </span>
-                                                </div>
-                                                <p className={`font-medium text-gray-800 mb-1 line-clamp-2 leading-tight ${reviewMode ? 'text-xs' : 'text-xs sm:text-sm'}`}>{product.name}</p>
-                                                <p className={`font-bold text-emerald-600 ${reviewMode ? 'text-xs' : 'text-xs sm:text-sm'}`}>{formatCurrency(price)}</p>
-                                                {!reviewMode && product.pointsPerUnit > 0 && (
-                                                    <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 sm:mt-1">+{product.pointsPerUnit} แต้ม</p>
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                /* Bundle Grid */
-                                <div className={`grid gap-2 sm:gap-3 ${reviewMode
-                                    ? 'grid-cols-1 lg:grid-cols-2'
-                                    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-                                    }`}>
-                                    {filteredBundles.length === 0 ? (
-                                        <div className="col-span-full text-center py-12 text-gray-400">
-                                            <p className="text-3xl mb-2">🎁</p>
-                                            <p className="text-sm">ไม่พบชุดสินค้า</p>
-                                        </div>
-                                    ) : (
-                                        filteredBundles.map(bundle => (
-                                            <button
-                                                key={bundle.id}
-                                                onClick={() => addBundleToCart(bundle)}
-                                                className="rounded-xl text-left transition-all p-3 sm:p-4 bg-white border border-purple-100 shadow-sm hover:shadow-md hover:border-purple-300 active:scale-[0.98]"
-                                            >
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <span className="font-mono text-purple-400 text-[10px] sm:text-xs">{bundle.code}</span>
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-700">
-                                                        {bundle.items.length} สินค้า
-                                                    </span>
-                                                </div>
-                                                <p className="font-medium text-gray-800 mb-1 text-xs sm:text-sm">🎁 {bundle.name}</p>
-                                                <p className="font-bold text-purple-600 text-xs sm:text-sm">{formatCurrency(Number(bundle.bundlePrice))}</p>
-                                                <div className="mt-1.5 space-y-0.5">
-                                                    {bundle.items.map(item => (
-                                                        <p key={item.id} className="text-[10px] text-gray-400">
-                                                            {item.product.name} ×{item.quantity}
-                                                        </p>
-                                                    ))}
-                                                </div>
-                                            </button>
-                                        ))
-                                    )}
-                                </div>
-                            )}
-                        </div>
                     </div>
                 </div>
 
-                {/* ══════ Right: Cart Panel (Desktop) ══════ */}
-                <div
-                    className="hidden lg:flex bg-white border-l border-gray-200 flex-col overflow-hidden"
-                    style={{
-                        width: '65%',
-                        minWidth: '500px',
-                    }}
-                >
-                    {/* Mode Toggle Header */}
-                    <div className="p-4 pb-3 border-b border-gray-100 bg-white">
-                        <div className="flex items-center gap-2">
-                            <div className="flex bg-gray-100 rounded-xl p-1 flex-1">
-                                <button
-                                    onClick={() => setReviewMode(false)}
-                                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${!reviewMode
-                                        ? 'bg-white text-emerald-700 shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                >
-                                    🛒 โหมดขาย
-                                </button>
-                                <button
-                                    onClick={() => setReviewMode(true)}
-                                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${reviewMode
-                                        ? 'bg-emerald-500 text-white shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                >
-                                    📋 โหมดทวนลูกค้า
-                                </button>
+                {/* ══════ Bottom Bar — Summary + Checkout ══════ */}
+                <div className="border-t border-emerald-100 bg-gray-50/80 p-3">
+                    <div className="max-w-5xl mx-auto space-y-2">
+                        <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-3">
+                            <div>
+                                <span className="text-sm opacity-80">รวมทั้งหมด ({cartCount} ชิ้น)</span>
+                                {totalPoints > 0 && <span className="text-xs opacity-70 ml-2">+{totalPoints} แต้ม</span>}
                             </div>
-                            {cart.length > 0 && (
-                                <span className="bg-emerald-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shrink-0">
-                                    {cartCount}
-                                </span>
-                            )}
+                            <p className="text-2xl font-black tracking-tight">{formatCurrency(total)}</p>
                         </div>
-                    </div>
-                    {renderCartContent()}
-                </div>
-            </div>
-
-            {/* ── Mobile: Floating Cart Button ── */}
-            {!showCart && (
-                <button
-                    onClick={() => setShowCart(true)}
-                    className="lg:hidden fixed bottom-6 right-4 z-40 flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold shadow-xl shadow-emerald-300/40 active:scale-95 transition-transform"
-                >
-                    <span className="text-lg">🛒</span>
-                    {cartCount > 0 ? (
-                        <>
-                            <span className="bg-white/20 px-2 py-0.5 rounded-full text-sm">{cartCount}</span>
-                            <span className="text-sm">{formatCurrency(total)}</span>
-                        </>
-                    ) : (
-                        <span className="text-sm">ตะกร้า</span>
-                    )}
-                </button>
-            )}
-
-            {/* ── Mobile: Cart Bottom Sheet ── */}
-            {showCart && (
-                <>
-                    <div
-                        className="lg:hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
-                        onClick={() => setShowCart(false)}
-                    />
-                    <div className="lg:hidden fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl flex flex-col shadow-2xl"
-                        style={{ maxHeight: '92dvh' }}>
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                            <div className="flex items-center gap-2">
-                                <span className="text-lg">🛒</span>
-                                <h2 className="font-bold text-gray-800">ตะกร้า</h2>
-                                {cartCount > 0 && (
-                                    <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">
-                                        {cartCount} ชิ้น
-                                    </span>
-                                )}
-                            </div>
+                        <div className="flex gap-2">
+                            <button type="button" onClick={() => setShowNotes(!showNotes)}
+                                className={`shrink-0 px-3 py-2.5 rounded-lg text-xs transition-colors ${saleNotes ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
+                                📝 Note
+                            </button>
                             <button
-                                onClick={() => setShowCart(false)}
-                                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 text-gray-500"
+                                onClick={openPaymentModal}
+                                disabled={cart.length === 0 || loading}
+                                className="flex-1 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all py-2.5 text-sm"
                             >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                💳 ชำระเงิน
                             </button>
                         </div>
-                        {renderCartContent(true)}
+                        {showNotes && (
+                            <textarea value={saleNotes} onChange={e => setSaleNotes(e.target.value)}
+                                rows={2} placeholder="หมายเหตุสำหรับบิลนี้..."
+                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-1 focus:ring-emerald-500 resize-none" />
+                        )}
                     </div>
-                </>
-            )}
+                </div>
+            </div>
 
             {/* ── Payment Modal ── */}
             {showPaymentModal && (
@@ -1186,3 +1058,4 @@ export default function POSPage() {
         </div>
     );
 }
+

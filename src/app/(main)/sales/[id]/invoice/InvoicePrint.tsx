@@ -33,6 +33,7 @@ interface TemplateData {
     showBillNo: boolean;
     showVat: boolean;
     showQr: boolean;
+    qrCodeUrl: string | null;
     showStaff: boolean;
     showCustomer: boolean;
 }
@@ -268,10 +269,54 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                     </div>
                 )}
 
-                {/* Credit info */}
-                {totalCredit > 0 && sale.creditDueDate && (
-                    <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 12 }}>
-                        กำหนดชำระเงิน: {new Date(sale.creditDueDate).toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                {/* Outstanding Balance Summary */}
+                {totalCredit > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                        <table style={{ borderCollapse: 'collapse', width: '100%', border: '1px solid #fecaca', borderRadius: 6 }}>
+                            <tbody>
+                                <tr style={{ background: '#fef2f2' }}>
+                                    <td style={{ padding: '8px 12px', fontSize: 12, color: '#666', width: '50%' }}>
+                                        รวมเงินทั้งสิ้น
+                                    </td>
+                                    <td style={{ padding: '8px 12px', fontSize: 13, fontWeight: 700, textAlign: 'right' }}>
+                                        {formatCurrency(sale.totalAmount)}
+                                    </td>
+                                </tr>
+                                <tr style={{ background: '#fef2f2' }}>
+                                    <td style={{ padding: '8px 12px', fontSize: 12, color: '#666' }}>
+                                        ชำระแล้ว
+                                    </td>
+                                    <td style={{ padding: '8px 12px', fontSize: 13, fontWeight: 600, textAlign: 'right', color: '#16a34a' }}>
+                                        {formatCurrency(totalPaid)}
+                                    </td>
+                                </tr>
+                                <tr style={{ background: '#fee2e2', borderTop: '1px solid #fecaca' }}>
+                                    <td style={{ padding: '8px 12px', fontSize: 13, fontWeight: 700, color: '#dc2626' }}>
+                                        ยอดค้างชำระ
+                                    </td>
+                                    <td style={{ padding: '8px 12px', fontSize: 16, fontWeight: 700, textAlign: 'right', color: '#dc2626' }}>
+                                        {formatCurrency(totalCredit)}
+                                    </td>
+                                </tr>
+                                {sale.creditDueDate && (
+                                    <tr style={{ background: '#fef2f2' }}>
+                                        <td colSpan={2} style={{ padding: '6px 12px', fontSize: 11, color: '#dc2626', textAlign: 'center' }}>
+                                            กำหนดชำระเงิน: {new Date(sale.creditDueDate).toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* QR Code */}
+                {template?.showQr && template?.qrCodeUrl && (
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <img src={template.qrCodeUrl} alt="QR Code" style={{ width: 120, height: 120, objectFit: 'contain' }} />
+                            <div style={{ fontSize: 10, color: '#888', marginTop: 4 }}>สแกนเพื่อชำระเงิน</div>
+                        </div>
                     </div>
                 )}
 

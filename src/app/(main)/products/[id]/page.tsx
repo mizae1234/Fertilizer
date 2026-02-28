@@ -100,7 +100,7 @@ export default function ProductDetailPage() {
     const [unitValue, setUnitValue] = useState('');
 
     // Product info editing
-    const [infoForm, setInfoForm] = useState({ name: '', description: '', brand: '', packaging: '', productGroupId: '', minStock: 10 });
+    const [infoForm, setInfoForm] = useState({ code: '', name: '', description: '', brand: '', packaging: '', productGroupId: '', minStock: 10 });
     const [savingInfo, setSavingInfo] = useState(false);
     const [productGroups, setProductGroups] = useState<{ id: string; name: string }[]>([]);
     const [brands, setBrands] = useState<string[]>([]);
@@ -148,6 +148,7 @@ export default function ProductDetailPage() {
     useEffect(() => {
         if (product) {
             setInfoForm({
+                code: product.code,
                 name: product.name,
                 description: product.description || '',
                 brand: product.brand || '',
@@ -416,8 +417,8 @@ export default function ProductDetailPage() {
                 <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">รหัสสินค้า</label>
-                        <input type="text" value={product.code} disabled
-                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-500 cursor-not-allowed" />
+                        <input type="text" value={infoForm.code} onChange={e => setInfoForm({ ...infoForm, code: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">ชื่อสินค้า *</label>
@@ -537,6 +538,7 @@ export default function ProductDetailPage() {
 
                 {/* Save Button */}
                 <button onClick={async () => {
+                    if (!infoForm.code.trim()) { showAlert('กรุณาระบุรหัสสินค้า', 'error', 'ผิดพลาด'); return; }
                     if (!infoForm.name.trim()) { showAlert('กรุณาระบุชื่อสินค้า', 'error', 'ผิดพลาด'); return; }
                     setSavingInfo(true);
                     try {
@@ -546,6 +548,7 @@ export default function ProductDetailPage() {
                         else if (costType === 'custom') costVal = parseFloat(customCost) || 0;
 
                         const updateData: Record<string, any> = {
+                            code: infoForm.code.trim(),
                             name: infoForm.name,
                             description: infoForm.description || null,
                             brand: infoForm.brand || null,
