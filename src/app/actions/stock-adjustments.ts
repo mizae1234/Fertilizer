@@ -37,7 +37,7 @@ export async function getStockAdjustments(page = 1, search = '') {
 }
 
 export async function createStockAdjustment(data: {
-    adjustmentType: 'increase' | 'decrease';
+    adjustmentType?: 'increase' | 'decrease';
     note?: string;
     items: {
         productId: string;
@@ -47,6 +47,7 @@ export async function createStockAdjustment(data: {
     }[];
     userId: string;
 }) {
+    if (!data.adjustmentType) data.adjustmentType = 'decrease';
     if (!data.items.length) throw new Error('กรุณาเพิ่มรายการสินค้า');
 
     const adjNumber = generateNumber('ADJ');
