@@ -65,6 +65,19 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
 
             doc.setFont('Sarabun');
 
+            // Fix Thai combining characters for jsPDF
+            // jsPDF doesn't do OpenType shaping, so we reorder above-vowels + tone marks
+            const fixThai = (text: string): string => {
+                // NFC normalization
+                let s = text.normalize('NFC');
+                // Reorder: swap above-vowel (่ ้ ๊ ๋ ์ ็) with preceding sara-am / above marks
+                // Pattern: (base)(upper vowel ิ ี ึ ื ั)(tone ่้๊๋์็) → keep in NFC order
+                // The main issue is sara-am (ำ = 0E33) which decomposes in some inputs
+                // Also ensure ั้ / ิ้ / ี้ combinations render correctly
+                s = s.replace(/\u0E33/g, '\u0E4D\u0E32'); // decompose sara-am → nikhahit + sara-aa
+                return s;
+            };
+
             const pageWidth = doc.internal.pageSize.getWidth();
             const margin = 15;
             let y = 15;
@@ -72,17 +85,17 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
             // Header
             doc.setFontSize(18);
             doc.setFont('Sarabun', 'bold');
-            doc.text('ใบเคลมสินค้าคืนโรงงาน', pageWidth / 2, y, { align: 'center' });
+            doc.text(fixThai('ใบเคลมสินค้าคืนโรงงาน'), pageWidth / 2, y, { align: 'center' });
             y += 10;
 
             doc.setFontSize(10);
             doc.setFont('Sarabun', 'normal');
-            doc.text('เลขที่: ' + data.returnNumber, pageWidth - margin, y, { align: 'right' });
+            doc.text(fixThai('เลขที่: ' + data.returnNumber), pageWidth - margin, y, { align: 'right' });
             y += 6;
 
             const createdDate = new Date(data.createdAt);
             const dateStr = createdDate.toLocaleString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            doc.text('วันที่: ' + dateStr, pageWidth - margin, y, { align: 'right' });
+            doc.text(fixThai('วันที่: ' + dateStr), pageWidth - margin, y, { align: 'right' });
             y += 8;
 
             // Info box
@@ -92,20 +105,20 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
 
             doc.setFontSize(10);
             doc.setFont('Sarabun', 'bold');
-            doc.text('ผู้ส่งสินค้า:', margin + 4, y + 7);
+            doc.text(fixThai('ผู้ส่งสินค้า:'), margin + 4, y + 7);
             doc.setFont('Sarabun', 'normal');
-            doc.text(data.vendor.name, margin + 30, y + 7);
+            doc.text(fixThai(data.vendor.name), margin + 30, y + 7);
 
             doc.setFont('Sarabun', 'bold');
-            doc.text('ผู้สร้าง:', margin + 4, y + 15);
+            doc.text(fixThai('ผู้สร้าง:'), margin + 4, y + 15);
             doc.setFont('Sarabun', 'normal');
-            doc.text(data.createdBy.name, margin + 22, y + 15);
+            doc.text(fixThai(data.createdBy.name), margin + 22, y + 15);
 
             if (data.notes) {
                 doc.setFont('Sarabun', 'bold');
-                doc.text('หมายเหตุ:', pageWidth / 2, y + 7);
+                doc.text(fixThai('หมายเหตุ:'), pageWidth / 2, y + 7);
                 doc.setFont('Sarabun', 'normal');
-                doc.text(data.notes, pageWidth / 2 + 22, y + 7);
+                doc.text(fixThai(data.notes), pageWidth / 2 + 22, y + 7);
             }
 
             y += 28;
@@ -116,8 +129,8 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
             const tableBody = data.items.map((item, idx) => [
                 String(idx + 1),
                 item.product.code,
-                item.product.name,
-                item.warehouse.name,
+                fixThai(item.product.name),
+                fixThai(item.warehouse.name),
                 item.quantity + ' ' + item.product.unit,
                 formatNum(Number(item.unitCost)),
                 formatNum(Number(item.totalCost)),
@@ -125,9 +138,9 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
 
             autoTable(doc, {
                 startY: y,
-                head: [['#', 'รหัส', 'ชื่อสินค้า', 'คลัง', 'จำนวน', 'ราคาต้นทุน', 'รวม']],
+                head: [[fixThai('#'), fixThai('รหัส'), fixThai('ชื่อสินค้า'), fixThai('คลัง'), fixThai('จำนวน'), fixThai('ราคาต้นทุน'), fixThai('รวม')]],
                 body: tableBody,
-                foot: [[{ content: 'ยอดรวมทั้งหมด', colSpan: 6, styles: { halign: 'right' } }, formatNum(Number(data.totalAmount))]],
+                foot: [[{ content: fixThai('ยอดรวมทั้งหมด'), colSpan: 6, styles: { halign: 'right' } }, formatNum(Number(data.totalAmount))]],
                 styles: {
                     font: 'Sarabun',
                     fontSize: 10,
@@ -181,26 +194,26 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
             doc.line(leftX, signLineY, leftX + signWidth, signLineY);
             doc.setFont('Sarabun', 'normal');
             doc.setFontSize(10);
-            doc.text('ผู้ส่งสินค้าคืน', leftX + signWidth / 2, signLineY + 6, { align: 'center' });
+            doc.text(fixThai('ผู้ส่งสินค้าคืน'), leftX + signWidth / 2, signLineY + 6, { align: 'center' });
             if (data.senderName) {
                 doc.setFont('Sarabun', 'bold');
-                doc.text(data.senderName, leftX + signWidth / 2, signLineY - 4, { align: 'center' });
+                doc.text(fixThai(data.senderName), leftX + signWidth / 2, signLineY - 4, { align: 'center' });
             }
 
             // Right signature - ผู้ตรวจนับและรับสินค้าคืน
             doc.line(rightX, signLineY, rightX + signWidth, signLineY);
             doc.setFont('Sarabun', 'normal');
-            doc.text('ผู้ตรวจนับและรับสินค้าคืน', rightX + signWidth / 2, signLineY + 6, { align: 'center' });
+            doc.text(fixThai('ผู้ตรวจนับและรับสินค้าคืน'), rightX + signWidth / 2, signLineY + 6, { align: 'center' });
             if (data.receiverName) {
                 doc.setFont('Sarabun', 'bold');
-                doc.text(data.receiverName, rightX + signWidth / 2, signLineY - 4, { align: 'center' });
+                doc.text(fixThai(data.receiverName), rightX + signWidth / 2, signLineY - 4, { align: 'center' });
             }
 
             // Date lines under signatures
             doc.setFont('Sarabun', 'normal');
             doc.setFontSize(9);
-            doc.text('วันที่ ____/____/____', leftX + signWidth / 2, signLineY + 14, { align: 'center' });
-            doc.text('วันที่ ____/____/____', rightX + signWidth / 2, signLineY + 14, { align: 'center' });
+            doc.text(fixThai('วันที่ ____/____/____'), leftX + signWidth / 2, signLineY + 14, { align: 'center' });
+            doc.text(fixThai('วันที่ ____/____/____'), rightX + signWidth / 2, signLineY + 14, { align: 'center' });
 
             // Save
             doc.save(`${data.returnNumber}.pdf`);
