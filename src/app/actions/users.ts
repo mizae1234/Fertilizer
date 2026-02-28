@@ -70,6 +70,7 @@ export async function updateUser(
         name?: string;
         role?: 'ADMIN' | 'STAFF';
         allowedMenus?: string[] | null;
+        defaultWarehouseId?: string | null;
     }
 ) {
     // If username is changing, check uniqueness
@@ -86,6 +87,7 @@ export async function updateUser(
     if (data.role) updateData.role = data.role;
     if (data.password) updateData.password = await hashPassword(data.password);
     if ('allowedMenus' in data) updateData.allowedMenus = data.allowedMenus === null ? Prisma.JsonNull : data.allowedMenus;
+    if ('defaultWarehouseId' in data) updateData.defaultWarehouseId = data.defaultWarehouseId;
 
     const user = await prisma.user.update({
         where: { id },

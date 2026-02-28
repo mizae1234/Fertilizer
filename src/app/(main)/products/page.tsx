@@ -4,6 +4,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Suspense } from 'react';
 import ProductFilter from './ProductFilter';
 import ExportProductsButton from './ExportProductsButton';
+import { isServerAdmin } from '@/lib/server-auth';
 
 interface Props {
     searchParams: Promise<{ page?: string; search?: string; warehouse?: string; group?: string }>;
@@ -11,6 +12,7 @@ interface Props {
 
 export default async function ProductsPage({ searchParams }: Props) {
     const sp = await searchParams;
+    const adminUser = await isServerAdmin();
     const page = parseInt(sp.page || '1');
     const search = sp.search || '';
     const warehouseFilter = sp.warehouse || '';
@@ -104,7 +106,7 @@ export default async function ProductsPage({ searchParams }: Props) {
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">หมวดหมู่</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ยี่ห้อ</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">บรรจุภัณฑ์</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ต้นทุน</th>
+                                {adminUser && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ต้นทุน</th>}
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ราคาขาย</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">หน่วย</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -145,7 +147,7 @@ export default async function ProductsPage({ searchParams }: Props) {
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-600">{product.brand || <span className="text-gray-300">-</span>}</td>
                                             <td className="px-4 py-3 text-sm text-gray-600">{product.packaging || <span className="text-gray-300">-</span>}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatCurrency(Number(product.cost))}</td>
+                                            {adminUser && <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatCurrency(Number(product.cost))}</td>}
                                             <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(product.price))}</td>
                                             <td className="px-4 py-3 text-sm text-gray-600">{product.unit}</td>
                                             <td className="px-4 py-3">

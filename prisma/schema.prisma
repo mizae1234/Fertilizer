@@ -31,16 +31,18 @@ enum TransactionType {
 
 // ============ Users ============
 model User {
-  id           String    @id @default(cuid())
-  username     String    @unique
-  password     String
-  name         String
-  role         UserRole  @default(STAFF)
-  allowedMenus Json? // string[] of allowed menu hrefs, null = all access
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
+  id                  String     @id @default(cuid())
+  username            String     @unique
+  password            String
+  name                String
+  role                UserRole   @default(STAFF)
+  allowedMenus        Json? // string[] of allowed menu hrefs, null = all access
+  defaultWarehouseId  String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  deletedAt           DateTime?
 
+  defaultWarehouse  Warehouse? @relation("UserDefaultWarehouse", fields: [defaultWarehouseId], references: [id])
   goodsReceives     GoodsReceive[]
   sales             Sale[]
   stockTransfers    StockTransfer[]
@@ -69,6 +71,7 @@ model Warehouse {
   stockTransferItems    StockTransferItem[]
   receiptTemplates      ReceiptTemplate[]
   factoryReturnItems    FactoryReturnItem[]
+  defaultWarehouseUsers User[]              @relation("UserDefaultWarehouse")
 }
 
 // ============ Receipt Templates ============

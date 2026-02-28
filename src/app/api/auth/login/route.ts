@@ -41,6 +41,7 @@ export async function POST(request: Request) {
             name: user.name,
             role: user.role,
             allowedMenus,
+            defaultWarehouseId: user.defaultWarehouseId,
         });
 
         return NextResponse.json({

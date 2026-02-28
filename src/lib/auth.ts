@@ -9,6 +9,7 @@ export interface JWTPayload {
     name: string;
     role: string;
     allowedMenus: string[] | null;
+    defaultWarehouseId?: string | null;
 }
 
 export function signToken(payload: JWTPayload): string {

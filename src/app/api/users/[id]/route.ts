@@ -12,6 +12,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
                 name: true,
                 role: true,
                 allowedMenus: true,
+                defaultWarehouseId: true,
             },
         });
         if (!user) {

@@ -299,11 +299,13 @@ export default function POSPage() {
     const CUSTOMER_STORAGE_KEY = 'pos_customer';
 
     useEffect(() => {
+        let userDefaultWhId = '';
         try {
             const token = document.cookie.split('; ').find(c => c.startsWith('token='))?.split('=')[1];
             if (token) {
                 const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(token.split('.')[1]), c => c.charCodeAt(0))));
                 if (payload.userId) setUserId(payload.userId);
+                if (payload.defaultWarehouseId) userDefaultWhId = payload.defaultWarehouseId;
             }
         } catch { /* ignore */ }
 
@@ -315,7 +317,9 @@ export default function POSPage() {
             setWarehouses(w);
             setCustomerGroups(cg);
             setBundles(b);
-            if (w.length > 0) setDefaultWarehouseId(w[0].id);
+            // Use user's default warehouse if set, otherwise first warehouse
+            const whId = userDefaultWhId && w.some((wh: any) => wh.id === userDefaultWhId) ? userDefaultWhId : w[0]?.id || '';
+            if (whId) setDefaultWarehouseId(whId);
         });
     }, []);
 

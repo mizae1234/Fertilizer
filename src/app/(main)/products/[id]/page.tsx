@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { updateProductCost } from '@/app/actions/products';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 import AlertModal from '@/components/AlertModal';
+import { useUser } from '@/hooks/useUser';
 
 interface ProductStock {
     id: string;
@@ -95,6 +96,7 @@ export default function ProductDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
+    const user = useUser();
 
     const [product, setProduct] = useState<ProductDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -510,8 +512,8 @@ export default function ProductDetailPage() {
                     </datalist>
                 </div>
 
-                {/* Cost with 3 options */}
-                <div className="mb-4">
+                {/* Cost with 3 options - Admin only */}
+                {user?.role === 'ADMIN' && <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">ต้นทุน (Cost)</label>
                     <div className="space-y-2">
                         <label className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200 cursor-pointer hover:border-blue-300">
@@ -542,7 +544,7 @@ export default function ProductDetailPage() {
                             </div>
                         </label>
                     </div>
-                </div>
+                </div>}
 
                 <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
@@ -958,7 +960,7 @@ export default function ProductDetailPage() {
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ประเภท</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
                                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>
+                                                    {user?.role === 'ADMIN' && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>}
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">อ้างอิง</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ผู้ทำรายการ</th>
@@ -982,7 +984,7 @@ export default function ProductDetailPage() {
                                                                     {Math.abs(tx.quantity).toLocaleString()} {product.unit}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(tx.unitCost))}</td>
+                                                            {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(tx.unitCost))}</td>}
                                                             <td className="px-4 py-3 text-xs text-gray-500">
                                                                 {tx.lotNo ? <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">{tx.lotNo}</span> : <span className="text-gray-300">-</span>}
                                                             </td>
