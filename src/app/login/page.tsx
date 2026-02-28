@@ -30,7 +30,9 @@ export default function LoginPage() {
             }
 
             document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}`;
-            router.push('/');
+            // Admin → Owner Dashboard, Staff → normal Dashboard
+            const redirectTo = data.user?.role === 'ADMIN' ? '/owner-dashboard' : '/';
+            router.push(redirectTo);
             router.refresh();
         } catch {
             setError('เกิดข้อผิดพลาด กรุณาลองใหม่');
