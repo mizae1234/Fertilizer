@@ -644,6 +644,7 @@ export default function POSPage() {
             });
             setShowPaymentModal(false);
             setCart([]);
+            setSelectedCustomer(null);
             setBillDiscount(0);
             setShowBillDiscount(false);
             setSaleNotes('');
