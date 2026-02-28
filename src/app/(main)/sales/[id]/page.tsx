@@ -300,13 +300,15 @@ export default function SaleDetailPage() {
                                         <td className="px-4 py-3 text-sm text-gray-500">{idx + 1}</td>
                                         <td className="px-4 py-3"><p className="text-sm font-medium text-gray-800">{item.product.name}</p><p className="text-xs text-gray-400">{item.product.code}</p></td>
                                         <td className="px-4 py-3 text-sm text-gray-600">{item.warehouse.name}</td>
-                                        <td className="px-4 py-3 text-sm text-gray-800 text-right">
-                                            {item.quantity} {item.unitName || item.product.unit}
-                                            {item.unitName && item.unitName !== item.product.unit && (() => {
-                                                const pu = item.product.productUnits?.find(u => u.unitName === item.unitName);
-                                                if (pu) return <span className="text-xs text-gray-400 ml-1">(×{Number(pu.conversionRate)})</span>;
-                                                return null;
-                                            })()}
+                                        <td className="px-4 py-3 text-right">
+                                            <p className="text-sm font-semibold text-gray-800">{item.quantity}</p>
+                                            <p className="text-xs text-gray-400">
+                                                {item.unitName || item.product.unit}
+                                                {item.unitName && item.unitName !== item.product.unit && (() => {
+                                                    const pu = item.product.productUnits?.find(u => u.unitName === item.unitName);
+                                                    return pu ? ` (×${Number(pu.conversionRate)})` : '';
+                                                })()}
+                                            </p>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitPrice))}</td>
                                         <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(item.totalPrice))}</td>
