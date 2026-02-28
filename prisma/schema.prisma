@@ -44,6 +44,7 @@ model User {
   stockTransfers    StockTransfer[]
   expenses          Expense[]
   stockTransactions StockTransaction[]
+  productLogs       ProductLog[]
 }
 
 // ============ Warehouse ============
@@ -76,6 +77,7 @@ model ReceiptTemplate {
   logoUrl       String?  @db.Text
   headerText    String   @default("")
   footerText    String   @default("")
+  specialNote   String?  @db.Text  // โน๊ตพิเศษ แสดงเฉพาะใบ A4
   showBillNo    Boolean  @default(true)
   showVat       Boolean  @default(false)
   showQr        Boolean  @default(false)
@@ -126,6 +128,23 @@ model Product {
   stockTransferItems StockTransferItem[]
   stockTransactions  StockTransaction[]
   bundleItems        ProductBundleItem[]
+  productLogs        ProductLog[]
+}
+
+// ============ Product Audit Log ============
+model ProductLog {
+  id          String   @id @default(cuid())
+  productId   String
+  userId      String?
+  action      String   // CREATE, UPDATE, DELETE, PRICE_CHANGE, UNIT_CHANGE, etc.
+  field       String?  // which field changed
+  oldValue    String?  // previous value
+  newValue    String?  // new value
+  details     String?  @db.Text // human-readable summary
+  createdAt   DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
 }
 
 model ProductStock {

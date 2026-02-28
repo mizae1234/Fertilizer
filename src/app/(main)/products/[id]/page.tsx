@@ -46,6 +46,17 @@ interface ProductUnit {
     isBaseUnit: boolean;
 }
 
+interface ProductLog {
+    id: string;
+    action: string;
+    field: string | null;
+    oldValue: string | null;
+    newValue: string | null;
+    details: string | null;
+    createdAt: string;
+    user: { name: string } | null;
+}
+
 interface ProductDetail {
     id: string;
     code: string;
@@ -67,6 +78,7 @@ interface ProductDetail {
     productPrices: ProductPrice[];
     productUnits: ProductUnit[];
     stockTransactions: StockTransaction[];
+    productLogs: ProductLog[];
 }
 
 const txTypeLabels: Record<string, { label: string; color: string; icon: string }> = {
@@ -84,7 +96,7 @@ export default function ProductDetailPage() {
 
     const [product, setProduct] = useState<ProductDetail | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'stock' | 'log'>('stock');
+    const [activeTab, setActiveTab] = useState<'stock' | 'log' | 'editLog'>('stock');
 
     // Cost editing (product-level)
     const [costType, setCostType] = useState<'avg' | 'last' | 'custom'>('avg');
@@ -801,7 +813,7 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl w-fit">
+            <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl w-fit flex-wrap">
                 <button
                     onClick={() => setActiveTab('stock')}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'stock' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
@@ -812,7 +824,13 @@ export default function ProductDetailPage() {
                     onClick={() => setActiveTab('log')}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'log' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                 >
-                    📋 ประวัติ
+                    📋 ประวัติรับ-จ่าย
+                </button>
+                <button
+                    onClick={() => setActiveTab('editLog')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'editLog' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                    ✏️ ประวัติแก้ไข
                 </button>
             </div>
 
@@ -931,6 +949,75 @@ export default function ProductDetailPage() {
                                             </div>
                                         );
                                     })}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )
+            }
+
+            {/* Edit Log Tab */}
+            {
+                activeTab === 'editLog' && (
+                    <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                        {(!product.productLogs || product.productLogs.length === 0) ? (
+                            <div className="p-8 text-center text-gray-400">ยังไม่มีประวัติการแก้ไข</div>
+                        ) : (
+                            <>
+                                {/* Desktop Table */}
+                                <div className="hidden sm:block">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="bg-gray-50 border-b border-gray-100">
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">วันที่</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ฟิลด์</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ค่าเดิม</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ค่าใหม่</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ผู้แก้ไข</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {product.productLogs.map(log => (
+                                                <tr key={log.id} className="hover:bg-gray-50">
+                                                    <td className="px-4 py-3 text-sm text-gray-600">{formatDate(log.createdAt)}</td>
+                                                    <td className="px-4 py-3">
+                                                        <span className="inline-flex items-center text-xs font-medium px-2 py-1 rounded-lg bg-blue-50 text-blue-700">
+                                                            {log.field || log.action}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-gray-500">
+                                                        {log.oldValue ? (
+                                                            <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-xs">{log.oldValue.length > 50 ? log.oldValue.slice(0, 50) + '...' : log.oldValue}</span>
+                                                        ) : <span className="text-gray-300">-</span>}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-gray-500">
+                                                        {log.newValue ? (
+                                                            <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded text-xs">{log.newValue.length > 50 ? log.newValue.slice(0, 50) + '...' : log.newValue}</span>
+                                                        ) : <span className="text-gray-300">-</span>}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs text-gray-600">
+                                                        {log.user?.name || <span className="text-gray-300">-</span>}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Mobile Cards */}
+                                <div className="sm:hidden divide-y divide-gray-50">
+                                    {product.productLogs.map(log => (
+                                        <div key={log.id} className="p-4">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="inline-flex items-center text-xs font-medium px-2 py-1 rounded-lg bg-blue-50 text-blue-700">
+                                                    {log.field || log.action}
+                                                </span>
+                                                <span className="text-xs text-gray-400">{formatDate(log.createdAt)}</span>
+                                            </div>
+                                            {log.details && <p className="text-sm text-gray-700 mb-1">{log.details}</p>}
+                                            {log.user && <p className="text-xs text-blue-500">👤 {log.user.name}</p>}
+                                        </div>
+                                    ))}
                                 </div>
                             </>
                         )}

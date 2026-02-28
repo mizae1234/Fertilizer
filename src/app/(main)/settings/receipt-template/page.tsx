@@ -12,6 +12,7 @@ interface TemplateData {
     logoUrl: string | null;
     headerText: string;
     footerText: string;
+    specialNote: string | null;
     showBillNo: boolean;
     showVat: boolean;
     showQr: boolean;
@@ -28,6 +29,7 @@ const NEW_TEMPLATE = (): TemplateData => ({
     logoUrl: null,
     headerText: '',
     footerText: '',
+    specialNote: null,
     showBillNo: true,
     showVat: false,
     showQr: false,
@@ -365,6 +367,17 @@ export default function ReceiptTemplatePage() {
                                     rows={3}
                                     placeholder={"ขอบคุณที่อุดหนุน\nสินค้าซื้อแล้วไม่รับคืน"}
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm font-mono resize-none" />
+                            </div>
+
+                            {/* Special Note (A4 only) */}
+                            <div className="bg-white rounded-xl shadow-md border border-amber-200 p-5">
+                                <h3 className="text-sm font-semibold text-amber-700 mb-1">📝 โน๊ตพิเศษ (แสดงเฉพาะใบ A4)</h3>
+                                <p className="text-xs text-gray-400 mb-3">ข้อความนี้จะแสดงเฉพาะตอนปริ้นท์กระดาษ A4 เท่านั้น</p>
+                                <textarea value={editing.specialNote || ''}
+                                    onChange={e => updateField('specialNote', e.target.value || null)}
+                                    rows={3}
+                                    placeholder="เช่น: สินค้าซื้อแล้วไม่รับเปลี่ยนคืน / เงื่อนไขการรับประกัน..."
+                                    className="w-full px-4 py-3 rounded-xl border border-amber-200 focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none text-sm font-mono resize-none" />
                             </div>
 
                             {/* Paper Size */}

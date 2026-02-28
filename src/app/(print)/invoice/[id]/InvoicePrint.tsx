@@ -30,6 +30,7 @@ interface TemplateData {
     logoUrl: string | null;
     headerText: string;
     footerText: string;
+    specialNote: string | null;
     showBillNo: boolean;
     showVat: boolean;
     showQr: boolean;
@@ -266,6 +267,14 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                     <div style={{ marginBottom: 12, padding: '8px 12px', background: '#f9fafb', borderRadius: 6, border: '1px solid #e5e7eb' }}>
                         <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>หมายเหตุ:</div>
                         <div style={{ fontSize: 12, color: '#333', whiteSpace: 'pre-wrap' }}>{sale.notes}</div>
+                    </div>
+                )}
+
+                {/* Special Note (A4 only) */}
+                {template?.specialNote && (
+                    <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fffbeb', borderRadius: 6, border: '1px solid #fcd34d' }}>
+                        <div style={{ fontSize: 11, color: '#92400e', fontWeight: 600, marginBottom: 2 }}>โน๊ตพิเศษ:</div>
+                        <div style={{ fontSize: 12, color: '#78350f', whiteSpace: 'pre-wrap' }}>{template.specialNote}</div>
                     </div>
                 )}
 

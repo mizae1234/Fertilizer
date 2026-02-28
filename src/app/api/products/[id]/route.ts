@@ -28,6 +28,11 @@ export async function GET(
                     orderBy: { createdAt: 'desc' },
                     take: 50,
                 },
+                productLogs: {
+                    include: { user: { select: { name: true } } },
+                    orderBy: { createdAt: 'desc' },
+                    take: 100,
+                },
             },
         });
 
@@ -62,6 +67,18 @@ export async function PATCH(
         }
     }
 
+    // Extract userId from cookie for audit logging
+    let userId: string | null = null;
+    try {
+        const cookieHeader = request.headers.get('cookie') || '';
+        const tokenMatch = cookieHeader.split('; ').find(c => c.startsWith('token='));
+        if (tokenMatch) {
+            const token = tokenMatch.split('=')[1];
+            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+            userId = payload.userId || null;
+        }
+    } catch { /* ignore */ }
+
     try {
         // Check for duplicate code if code is being updated
         if (data.code) {
@@ -77,10 +94,53 @@ export async function PATCH(
             }
         }
 
+        // Fetch old product data for comparison
+        const oldProduct = await prisma.product.findUnique({ where: { id } });
+        if (!oldProduct) {
+            return NextResponse.json({ error: 'ไม่พบสินค้า' }, { status: 404 });
+        }
+
         const updated = await prisma.product.update({
             where: { id },
             data,
         });
+
+        // Create audit log entries for each changed field
+        const fieldLabels: Record<string, string> = {
+            name: 'ชื่อสินค้า', code: 'รหัสสินค้า', unit: 'หน่วยนับ',
+            cost: 'ราคาทุน', price: 'ราคาขาย', brand: 'แบรนด์',
+            packaging: 'บรรจุภัณฑ์', productGroupId: 'กลุ่มสินค้า',
+            pointsPerUnit: 'แต้มต่อหน่วย', minStock: 'สต็อกขั้นต่ำ',
+            isActive: 'สถานะ', description: 'คำอธิบาย', imageUrl: 'รูปภาพ',
+        };
+        const logEntries: { field: string; oldValue: string; newValue: string; details: string }[] = [];
+        for (const key of Object.keys(data)) {
+            const oldVal = String(oldProduct[key as keyof typeof oldProduct] ?? '');
+            const newVal = String(data[key] ?? '');
+            if (oldVal !== newVal) {
+                const label = fieldLabels[key] || key;
+                logEntries.push({
+                    field: key,
+                    oldValue: oldVal,
+                    newValue: newVal,
+                    details: `แก้ไข${label}: "${oldVal}" → "${newVal}"`,
+                });
+            }
+        }
+        if (logEntries.length > 0) {
+            await prisma.productLog.createMany({
+                data: logEntries.map(e => ({
+                    productId: id,
+                    userId,
+                    action: 'UPDATE',
+                    field: e.field,
+                    oldValue: e.oldValue,
+                    newValue: e.newValue,
+                    details: e.details,
+                })),
+            });
+        }
+
         return NextResponse.json(JSON.parse(JSON.stringify(updated)));
     } catch (error: any) {
         console.error('Product PATCH error:', error.message, JSON.stringify(data));
