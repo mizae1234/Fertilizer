@@ -6,7 +6,7 @@ import { updateSale, cancelSale } from '@/app/actions/sales';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
 
 interface SaleDetail {
     id: string; saleNumber: string; status: string;
@@ -223,7 +223,7 @@ export default function SaleDetailPage() {
                     </div>
                     <div>
                         <p className="text-xs text-gray-500">วันที่สร้าง</p>
-                        <p className="text-sm text-gray-800">{formatDate(sale.createdAt)}</p>
+                        <p className="text-sm text-gray-800">{formatDateTime(sale.createdAt)}</p>
                     </div>
                 </div>
             </div>
@@ -299,7 +299,7 @@ export default function SaleDetailPage() {
                                         <td className="px-4 py-3 text-sm text-gray-500">{idx + 1}</td>
                                         <td className="px-4 py-3"><p className="text-sm font-medium text-gray-800">{item.product.name}</p><p className="text-xs text-gray-400">{item.product.code}</p></td>
                                         <td className="px-4 py-3 text-sm text-gray-600">{item.warehouse.name}</td>
-                                        <td className="px-4 py-3 text-sm text-gray-800 text-right">{item.quantity} {item.product.unit}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-800 text-right">{item.quantity} {(item as any).unitName || item.product.unit}</td>
                                         <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitPrice))}</td>
                                         <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(item.totalPrice))}</td>
                                         <td className="px-4 py-3 text-sm text-emerald-600 text-right">+{item.points}</td>

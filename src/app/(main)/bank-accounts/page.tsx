@@ -37,6 +37,7 @@ export default function BankAccountsPage() {
     const [form, setForm] = useState({ accountName: '', accountNumber: '', bankName: '', qrCodeUrl: '' as string | null, isDefault: false });
     const [saving, setSaving] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [uploadError, setUploadError] = useState('');
     const fileRef = useRef<HTMLInputElement>(null);
 
     const loadAccounts = useCallback(async () => {
@@ -67,9 +68,11 @@ export default function BankAccountsPage() {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 2 * 1024 * 1024) {
-            alert('ไฟล์ใหญ่เกินไป (สูงสุด 2MB)');
+            setUploadError('ไฟล์ใหญ่เกินไป (สูงสุด 2MB)');
+            setTimeout(() => setUploadError(''), 3000);
             return;
         }
+        setUploadError('');
         const reader = new FileReader();
         reader.onload = () => {
             setForm(f => ({ ...f, qrCodeUrl: reader.result as string }));
@@ -182,6 +185,7 @@ export default function BankAccountsPage() {
                                         📷 คลิกเพื่อเลือกรูป QR Code
                                     </button>
                                     <p className="text-xs text-gray-400 mt-1">รองรับ JPG, PNG (สูงสุด 2MB)</p>
+                                    {uploadError && <p className="text-xs text-red-500 mt-1">⚠️ {uploadError}</p>}
                                 </div>
                                 {form.qrCodeUrl && (
                                     <div className="relative">

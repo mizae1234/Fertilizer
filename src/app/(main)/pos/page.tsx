@@ -415,7 +415,7 @@ export default function POSPage() {
         if (existing) {
             setCart(cart.map(c =>
                 c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === ''
-                    ? { ...c, quantity: c.quantity + 1, points: (c.quantity + 1) * c.pointsPerUnit }
+                    ? { ...c, quantity: c.quantity + 1, points: (c.quantity + 1) * c.conversionRate * c.pointsPerUnit }
                     : c
             ));
             triggerPulse(product.id);
@@ -520,7 +520,7 @@ export default function POSPage() {
     const updateCartQty = (idx: number, qty: number) => {
         if (qty <= 0) { removeFromCart(idx); return; }
         const item = cart[idx];
-        setCart(cart.map((c, i) => i === idx ? { ...c, quantity: qty, points: qty * c.pointsPerUnit } : c));
+        setCart(cart.map((c, i) => i === idx ? { ...c, quantity: qty, points: qty * c.conversionRate * c.pointsPerUnit } : c));
         triggerPulse(item.productId);
     };
 
@@ -564,6 +564,7 @@ export default function POSPage() {
                     unit: product?.unit || c.unit,
                     availableStock: baseStock,
                     priceTier: 'custom',
+                    points: c.quantity * 1 * c.pointsPerUnit,
                 };
             }
 
@@ -587,6 +588,7 @@ export default function POSPage() {
                 unit: unit.unitName,
                 availableStock: baseStock,
                 priceTier: 'custom',
+                points: c.quantity * convRate * c.pointsPerUnit,
             };
         }));
     };
@@ -617,7 +619,7 @@ export default function POSPage() {
         setLoading(true);
         try {
             // Expand bundle items into individual product items for stock deduction
-            const saleItems: { productId: string; warehouseId: string; quantity: number; unitPrice: number; points: number; conversionRate: number }[] = [];
+            const saleItems: { productId: string; warehouseId: string; quantity: number; unitPrice: number; points: number; conversionRate: number; unitName?: string }[] = [];
             for (const c of cart) {
                 if (c.isBundle && c.bundleItems) {
                     for (const si of c.bundleItems) {
@@ -625,6 +627,7 @@ export default function POSPage() {
                             productId: si.productId, warehouseId: si.warehouseId,
                             quantity: si.quantity * c.quantity, unitPrice: si.unitPrice, points: si.points * c.quantity,
                             conversionRate: 1,
+                            unitName: si.unit,
                         });
                     }
                 } else {
@@ -632,6 +635,7 @@ export default function POSPage() {
                         productId: c.productId, warehouseId: c.warehouseId,
                         quantity: c.quantity, unitPrice: c.unitPrice, points: c.points,
                         conversionRate: c.conversionRate,
+                        unitName: c.selectedUnitName,
                     });
                 }
             }

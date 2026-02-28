@@ -13,6 +13,7 @@ export async function createSaleFromPOS(data: {
         unitPrice: number;
         points: number;
         conversionRate?: number;
+        unitName?: string;
     }[];
     userId: string;
     payments: { method: string; amount: number; dueDate?: string }[];
@@ -70,6 +71,7 @@ export async function createSaleFromPOS(data: {
                         unitPrice: item.unitPrice,
                         totalPrice: item.quantity * item.unitPrice,
                         points: item.points,
+                        unitName: item.unitName || null,
                     })),
                 },
             },
