@@ -19,7 +19,7 @@ interface SaleDetail {
         id: string; quantity: number; unitPrice: string; totalPrice: string; points: number;
         unitName: string | null;
         productId: string; warehouseId: string;
-        product: { name: string; code: string; unit: string };
+        product: { name: string; code: string; unit: string; productUnits: { unitName: string; conversionRate: string }[] };
         warehouse: { name: string };
     }[];
 }
@@ -300,7 +300,17 @@ export default function SaleDetailPage() {
                                         <td className="px-4 py-3 text-sm text-gray-500">{idx + 1}</td>
                                         <td className="px-4 py-3"><p className="text-sm font-medium text-gray-800">{item.product.name}</p><p className="text-xs text-gray-400">{item.product.code}</p></td>
                                         <td className="px-4 py-3 text-sm text-gray-600">{item.warehouse.name}</td>
-                                        <td className="px-4 py-3 text-sm text-gray-800 text-right">{item.quantity} {item.unitName || item.product.unit}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-800 text-right">
+                                            {item.quantity} {item.unitName || item.product.unit}
+                                            {item.unitName && item.unitName !== item.product.unit && (() => {
+                                                const pu = item.product.productUnits?.find(u => u.unitName === item.unitName);
+                                                if (pu) {
+                                                    const conv = Number(pu.conversionRate);
+                                                    return <span className="text-xs text-gray-400 ml-1">({item.quantity * conv} {item.product.unit})</span>;
+                                                }
+                                                return null;
+                                            })()}
+                                        </td>
                                         <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitPrice))}</td>
                                         <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(item.totalPrice))}</td>
                                         <td className="px-4 py-3 text-sm text-emerald-600 text-right">+{item.points}</td>

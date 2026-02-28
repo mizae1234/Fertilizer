@@ -13,7 +13,7 @@ export async function GET(
             createdBy: { select: { name: true } },
             items: {
                 include: {
-                    product: { select: { name: true, code: true, unit: true } },
+                    product: { select: { name: true, code: true, unit: true, productUnits: { select: { unitName: true, conversionRate: true } } } },
                     warehouse: { select: { name: true } },
                 },
             },

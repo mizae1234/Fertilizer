@@ -41,7 +41,7 @@ export default async function SalesPage({ searchParams }: Props) {
                 _count: { select: { items: true } },
                 items: {
                     take: 3,
-                    select: { quantity: true, product: { select: { name: true, unit: true } } },
+                    select: { quantity: true, unitName: true, product: { select: { name: true, unit: true } } },
                 },
             },
             skip: (page - 1) * perPage,
@@ -132,7 +132,7 @@ export default async function SalesPage({ searchParams }: Props) {
                                         <div className="space-y-0.5">
                                             {sale.items.map((item, i) => (
                                                 <p key={i} className="text-xs text-gray-500">
-                                                    {item.product.name} x{item.quantity} {item.product.unit}
+                                                    {item.product.name} x{item.quantity} {item.unitName || item.product.unit}
                                                 </p>
                                             ))}
                                             {sale._count.items > 3 && (
