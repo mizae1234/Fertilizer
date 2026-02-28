@@ -33,7 +33,7 @@ export default function NewProductPage() {
         pointsPerUnit: 0,
         minStock: 10,
     });
-    const [prices, setPrices] = useState<{ customerGroupId: string; price: number }[]>([]);
+    const [prices, setPrices] = useState<{ customerGroupId: string; productUnitId: string; price: number }[]>([]);
     const [units, setUnits] = useState<{ unitName: string; conversionRate: number; sellingPrice: number; isBaseUnit: boolean }[]>([]);
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
     const [brands, setBrands] = useState<string[]>([]);
@@ -254,61 +254,7 @@ export default function NewProductPage() {
                     </div>
                 </div>
 
-                {/* Pricing per Customer Group */}
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="font-semibold text-gray-800">ราคาตามกลุ่มลูกค้า</h2>
-                        <button type="button"
-                            onClick={() => setPrices(prev => [...prev, { customerGroupId: '', price: 0 }])}
-                            className="text-xs text-emerald-600 font-medium hover:underline">
-                            + เพิ่มราคา
-                        </button>
-                    </div>
-                    {prices.length === 0 ? (
-                        <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีราคาเฉพาะกลุ่ม — จะใช้ราคาขายปกติ</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {prices.map((p, idx) => (
-                                <div key={idx} className="flex items-center gap-3">
-                                    <select
-                                        value={p.customerGroupId}
-                                        onChange={(e) => {
-                                            const newPrices = [...prices];
-                                            newPrices[idx] = { ...newPrices[idx], customerGroupId: e.target.value };
-                                            setPrices(newPrices);
-                                        }}
-                                        className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                    >
-                                        <option value="">-- เลือกกลุ่มลูกค้า --</option>
-                                        {customerGroups.map(g => (
-                                            <option key={g.id} value={g.id} disabled={prices.some((pp, i) => i !== idx && pp.customerGroupId === g.id)}>
-                                                {g.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <input
-                                        type="number"
-                                        value={p.price || ''}
-                                        onChange={(e) => {
-                                            const newPrices = [...prices];
-                                            newPrices[idx] = { ...newPrices[idx], price: parseFloat(e.target.value) || 0 };
-                                            setPrices(newPrices);
-                                        }}
-                                        className="w-32 px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                        placeholder="0.00"
-                                        step="0.01"
-                                        min={0}
-                                    />
-                                    <span className="text-xs text-gray-400">บาท</span>
-                                    <button type="button" onClick={() => setPrices(prev => prev.filter((_, i) => i !== idx))}
-                                        className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Units Section */}
+                {/* Units Section (moved above Pricing) */}
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 space-y-4">
                     <div className="flex items-center justify-between">
                         <h2 className="font-semibold text-gray-800">📦 หน่วยขาย</h2>
@@ -376,6 +322,74 @@ export default function NewProductPage() {
                                 {unitNames.map(u => <option key={u} value={u} />)}
                             </datalist>
                             <p className="text-[10px] text-gray-400">* ระบุจำนวน base unit ต่อ 1 หน่วยนี้</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Pricing per Customer Group (moved below Units) */}
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="font-semibold text-gray-800">💰 ราคาตามกลุ่มลูกค้า</h2>
+                        <button type="button"
+                            onClick={() => setPrices(prev => [...prev, { customerGroupId: '', productUnitId: '', price: 0 }])}
+                            className="text-xs text-emerald-600 font-medium hover:underline">
+                            + เพิ่มราคา
+                        </button>
+                    </div>
+                    {prices.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีราคาเฉพาะกลุ่ม — จะใช้ราคาขายปกติ</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {prices.map((p, idx) => (
+                                <div key={idx} className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                    <select
+                                        value={p.customerGroupId}
+                                        onChange={(e) => {
+                                            const newPrices = [...prices];
+                                            newPrices[idx] = { ...newPrices[idx], customerGroupId: e.target.value };
+                                            setPrices(newPrices);
+                                        }}
+                                        className="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                    >
+                                        <option value="">-- เลือกกลุ่มลูกค้า --</option>
+                                        {customerGroups.map(g => (
+                                            <option key={g.id} value={g.id} disabled={prices.some((pp, i) => i !== idx && pp.customerGroupId === g.id)}>
+                                                {g.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={p.productUnitId}
+                                        onChange={(e) => {
+                                            const newPrices = [...prices];
+                                            newPrices[idx] = { ...newPrices[idx], productUnitId: e.target.value };
+                                            setPrices(newPrices);
+                                        }}
+                                        className="w-28 px-3 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                    >
+                                        <option value="">{form.unit || 'หน่วยหลัก'} (หลัก)</option>
+                                        {units.filter(u => u.unitName.trim()).map((u, uIdx) => (
+                                            <option key={uIdx} value={`unit-${uIdx}`}>{u.unitName}</option>
+                                        ))}
+                                    </select>
+                                    <input
+                                        type="number"
+                                        value={p.price || ''}
+                                        onChange={(e) => {
+                                            const newPrices = [...prices];
+                                            newPrices[idx] = { ...newPrices[idx], price: parseFloat(e.target.value) || 0 };
+                                            setPrices(newPrices);
+                                        }}
+                                        className="w-28 px-3 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                        placeholder="0.00"
+                                        step="0.01"
+                                        min={0}
+                                    />
+                                    <span className="text-xs text-gray-400">บาท</span>
+                                    <button type="button" onClick={() => setPrices(prev => prev.filter((_, i) => i !== idx))}
+                                        className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>

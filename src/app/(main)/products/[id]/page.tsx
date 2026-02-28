@@ -606,6 +606,90 @@ export default function ProductDetailPage() {
 
 
 
+            {/* Units - Inline Rows */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className="font-semibold text-gray-800">📦 หน่วยขาย</h2>
+                    <button type="button"
+                        onClick={() => {
+                            setNewUnitRows(prev => [...prev, { unitName: '', conversionRate: 1, sellingPrice: 0, isBaseUnit: false }]);
+                        }}
+                        className="text-xs text-emerald-600 font-medium hover:underline">
+                        + เพิ่มหน่วย
+                    </button>
+                </div>
+                {((!product.productUnits || product.productUnits.length === 0) && newUnitRows.length === 0) ? (
+                    <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีหน่วยขาย — กดปุ่ม &quot;+ เพิ่มหน่วย&quot; เพื่อเริ่มต้น</p>
+                ) : (
+                    <div className="space-y-3">
+                        {product.productUnits.map(unit => (
+                            <div key={unit.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50">
+                                <div className="flex-1 min-w-0">
+                                    <input type="text" value={unit.unitName}
+                                        onChange={e => updateExistingUnit(unit.id, { unitName: e.target.value })}
+                                        list="unit-name-suggestions"
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                        placeholder="ชื่อหน่วย" />
+                                </div>
+                                <div className="w-24">
+                                    <input type="number" value={Number(unit.conversionRate) || ''}
+                                        onChange={e => updateExistingUnit(unit.id, { conversionRate: parseFloat(e.target.value) || 0 })}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                        placeholder="จำนวน" min={0.0001} step="0.0001" />
+                                </div>
+                                <div className="w-28">
+                                    <input type="number" value={Number(unit.sellingPrice) || ''}
+                                        onChange={e => updateExistingUnit(unit.id, { sellingPrice: parseFloat(e.target.value) || 0 })}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                        placeholder="ราคา" step="0.01" min={0} />
+                                </div>
+                                <button type="button" onClick={() => handleSaveExistingUnit(unit)}
+                                    disabled={savingId === unit.id}
+                                    className="text-blue-500 hover:text-blue-700 text-xs font-medium px-1 disabled:opacity-50">
+                                    {savingId === unit.id ? '...' : '💾'}
+                                </button>
+                                <button type="button" onClick={() => handleDeleteUnit(unit)}
+                                    className="text-red-400 hover:text-red-600 text-sm px-1 shrink-0">✕</button>
+                            </div>
+                        ))}
+                        {newUnitRows.map((u, idx) => (
+                            <div key={`new-${idx}`} className="flex items-center gap-3 p-3 rounded-xl border border-blue-200 bg-blue-50/30">
+                                <div className="flex-1 min-w-0">
+                                    <input type="text" value={u.unitName}
+                                        onChange={e => { const nr = [...newUnitRows]; nr[idx] = { ...nr[idx], unitName: e.target.value }; setNewUnitRows(nr); }}
+                                        list="unit-name-suggestions"
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                        placeholder="ชื่อหน่วย (เช่น ถุง, ลัง)" />
+                                </div>
+                                <div className="w-24">
+                                    <input type="number" value={u.conversionRate || ''}
+                                        onChange={e => { const nr = [...newUnitRows]; nr[idx] = { ...nr[idx], conversionRate: parseFloat(e.target.value) || 0 }; setNewUnitRows(nr); }}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                        placeholder="จำนวน" min={0.0001} step="0.0001" />
+                                </div>
+                                <div className="w-28">
+                                    <input type="number" value={u.sellingPrice || ''}
+                                        onChange={e => { const nr = [...newUnitRows]; nr[idx] = { ...nr[idx], sellingPrice: parseFloat(e.target.value) || 0 }; setNewUnitRows(nr); }}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                        placeholder="ราคา" step="0.01" min={0} />
+                                </div>
+                                <button type="button" onClick={() => handleSaveNewUnit(u, idx)}
+                                    disabled={savingId === `new-unit-${idx}`}
+                                    className="text-emerald-500 hover:text-emerald-700 text-xs font-medium px-1 disabled:opacity-50">
+                                    {savingId === `new-unit-${idx}` ? '...' : '💾'}
+                                </button>
+                                <button type="button" onClick={() => setNewUnitRows(prev => prev.filter((_, i) => i !== idx))}
+                                    className="text-red-400 hover:text-red-600 text-sm px-1 shrink-0">✕</button>
+                            </div>
+                        ))}
+                        <datalist id="unit-name-suggestions">
+                            {unitNames.map(u => <option key={u} value={u} />)}
+                        </datalist>
+                        <p className="text-[10px] text-gray-400">* ระบุจำนวน base unit ต่อ 1 หน่วยนี้ | กด 💾 เพื่อบันทึกแต่ละแถว</p>
+                    </div>
+                )}
+            </div>
+
             {/* Pricing - Inline Rows */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
                 <div className="flex items-center justify-between mb-3">
@@ -711,90 +795,6 @@ export default function ProductDetailPage() {
                                     className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
                             </div>
                         ))}
-                    </div>
-                )}
-            </div>
-
-            {/* Units - Inline Rows */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
-                <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-semibold text-gray-800">📦 หน่วยขาย</h2>
-                    <button type="button"
-                        onClick={() => {
-                            setNewUnitRows(prev => [...prev, { unitName: '', conversionRate: 1, sellingPrice: 0, isBaseUnit: false }]);
-                        }}
-                        className="text-xs text-emerald-600 font-medium hover:underline">
-                        + เพิ่มหน่วย
-                    </button>
-                </div>
-                {((!product.productUnits || product.productUnits.length === 0) && newUnitRows.length === 0) ? (
-                    <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีหน่วยขาย — กดปุ่ม &quot;+ เพิ่มหน่วย&quot; เพื่อเริ่มต้น</p>
-                ) : (
-                    <div className="space-y-3">
-                        {product.productUnits.map(unit => (
-                            <div key={unit.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50">
-                                <div className="flex-1 min-w-0">
-                                    <input type="text" value={unit.unitName}
-                                        onChange={e => updateExistingUnit(unit.id, { unitName: e.target.value })}
-                                        list="unit-name-suggestions"
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                        placeholder="ชื่อหน่วย" />
-                                </div>
-                                <div className="w-24">
-                                    <input type="number" value={Number(unit.conversionRate) || ''}
-                                        onChange={e => updateExistingUnit(unit.id, { conversionRate: parseFloat(e.target.value) || 0 })}
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                        placeholder="จำนวน" min={0.0001} step="0.0001" />
-                                </div>
-                                <div className="w-28">
-                                    <input type="number" value={Number(unit.sellingPrice) || ''}
-                                        onChange={e => updateExistingUnit(unit.id, { sellingPrice: parseFloat(e.target.value) || 0 })}
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                        placeholder="ราคา" step="0.01" min={0} />
-                                </div>
-                                <button type="button" onClick={() => handleSaveExistingUnit(unit)}
-                                    disabled={savingId === unit.id}
-                                    className="text-blue-500 hover:text-blue-700 text-xs font-medium px-1 disabled:opacity-50">
-                                    {savingId === unit.id ? '...' : '💾'}
-                                </button>
-                                <button type="button" onClick={() => handleDeleteUnit(unit)}
-                                    className="text-red-400 hover:text-red-600 text-sm px-1 shrink-0">✕</button>
-                            </div>
-                        ))}
-                        {newUnitRows.map((u, idx) => (
-                            <div key={`new-${idx}`} className="flex items-center gap-3 p-3 rounded-xl border border-blue-200 bg-blue-50/30">
-                                <div className="flex-1 min-w-0">
-                                    <input type="text" value={u.unitName}
-                                        onChange={e => { const nr = [...newUnitRows]; nr[idx] = { ...nr[idx], unitName: e.target.value }; setNewUnitRows(nr); }}
-                                        list="unit-name-suggestions"
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                        placeholder="ชื่อหน่วย (เช่น ถุง, ลัง)" />
-                                </div>
-                                <div className="w-24">
-                                    <input type="number" value={u.conversionRate || ''}
-                                        onChange={e => { const nr = [...newUnitRows]; nr[idx] = { ...nr[idx], conversionRate: parseFloat(e.target.value) || 0 }; setNewUnitRows(nr); }}
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                        placeholder="จำนวน" min={0.0001} step="0.0001" />
-                                </div>
-                                <div className="w-28">
-                                    <input type="number" value={u.sellingPrice || ''}
-                                        onChange={e => { const nr = [...newUnitRows]; nr[idx] = { ...nr[idx], sellingPrice: parseFloat(e.target.value) || 0 }; setNewUnitRows(nr); }}
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                        placeholder="ราคา" step="0.01" min={0} />
-                                </div>
-                                <button type="button" onClick={() => handleSaveNewUnit(u, idx)}
-                                    disabled={savingId === `new-unit-${idx}`}
-                                    className="text-emerald-500 hover:text-emerald-700 text-xs font-medium px-1 disabled:opacity-50">
-                                    {savingId === `new-unit-${idx}` ? '...' : '💾'}
-                                </button>
-                                <button type="button" onClick={() => setNewUnitRows(prev => prev.filter((_, i) => i !== idx))}
-                                    className="text-red-400 hover:text-red-600 text-sm px-1 shrink-0">✕</button>
-                            </div>
-                        ))}
-                        <datalist id="unit-name-suggestions">
-                            {unitNames.map(u => <option key={u} value={u} />)}
-                        </datalist>
-                        <p className="text-[10px] text-gray-400">* ระบุจำนวน base unit ต่อ 1 หน่วยนี้ | กด 💾 เพื่อบันทึกแต่ละแถว</p>
                     </div>
                 )}
             </div>
