@@ -811,7 +811,7 @@ export default function ProductDetailPage() {
                     onClick={() => setActiveTab('log')}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'log' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                 >
-                    📋 ประวัติรับ-จ่าย
+                    📋 ประวัติ
                 </button>
             </div>
 
@@ -847,7 +847,7 @@ export default function ProductDetailPage() {
                 activeTab === 'log' && (
                     <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                         {product.stockTransactions.length === 0 ? (
-                            <div className="p-8 text-center text-gray-400">ยังไม่มีประวัติรับ-จ่ายสินค้า</div>
+                            <div className="p-8 text-center text-gray-400">ยังไม่มีประวัติสินค้า</div>
                         ) : (
                             <>
                                 {/* Desktop Table */}

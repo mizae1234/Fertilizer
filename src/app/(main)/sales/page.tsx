@@ -5,7 +5,7 @@ import StatusBadge from '@/components/StatusBadge';
 import { Suspense } from 'react';
 import SalesDateFilter from './SalesDateFilter';
 
-interface Props { searchParams: Promise<{ page?: string; status?: string; from?: string; to?: string }> }
+interface Props { searchParams: Promise<{ page?: string; status?: string; from?: string; to?: string; search?: string }> }
 
 export default async function SalesPage({ searchParams }: Props) {
     const sp = await searchParams;
@@ -13,6 +13,7 @@ export default async function SalesPage({ searchParams }: Props) {
     const status = sp.status || '';
     const from = sp.from || '';
     const to = sp.to || '';
+    const searchQuery = sp.search || '';
     const perPage = 15;
 
     const where: Record<string, unknown> = { deletedAt: null };
@@ -21,6 +22,12 @@ export default async function SalesPage({ searchParams }: Props) {
         where.createdAt = {};
         if (from) (where.createdAt as Record<string, unknown>).gte = new Date(from);
         if (to) (where.createdAt as Record<string, unknown>).lte = new Date(to + 'T23:59:59');
+    }
+    if (searchQuery) {
+        where.OR = [
+            { saleNumber: { contains: searchQuery } },
+            { customer: { name: { contains: searchQuery } } },
+        ];
     }
 
     const [sales, total] = await Promise.all([
@@ -47,7 +54,7 @@ export default async function SalesPage({ searchParams }: Props) {
 
     const buildUrl = (params: Record<string, string>) => {
         const p = new URLSearchParams();
-        const vals = { page: String(page), status, from, to, ...params };
+        const vals = { page: String(page), status, from, to, search: searchQuery, ...params };
         Object.entries(vals).forEach(([k, v]) => { if (v) p.set(k, v); });
         return `/sales?${p.toString()}`;
     };
@@ -82,6 +89,19 @@ export default async function SalesPage({ searchParams }: Props) {
                         <SalesDateFilter />
                     </Suspense>
                 </div>
+            </div>
+            {/* Search */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">
+                <form method="get" action="/sales" className="flex gap-2">
+                    <input type="hidden" name="status" value={status} />
+                    <input type="hidden" name="from" value={from} />
+                    <input type="hidden" name="to" value={to} />
+                    <input type="text" name="search" defaultValue={searchQuery}
+                        placeholder="🔍 ค้นหาเลขบิล หรือชื่อลูกค้า..."
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm" />
+                    <button type="submit" className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600">ค้นหา</button>
+                    {searchQuery && <a href={buildUrl({ search: '', page: '1' })} className="px-3 py-2.5 rounded-xl bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200">ล้าง</a>}
+                </form>
             </div>
 
             {/* Sales Table */}
