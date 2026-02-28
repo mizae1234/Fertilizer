@@ -263,11 +263,11 @@ export default function NewFactoryReturnPage() {
                                                 <p className="text-[10px] text-gray-400 mt-0.5">คงเหลือ: {item.availableStock}</p>
                                             </td>
                                             <td className="px-3 py-2">
-                                                <input type="number" min={1} value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
+                                                <input type="number" min={1} value={item.quantity} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
                                                     className="w-20 px-2 py-1 rounded border border-gray-200 text-sm text-right outline-none focus:ring-1 focus:ring-orange-500" />
                                             </td>
                                             <td className="px-3 py-2">
-                                                <input type="number" step="0.01" value={item.unitCost} onChange={e => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
+                                                <input type="number" step="0.01" value={item.unitCost} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
                                                     className="w-24 px-2 py-1 rounded border border-gray-200 text-sm text-right outline-none focus:ring-1 focus:ring-orange-500" />
                                             </td>
                                             <td className="px-3 py-2 text-sm font-semibold text-gray-800 text-right">{formatCurrency(item.quantity * item.unitCost)}</td>
@@ -308,12 +308,12 @@ export default function NewFactoryReturnPage() {
                                         </div>
                                         <div>
                                             <label className="text-[10px] text-gray-400">จำนวน (คงเหลือ: {item.availableStock})</label>
-                                            <input type="number" min={1} value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
+                                            <input type="number" min={1} value={item.quantity} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
                                                 className="w-full px-2 py-1 rounded border border-gray-200 text-xs text-right outline-none" />
                                         </div>
                                         <div>
                                             <label className="text-[10px] text-gray-400">ราคาต้นทุน</label>
-                                            <input type="number" step="0.01" value={item.unitCost} onChange={e => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
+                                            <input type="number" step="0.01" value={item.unitCost} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
                                                 className="w-full px-2 py-1 rounded border border-gray-200 text-xs text-right outline-none" />
                                         </div>
                                         <div>
