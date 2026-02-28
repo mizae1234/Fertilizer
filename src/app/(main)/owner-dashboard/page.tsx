@@ -51,7 +51,7 @@ function getPresetDates(preset: Preset): { from: string; to: string } {
 }
 
 export default function OwnerDashboardPage() {
-    const [preset, setPreset] = useState<Preset>('this_month');
+    const [preset, setPreset] = useState<Preset>('30d');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [data, setData] = useState<DashboardData | null>(null);
@@ -68,7 +68,7 @@ export default function OwnerDashboardPage() {
     }, []);
 
     useEffect(() => {
-        const { from, to } = getPresetDates('this_month');
+        const { from, to } = getPresetDates('30d');
         setDateFrom(from);
         setDateTo(to);
         fetchData(from, to);
