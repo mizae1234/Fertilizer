@@ -26,6 +26,7 @@ interface StockTransaction {
     notes: string | null;
     createdAt: string;
     warehouse: { name: string };
+    user: { name: string } | null;
 }
 
 interface ProductPrice {
@@ -862,6 +863,7 @@ export default function ProductDetailPage() {
                                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>
                                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
                                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">อ้างอิง</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ผู้ทำรายการ</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
@@ -889,6 +891,9 @@ export default function ProductDetailPage() {
                                                         <td className="px-4 py-3 text-xs text-gray-500">
                                                             {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
                                                             {tx.notes && <p className="text-gray-400 mt-0.5">{tx.notes}</p>}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-xs text-gray-600">
+                                                            {tx.user?.name || <span className="text-gray-300">-</span>}
                                                         </td>
                                                     </tr>
                                                 );
@@ -922,6 +927,7 @@ export default function ProductDetailPage() {
                                                 </div>
                                                 {tx.lotNo && <p className="text-xs text-purple-600 mt-1">📋 Lot: {tx.lotNo}</p>}
                                                 {tx.notes && <p className="text-xs text-gray-400 mt-1">{tx.notes}</p>}
+                                                {tx.user && <p className="text-xs text-blue-500 mt-1">👤 {tx.user.name}</p>}
                                             </div>
                                         );
                                     })}

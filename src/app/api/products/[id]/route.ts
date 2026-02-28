@@ -21,7 +21,10 @@ export async function GET(
                     orderBy: [{ isBaseUnit: 'desc' }, { conversionRate: 'asc' }],
                 },
                 stockTransactions: {
-                    include: { warehouse: { select: { name: true } } },
+                    include: {
+                        warehouse: { select: { name: true } },
+                        user: { select: { name: true } },
+                    },
                     orderBy: { createdAt: 'desc' },
                     take: 50,
                 },

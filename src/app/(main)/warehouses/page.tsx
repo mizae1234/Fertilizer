@@ -17,7 +17,7 @@ export default async function WarehousesPage({ searchParams }: Props) {
         prisma.warehouse.findMany({
             where,
             select: {
-                id: true, name: true, location: true, createdAt: true,
+                id: true, name: true, location: true, isActive: true, createdAt: true,
                 _count: { select: { productStocks: true } },
                 productStocks: {
                     select: { quantity: true },
