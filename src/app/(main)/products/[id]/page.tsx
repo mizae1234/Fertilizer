@@ -518,7 +518,7 @@ export default function ProductDetailPage() {
 
                 <div className="grid grid-cols-3 gap-4 mb-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1.5">หน่วยนับ</label>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">หน่วยนับ (หน่วยหลัก)</label>
                         <input type="text" value={unitValue || product.unit} onChange={e => setUnitValue(e.target.value)}
                             list="unit-suggestions"
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
@@ -609,7 +609,7 @@ export default function ProductDetailPage() {
             {/* Units - Inline Rows */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
                 <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-semibold text-gray-800">📦 หน่วยขาย</h2>
+                    <h2 className="font-semibold text-gray-800">📦 หน่วยขายเพิ่มเติม</h2>
                     <button type="button"
                         onClick={() => {
                             setNewUnitRows(prev => [...prev, { unitName: '', conversionRate: 1, sellingPrice: 0, isBaseUnit: false }]);
@@ -619,7 +619,7 @@ export default function ProductDetailPage() {
                     </button>
                 </div>
                 {((!product.productUnits || product.productUnits.length === 0) && newUnitRows.length === 0) ? (
-                    <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีหน่วยขาย — กดปุ่ม &quot;+ เพิ่มหน่วย&quot; เพื่อเริ่มต้น</p>
+                    <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีหน่วยเพิ่มเติม — เช่น ลัง, โหล ฯลฯ</p>
                 ) : (
                     <div className="space-y-3">
                         {product.productUnits.map(unit => (
@@ -685,7 +685,7 @@ export default function ProductDetailPage() {
                         <datalist id="unit-name-suggestions">
                             {unitNames.map(u => <option key={u} value={u} />)}
                         </datalist>
-                        <p className="text-[10px] text-gray-400">* ระบุจำนวน base unit ต่อ 1 หน่วยนี้ | กด 💾 เพื่อบันทึกแต่ละแถว</p>
+                        <p className="text-[10px] text-gray-400">* ระบุจำนวนหน่วยหลัก ต่อ 1 หน่วยนี้ | กด 💾 เพื่อบันทึกแต่ละแถว</p>
                     </div>
                 )}
             </div>

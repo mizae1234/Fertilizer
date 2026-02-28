@@ -216,9 +216,9 @@ export default function NewProductPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1.5">หน่วยนับ</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-1.5">หน่วยนับ (หน่วยหลัก)</label>
                             <input
                                 type="text"
                                 value={form.unit}
@@ -241,6 +241,8 @@ export default function NewProductPage() {
                                 min={0}
                             />
                         </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">Stock ขั้นต่ำ</label>
                             <input
@@ -254,18 +256,18 @@ export default function NewProductPage() {
                     </div>
                 </div>
 
-                {/* Units Section (moved above Pricing) */}
+                {/* Additional Units Section */}
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="font-semibold text-gray-800">📦 หน่วยขาย</h2>
+                        <h2 className="font-semibold text-gray-800">📦 หน่วยขายเพิ่มเติม</h2>
                         <button type="button"
-                            onClick={() => setUnits(prev => [...prev, { unitName: '', conversionRate: prev.length === 0 ? 1 : 1, sellingPrice: 0, isBaseUnit: prev.length === 0 }])}
+                            onClick={() => setUnits(prev => [...prev, { unitName: '', conversionRate: 1, sellingPrice: 0, isBaseUnit: false }])}
                             className="text-xs text-emerald-600 font-medium hover:underline">
                             + เพิ่มหน่วย
                         </button>
                     </div>
                     {units.length === 0 ? (
-                        <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีหน่วยขาย — สามารถเพิ่มทีหลังในหน้ารายละเอียดสินค้าได้</p>
+                        <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีหน่วยเพิ่มเติม — เช่น ลัง, โหล ฯลฯ</p>
                     ) : (
                         <div className="space-y-3">
                             {units.map((u, idx) => (
