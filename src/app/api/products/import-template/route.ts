@@ -15,6 +15,7 @@ export async function GET() {
         'price',
         'packaging',
         'productGroup',
+        'initialStock',
     ];
 
     const thaiHeaders = [
@@ -29,6 +30,7 @@ export async function GET() {
         'ราคาขาย',
         'บรรจุภัณฑ์',
         'หมวดหมู่สินค้า',
+        'สต็อกตั้งต้น',
     ];
 
     // Example row
@@ -44,6 +46,7 @@ export async function GET() {
         550,
         'ถุง 50 กก.',
         'ปุ๋ยเคมี',
+        100,
     ];
 
     const ws = XLSX.utils.aoa_to_sheet([thaiHeaders, headers, example]);
@@ -61,6 +64,7 @@ export async function GET() {
         { wch: 12 },
         { wch: 18 },
         { wch: 18 },
+        { wch: 12 },
     ];
 
     const wb = XLSX.utils.book_new();

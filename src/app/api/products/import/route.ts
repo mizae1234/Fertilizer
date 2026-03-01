@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
         // Find the header row (look for the row that contains 'code' and 'name')
         let headerRowIdx = 0;
-        const fieldNames = ['code', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging', 'productGroup'];
+        const fieldNames = ['code', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging', 'productGroup', 'initialStock'];
         for (let i = 0; i < Math.min(rows.length, 5); i++) {
             const row = rows[i].map((c: any) => String(c).trim().toLowerCase());
             if (row.includes('code') && row.includes('name')) {
@@ -69,6 +69,12 @@ export async function POST(request: Request) {
         // Cache product groups by name for lookup
         const allGroups = await prisma.productGroup.findMany({ select: { id: true, name: true } });
         const groupMap = new Map(allGroups.map(g => [g.name.toLowerCase(), g.id]));
+
+        // Get default warehouse (first active)
+        const defaultWarehouse = await prisma.warehouse.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' } });
+        if (!defaultWarehouse) {
+            return NextResponse.json({ error: 'ไม่พบคลังสินค้า กรุณาสร้างคลังสินค้าก่อน' }, { status: 400 });
+        }
 
         for (let i = 0; i < dataRows.length; i++) {
             const row = dataRows[i];
@@ -134,6 +140,34 @@ export async function POST(request: Request) {
                 });
                 existingCodes.add(code.toLowerCase());
                 results.created++;
+
+                // Create initial stock if specified
+                const initialStock = parseInt(getValue('initialStock') || '0') || 0;
+                if (initialStock > 0) {
+                    const costVal = parseFloat(getValue('cost') || '0') || 0;
+                    const createdProduct = await prisma.product.findFirst({ where: { code }, select: { id: true } });
+                    if (createdProduct) {
+                        await prisma.productStock.create({
+                            data: {
+                                productId: createdProduct.id,
+                                warehouseId: defaultWarehouse.id,
+                                quantity: initialStock,
+                                avgCost: costVal,
+                                lastCost: costVal,
+                            },
+                        });
+                        await prisma.stockTransaction.create({
+                            data: {
+                                productId: createdProduct.id,
+                                warehouseId: defaultWarehouse.id,
+                                type: 'GOODS_RECEIVE',
+                                quantity: initialStock,
+                                unitCost: costVal,
+                                notes: 'สต็อกตั้งต้น (Import Excel)',
+                            },
+                        });
+                    }
+                }
             } catch (error: any) {
                 results.errors.push(`แถว ${i + 1}: ${error.message?.substring(0, 100)}`);
                 results.skipped++;

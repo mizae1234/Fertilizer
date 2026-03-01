@@ -16,6 +16,7 @@ interface PreviewRow {
     price: number;
     packaging: string;
     productGroup: string;
+    initialStock: number;
 }
 
 export default function ImportProductsButton() {
@@ -48,7 +49,7 @@ export default function ImportProductsButton() {
             }
 
             // Find header row
-            const fieldNames = ['code', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging', 'productGroup'];
+            const fieldNames = ['code', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging', 'productGroup', 'initialStock'];
             let headerRowIdx = 0;
             for (let i = 0; i < Math.min(rows.length, 5); i++) {
                 const row = rows[i].map((c: any) => String(c).trim().toLowerCase());
@@ -92,6 +93,7 @@ export default function ImportProductsButton() {
                     price: parseFloat(getValue('price') || '0') || 0,
                     packaging: getValue('packaging'),
                     productGroup: getValue('productGroup'),
+                    initialStock: parseInt(getValue('initialStock') || '0') || 0,
                 });
             }
 
@@ -216,6 +218,7 @@ export default function ImportProductsButton() {
                                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">บรรจุภัณฑ์</th>
                                             <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">แต้ม</th>
                                             <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">สต็อกขั้นต่ำ</th>
+                                            <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">สต็อกตั้งต้น</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
@@ -232,6 +235,7 @@ export default function ImportProductsButton() {
                                                 <td className="px-3 py-2 text-gray-600">{row.packaging || '-'}</td>
                                                 <td className="px-3 py-2 text-right text-gray-600">{row.pointsPerUnit}</td>
                                                 <td className="px-3 py-2 text-right text-gray-600">{row.minStock}</td>
+                                                <td className="px-3 py-2 text-right font-semibold text-emerald-600">{row.initialStock > 0 ? row.initialStock.toLocaleString() : '-'}</td>
                                             </tr>
                                         ))}
                                     </tbody>
