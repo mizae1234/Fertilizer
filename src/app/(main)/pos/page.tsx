@@ -49,6 +49,16 @@ interface CartItem {
     itemDiscount: number;
 }
 
+interface HeldSale {
+    id: string;
+    cart: CartItem[];
+    customer: Customer | null;
+    billDiscount: number;
+    notes: string;
+    heldAt: string;
+    label: string;
+}
+
 interface PaymentLine { method: string; amount: number; dueDate: string; bankAccountId?: string }
 interface BankAccountInfo { id: string; accountName: string; accountNumber: string; bankName: string; qrCodeUrl: string | null; isDefault: boolean; isActive: boolean }
 const PAYMENT_METHODS = [
@@ -665,6 +675,74 @@ export default function POSPage() {
     const [saleNotes, setSaleNotes] = useState('');
     const [showNotes, setShowNotes] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showHeldSales, setShowHeldSales] = useState(false);
+
+    // ── Held Sales (localStorage) ──
+    const HELD_SALES_KEY = 'pos_held_sales';
+    const [heldSales, setHeldSales] = useState<HeldSale[]>(() => {
+        if (typeof window === 'undefined') return [];
+        try { return JSON.parse(localStorage.getItem(HELD_SALES_KEY) || '[]'); } catch { return []; }
+    });
+    useEffect(() => {
+        try { localStorage.setItem(HELD_SALES_KEY, JSON.stringify(heldSales)); } catch { /* ignore */ }
+    }, [heldSales]);
+
+    const holdSale = () => {
+        if (cart.length === 0) return;
+        if (heldSales.length >= 10) {
+            setAlertModal({ open: true, message: 'รายการพักเต็มแล้ว (สูงสุด 10 รายการ) กรุณาลบรายการเก่าก่อน', type: 'warning', title: 'ไม่สามารถพักได้' });
+            return;
+        }
+        const held: HeldSale = {
+            id: Date.now().toString(),
+            cart: [...cart],
+            customer: selectedCustomer,
+            billDiscount,
+            notes: saleNotes,
+            heldAt: new Date().toISOString(),
+            label: selectedCustomer?.name || 'ลูกค้าทั่วไป',
+        };
+        setHeldSales(prev => [...prev, held]);
+        setCart([]);
+        setSelectedCustomer(null);
+        setBillDiscount(0);
+        setSaleNotes('');
+        setShowNotes(false);
+        setShowBillDiscount(false);
+        setAlertModal({ open: true, message: `พักรายการ "${held.label}" เรียบร้อย`, type: 'success', title: '⏸ พักการขาย' });
+    };
+
+    const resumeSale = (index: number) => {
+        const held = heldSales[index];
+        if (!held) return;
+        // If current cart has items, swap — hold current cart first
+        if (cart.length > 0) {
+            const currentHeld: HeldSale = {
+                id: Date.now().toString(),
+                cart: [...cart],
+                customer: selectedCustomer,
+                billDiscount,
+                notes: saleNotes,
+                heldAt: new Date().toISOString(),
+                label: selectedCustomer?.name || 'ลูกค้าทั่วไป',
+            };
+            setHeldSales(prev => [...prev.filter((_, i) => i !== index), currentHeld]);
+        } else {
+            setHeldSales(prev => prev.filter((_, i) => i !== index));
+        }
+        // Restore held sale
+        setCart(held.cart);
+        setSelectedCustomer(held.customer);
+        setBillDiscount(held.billDiscount);
+        setSaleNotes(held.notes);
+        setShowNotes(!!held.notes);
+        setShowHeldSales(false);
+        setAlertModal({ open: true, message: `เปิดรายการ "${held.label}" กลับมาขายต่อ`, type: 'success', title: '▶️ กลับมาขายต่อ' });
+    };
+
+    const deleteHeldSale = (index: number) => {
+        setHeldSales(prev => prev.filter((_, i) => i !== index));
+    };
 
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; type: 'success' | 'error' | 'warning' | 'info'; title?: string }>({ open: false, message: '', type: 'info' });
 
@@ -1029,6 +1107,12 @@ export default function POSPage() {
                                 <p className="text-5xl mb-4">🛒</p>
                                 <p className="text-lg font-medium text-gray-500 mb-1">ยังไม่มีสินค้าในตะกร้า</p>
                                 <p className="text-sm">ใช้ช่องค้นหาด้านบนเพื่อเพิ่มสินค้า</p>
+                                {heldSales.length > 0 && (
+                                    <button onClick={() => setShowHeldSales(true)}
+                                        className="mt-4 px-4 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-sm font-medium hover:bg-amber-100 transition-colors">
+                                        📋 มีรายการพัก {heldSales.length} รายการ
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <div className="space-y-1.5 lg:space-y-2">
@@ -1194,13 +1278,25 @@ export default function POSPage() {
                             <p className="text-2xl font-black tracking-tight">{formatCurrency(Math.max(0, total))}</p>
                         </div>
                         <div className="flex gap-2">
+                            <button type="button" onClick={holdSale}
+                                disabled={cart.length === 0}
+                                className="shrink-0 px-3 py-2.5 rounded-lg text-xs transition-colors bg-white border border-gray-200 text-gray-500 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 disabled:opacity-40 disabled:cursor-not-allowed">
+                                ⏸ พัก
+                            </button>
+                            {heldSales.length > 0 && (
+                                <button type="button" onClick={() => setShowHeldSales(true)}
+                                    className="shrink-0 px-3 py-2.5 rounded-lg text-xs transition-colors bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 relative">
+                                    📋 รายการพัก
+                                    <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{heldSales.length}</span>
+                                </button>
+                            )}
                             <button type="button" onClick={() => setShowBillDiscount(!showBillDiscount)}
                                 className={`shrink-0 px-3 py-2.5 rounded-lg text-xs transition-colors ${billDiscount > 0 ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
-                                🏷️ ส่วนลด{billDiscount > 0 ? ` -${formatCurrency(billDiscount)}` : ''}
+                                🏷️{billDiscount > 0 ? ` -${formatCurrency(billDiscount)}` : ''}
                             </button>
                             <button type="button" onClick={() => setShowNotes(!showNotes)}
                                 className={`shrink-0 px-3 py-2.5 rounded-lg text-xs transition-colors ${saleNotes ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
-                                📝 Note
+                                📝
                             </button>
                             <button
                                 onClick={openPaymentModal}
@@ -1238,6 +1334,68 @@ export default function POSPage() {
                     onClose={() => setShowPaymentModal(false)}
                     defaultPrintType={userPrintSetting as 'bill' | 'invoice' | 'none'}
                 />
+            )}
+
+            {/* ── Held Sales Modal ── */}
+            {showHeldSales && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowHeldSales(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-5 py-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-bold">📋 รายการพัก ({heldSales.length})</h3>
+                                <button onClick={() => setShowHeldSales(false)} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+                            </div>
+                            <p className="text-sm opacity-80 mt-1">เลือกรายการที่ต้องการเปิดขายต่อ</p>
+                        </div>
+                        <div className="max-h-[60vh] overflow-y-auto divide-y divide-gray-100">
+                            {heldSales.length === 0 ? (
+                                <div className="py-12 text-center text-gray-400">
+                                    <p className="text-3xl mb-2">📭</p>
+                                    <p className="text-sm">ไม่มีรายการพัก</p>
+                                </div>
+                            ) : (
+                                heldSales.map((held, idx) => {
+                                    const itemCount = held.cart.reduce((s, c) => s + c.quantity, 0);
+                                    const heldTotal = held.cart.reduce((s, c) => s + c.quantity * c.unitPrice, 0) - (held.billDiscount || 0);
+                                    const timeStr = new Date(held.heldAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                                    return (
+                                        <div key={held.id} className="p-4 hover:bg-gray-50 transition-colors">
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-gray-800 truncate">👤 {held.label}</p>
+                                                    <p className="text-xs text-gray-500 mt-0.5">
+                                                        {itemCount} ชิ้น · {formatCurrency(heldTotal)} · พักเมื่อ {timeStr}
+                                                    </p>
+                                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                                        {held.cart.slice(0, 3).map((c, ci) => (
+                                                            <span key={ci} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{c.productName} ×{c.quantity}</span>
+                                                        ))}
+                                                        {held.cart.length > 3 && <span className="text-[10px] text-gray-400">+{held.cart.length - 3} อื่นๆ</span>}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 ml-3 shrink-0">
+                                                    <button onClick={() => resumeSale(idx)}
+                                                        className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 transition-colors">
+                                                        ▶️ เปิด
+                                                    </button>
+                                                    <button onClick={() => deleteHeldSale(idx)}
+                                                        className="px-2 py-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 text-xs transition-colors">
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                        {cart.length > 0 && heldSales.length > 0 && (
+                            <div className="border-t border-gray-100 px-4 py-3 bg-amber-50">
+                                <p className="text-xs text-amber-700">💡 ตะกร้าปัจจุบันมีสินค้าอยู่ — เมื่อเปิดรายการพัก ตะกร้าปัจจุบันจะถูกพักไว้โดยอัตโนมัติ</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             )}
 
             <AlertModal
