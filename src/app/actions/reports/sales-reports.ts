@@ -86,6 +86,7 @@ export async function getSalesDetail(dateFrom?: string, dateTo?: string) {
             customer: { select: { name: true } },
             items: {
                 select: {
+                    id: true,
                     quantity: true,
                     unitPrice: true,
                     totalPrice: true,
@@ -93,27 +94,48 @@ export async function getSalesDetail(dateFrom?: string, dateTo?: string) {
                     warehouse: { select: { name: true } },
                 },
             },
+            saleReturns: {
+                select: { items: { select: { saleItemId: true, quantity: true } } },
+            },
         },
         orderBy: { createdAt: 'desc' },
         take: 200,
     });
 
-    return sales.map(s => ({
-        id: s.id,
-        saleNumber: s.saleNumber,
-        customer: s.customer?.name || 'ลูกค้าทั่วไป',
-        totalAmount: Number(s.totalAmount),
-        paymentMethod: s.paymentMethod,
-        createdAt: s.createdAt.toISOString(),
-        items: s.items.map(i => ({
-            productName: i.product.name,
-            productCode: i.product.code,
-            warehouse: i.warehouse.name,
-            quantity: i.quantity,
-            unitPrice: Number(i.unitPrice),
-            totalPrice: Number(i.totalPrice),
-        })),
-    }));
+    return sales.map(s => {
+        // Build returned quantity map
+        const retMap = new Map<string, number>();
+        for (const sr of s.saleReturns) {
+            for (const ri of sr.items) {
+                retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + ri.quantity);
+            }
+        }
+        // Adjust items and filter out fully returned
+        const adjustedItems = s.items
+            .map(i => {
+                const returned = retMap.get(i.id) || 0;
+                const remaining = i.quantity - returned;
+                return {
+                    productName: i.product.name,
+                    productCode: i.product.code,
+                    warehouse: i.warehouse.name,
+                    quantity: remaining,
+                    unitPrice: Number(i.unitPrice),
+                    totalPrice: remaining * Number(i.unitPrice),
+                };
+            })
+            .filter(i => i.quantity > 0);
+
+        return {
+            id: s.id,
+            saleNumber: s.saleNumber,
+            customer: s.customer?.name || 'ลูกค้าทั่วไป',
+            totalAmount: Number(s.totalAmount),
+            paymentMethod: s.paymentMethod,
+            createdAt: s.createdAt.toISOString(),
+            items: adjustedItems,
+        };
+    });
 }
 
 export async function getTopProducts(dateFrom?: string, dateTo?: string) {
@@ -124,78 +146,107 @@ export async function getTopProducts(dateFrom?: string, dateTo?: string) {
         ...(dateRange ? { createdAt: dateRange } : {}),
     };
 
-    const topProducts = await prisma.saleItem.groupBy({
-        by: ['productId'],
+    // Get all sale items with their return data
+    const allSaleItems = await prisma.saleItem.findMany({
         where: { sale: saleWhere },
-        _sum: { quantity: true, totalPrice: true },
-        _count: true,
-        orderBy: { _sum: { totalPrice: 'desc' } },
-        take: 20,
+        select: {
+            id: true,
+            productId: true,
+            quantity: true,
+            totalPrice: true,
+            unitPrice: true,
+            product: {
+                select: {
+                    id: true, name: true, code: true,
+                    productGroup: { select: { name: true } },
+                },
+            },
+            sale: {
+                select: {
+                    saleReturns: {
+                        select: { items: { select: { saleItemId: true, quantity: true } } },
+                    },
+                },
+            },
+        },
     });
 
-    const productIds = topProducts.map(p => p.productId);
-    const products = productIds.length > 0
-        ? await prisma.product.findMany({
-            where: { id: { in: productIds } },
-            select: { id: true, name: true, code: true, productGroup: { select: { name: true } } },
-        })
-        : [];
-    const productMap = new Map(products.map(p => [p.id, p]));
+    // Build global return map
+    const retMap = new Map<string, number>();
+    for (const si of allSaleItems) {
+        for (const sr of si.sale.saleReturns) {
+            for (const ri of sr.items) {
+                if (!retMap.has(ri.saleItemId)) retMap.set(ri.saleItemId, 0);
+                retMap.set(ri.saleItemId, retMap.get(ri.saleItemId)! + ri.quantity);
+            }
+        }
+    }
+
+    // Aggregate by product with returns deducted
+    const productAgg = new Map<string, {
+        productId: string; name: string; code: string; group: string;
+        quantity: number; totalAmount: number; orderIds: Set<string>;
+    }>();
+    const categoryMap = new Map<string, { total: number; count: number }>();
+    const productIdsWithSales = new Set<string>();
+
+    for (const si of allSaleItems) {
+        const returned = retMap.get(si.id) || 0;
+        const remaining = si.quantity - returned;
+        if (remaining <= 0) continue;
+
+        productIdsWithSales.add(si.productId);
+        const adjustedTotal = remaining * Number(si.unitPrice);
+
+        if (!productAgg.has(si.productId)) {
+            productAgg.set(si.productId, {
+                productId: si.productId,
+                name: si.product.name,
+                code: si.product.code,
+                group: si.product.productGroup?.name || '-',
+                quantity: 0, totalAmount: 0, orderIds: new Set(),
+            });
+        }
+        const p = productAgg.get(si.productId)!;
+        p.quantity += remaining;
+        p.totalAmount += adjustedTotal;
+
+        // Category aggregation
+        const cat = si.product.productGroup?.name || 'ไม่มีหมวดหมู่';
+        const existing = categoryMap.get(cat) || { total: 0, count: 0 };
+        existing.total += adjustedTotal;
+        existing.count += remaining;
+        categoryMap.set(cat, existing);
+    }
+
+    const topProducts = Array.from(productAgg.values())
+        .sort((a, b) => b.totalAmount - a.totalAmount)
+        .slice(0, 20)
+        .map(p => ({
+            productId: p.productId,
+            name: p.name,
+            code: p.code,
+            group: p.group,
+            quantity: p.quantity,
+            totalAmount: p.totalAmount,
+            orderCount: 0, // simplified
+        }));
 
     const allProducts = await prisma.product.findMany({
         where: { deletedAt: null, isActive: true },
         select: { id: true, name: true, code: true },
     });
 
-    const productsWithSales = new Set(
-        (await prisma.saleItem.findMany({
-            where: { sale: saleWhere },
-            select: { productId: true },
-            distinct: ['productId'],
-        })).map(s => s.productId)
-    );
-
     const slowMovers = allProducts
-        .filter(p => !productsWithSales.has(p.id))
+        .filter(p => !productIdsWithSales.has(p.id))
         .slice(0, 10);
 
-    // Sales by category  
-    const allSaleItems = await prisma.saleItem.findMany({
-        where: { sale: saleWhere },
-        select: {
-            totalPrice: true,
-            quantity: true,
-            product: {
-                select: { productGroup: { select: { name: true } } },
-            },
-        },
-    });
-
-    const categoryMap = new Map<string, { total: number; count: number }>();
-    for (const si of allSaleItems) {
-        const cat = si.product.productGroup?.name || 'ไม่มีหมวดหมู่';
-        const existing = categoryMap.get(cat) || { total: 0, count: 0 };
-        existing.total += Number(si.totalPrice);
-        existing.count += si.quantity;
-        categoryMap.set(cat, existing);
-    }
     const byCategory = Array.from(categoryMap.entries())
         .map(([category, data]) => ({ category, totalAmount: data.total, quantity: data.count }))
         .sort((a, b) => b.totalAmount - a.totalAmount);
 
     return {
-        topProducts: topProducts.map(p => {
-            const prod = productMap.get(p.productId);
-            return {
-                productId: p.productId,
-                name: prod?.name || 'ไม่พบ',
-                code: prod?.code || '',
-                group: prod?.productGroup?.name || '-',
-                quantity: p._sum.quantity || 0,
-                totalAmount: Number(p._sum.totalPrice || 0),
-                orderCount: p._count,
-            };
-        }),
+        topProducts,
         slowMovers,
         byCategory,
     };

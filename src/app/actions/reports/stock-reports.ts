@@ -13,18 +13,36 @@ export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
         ...(dateRange ? { createdAt: dateRange } : {}),
     };
 
-    // Get all sale items in the date range
+    // Get all sale items in the date range with return data
     const saleItems = await prisma.saleItem.findMany({
         where: { sale: saleWhere },
         select: {
+            id: true,
             productId: true,
             warehouseId: true,
             quantity: true,
             unitPrice: true,
             totalPrice: true,
             product: { select: { id: true, name: true, code: true } },
+            sale: {
+                select: {
+                    saleReturns: {
+                        select: { items: { select: { saleItemId: true, quantity: true } } },
+                    },
+                },
+            },
         },
     });
+
+    // Build return map
+    const retMap = new Map<string, number>();
+    for (const si of saleItems) {
+        for (const sr of si.sale.saleReturns) {
+            for (const ri of sr.items) {
+                retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + ri.quantity);
+            }
+        }
+    }
 
     // Get current stock for all products
     const stocks = await prisma.productStock.findMany({
@@ -50,10 +68,10 @@ export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
         }
     }
 
-    // Aggregate by product (avgCost per item for COGS from stock)
+    // Aggregate avgCost per item for COGS from stock
     const costMap = new Map(stocks.map(s => [`${s.productId}_${s.warehouseId}`, Number(s.avgCost)]));
 
-    // Aggregate sales by product
+    // Aggregate sales by product with returns deducted
     const productMap = new Map<string, {
         productId: string;
         productName: string;
@@ -64,6 +82,10 @@ export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
     }>();
 
     for (const si of saleItems) {
+        const returned = retMap.get(si.id) || 0;
+        const remaining = si.quantity - returned;
+        if (remaining <= 0) continue;
+
         const key = si.productId;
         if (!productMap.has(key)) {
             productMap.set(key, {
@@ -76,10 +98,10 @@ export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
             });
         }
         const p = productMap.get(key)!;
-        p.qtySold += si.quantity;
-        p.revenue += Number(si.totalPrice);
+        p.qtySold += remaining;
+        p.revenue += remaining * Number(si.unitPrice);
         const unitCost = costMap.get(`${si.productId}_${si.warehouseId}`) || 0;
-        p.cogs += si.quantity * unitCost;
+        p.cogs += remaining * unitCost;
     }
 
     // Build result with stock info

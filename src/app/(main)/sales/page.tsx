@@ -41,8 +41,10 @@ export default async function SalesPage({ searchParams }: Props) {
                 createdBy: { select: { name: true } },
                 _count: { select: { items: true } },
                 items: {
-                    take: 3,
-                    select: { quantity: true, unitName: true, product: { select: { name: true, unit: true, productUnits: { select: { unitName: true, conversionRate: true } } } } },
+                    select: { id: true, quantity: true, unitName: true, product: { select: { name: true, unit: true, productUnits: { select: { unitName: true, conversionRate: true } } } } },
+                },
+                saleReturns: {
+                    select: { items: { select: { saleItemId: true, quantity: true } } },
                 },
             },
             skip: (page - 1) * perPage,
@@ -131,18 +133,32 @@ export default async function SalesPage({ searchParams }: Props) {
                                     <td className="px-4 py-3 text-sm text-gray-800">{sale.customer?.name || 'ลูกค้าทั่วไป'}</td>
                                     <td className="px-4 py-3">
                                         <div className="space-y-0.5">
-                                            {sale.items.map((item, i) => (
-                                                <p key={i} className="text-xs text-gray-500">
-                                                    {item.product.name} x{item.quantity} {item.unitName || item.product.unit}
-                                                    {item.unitName && item.unitName !== item.product.unit && (() => {
-                                                        const pu = (item.product as any).productUnits?.find((u: any) => u.unitName === item.unitName);
-                                                        return pu ? ` (×${Number(pu.conversionRate)})` : '';
-                                                    })()}
-                                                </p>
-                                            ))}
-                                            {sale._count.items > 3 && (
-                                                <p className="text-xs text-gray-400">+{sale._count.items - 3} รายการ</p>
-                                            )}
+                                            {(() => {
+                                                // Build returned qty map
+                                                const retMap = new Map<string, number>();
+                                                for (const sr of sale.saleReturns) {
+                                                    for (const ri of sr.items) {
+                                                        retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + ri.quantity);
+                                                    }
+                                                }
+                                                const remaining = sale.items
+                                                    .map(item => ({ ...item, qty: item.quantity - (retMap.get(item.id) || 0) }))
+                                                    .filter(item => item.qty > 0);
+                                                return (<>
+                                                    {remaining.slice(0, 3).map((item, i) => (
+                                                        <p key={i} className="text-xs text-gray-500">
+                                                            {item.product.name} x{item.qty} {item.unitName || item.product.unit}
+                                                            {item.unitName && item.unitName !== item.product.unit && (() => {
+                                                                const pu = (item.product as any).productUnits?.find((u: any) => u.unitName === item.unitName);
+                                                                return pu ? ` (×${Number(pu.conversionRate)})` : '';
+                                                            })()}
+                                                        </p>
+                                                    ))}
+                                                    {remaining.length > 3 && (
+                                                        <p className="text-xs text-gray-400">+{remaining.length - 3} รายการ</p>
+                                                    )}
+                                                </>);
+                                            })()}
                                         </div>
                                     </td>
                                     <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(sale.totalAmount))}</td>

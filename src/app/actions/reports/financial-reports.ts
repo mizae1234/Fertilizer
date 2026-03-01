@@ -134,11 +134,30 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
         prisma.expense.aggregate({ where: expenseWhere, _sum: { amount: true } }),
     ]);
 
-    // COGS
+    // COGS — account for returns
     const saleItems = await prisma.saleItem.findMany({
         where: { sale: saleWhere },
-        select: { productId: true, warehouseId: true, quantity: true },
+        select: {
+            id: true, productId: true, warehouseId: true, quantity: true,
+            sale: {
+                select: {
+                    saleReturns: {
+                        select: { items: { select: { saleItemId: true, quantity: true } } },
+                    },
+                },
+            },
+        },
     });
+
+    // Build return map
+    const retMap = new Map<string, number>();
+    for (const si of saleItems) {
+        for (const sr of si.sale.saleReturns) {
+            for (const ri of sr.items) {
+                retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + ri.quantity);
+            }
+        }
+    }
 
     let cogsAmount = 0;
     if (saleItems.length > 0) {
@@ -149,7 +168,11 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
             select: { productId: true, warehouseId: true, avgCost: true },
         });
         const costMap = new Map(stocks.map(s => [`${s.productId}_${s.warehouseId}`, Number(s.avgCost)]));
-        cogsAmount = saleItems.reduce((sum, si) => sum + si.quantity * (costMap.get(`${si.productId}_${si.warehouseId}`) || 0), 0);
+        cogsAmount = saleItems.reduce((sum, si) => {
+            const returned = retMap.get(si.id) || 0;
+            const remaining = si.quantity - returned;
+            return sum + Math.max(0, remaining) * (costMap.get(`${si.productId}_${si.warehouseId}`) || 0);
+        }, 0);
     }
 
     const revenueAmount = Number(revenue._sum.totalAmount || 0);
@@ -187,7 +210,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
         ...(dateRange ? { createdAt: dateRange } : {}),
     };
 
-    // Get all sales with their items
+    // Get all sales with their items and return data
     const sales = await prisma.sale.findMany({
         where: saleWhere,
         select: {
@@ -198,6 +221,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
             customer: { select: { name: true } },
             items: {
                 select: {
+                    id: true,
                     productId: true,
                     warehouseId: true,
                     quantity: true,
@@ -205,6 +229,9 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
                     totalPrice: true,
                     product: { select: { name: true, code: true } },
                 },
+            },
+            saleReturns: {
+                select: { items: { select: { saleItemId: true, quantity: true } } },
             },
         },
         orderBy: { createdAt: 'desc' },
@@ -221,11 +248,22 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
 
     // Per-bill aggregation
     const byBill = sales.map(sale => {
+        // Build return map for this sale
+        const retMap = new Map<string, number>();
+        for (const sr of sale.saleReturns) {
+            for (const ri of sr.items) {
+                retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + ri.quantity);
+            }
+        }
+
         const revenue = Number(sale.totalAmount);
         let cogs = 0;
         for (const item of sale.items) {
+            const returned = retMap.get(item.id) || 0;
+            const remaining = item.quantity - returned;
+            if (remaining <= 0) continue;
             const unitCost = costMap.get(`${item.productId}_${item.warehouseId}`) || 0;
-            cogs += item.quantity * unitCost;
+            cogs += remaining * unitCost;
         }
         const profit = revenue - cogs;
         return {
@@ -240,29 +278,46 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
         };
     });
 
-    // Per-item flat rows
-    const byItem = sales.flatMap(sale =>
-        sale.items.map(item => {
-            const unitCost = costMap.get(`${item.productId}_${item.warehouseId}`) || 0;
-            const revenue = Number(item.totalPrice);
-            const cogs = item.quantity * unitCost;
-            const profit = revenue - cogs;
-            return {
-                saleNumber: sale.saleNumber,
-                customer: sale.customer?.name || '-',
-                createdAt: sale.createdAt.toISOString(),
-                productName: item.product.name,
-                productCode: item.product.code,
-                quantity: item.quantity,
-                unitPrice: Number(item.unitPrice),
-                unitCost,
-                revenue,
-                cogs,
-                profit,
-                margin: revenue > 0 ? (profit / revenue) * 100 : 0,
-            };
-        })
-    );
+    // Per-item flat rows (exclude fully returned)
+    const byItem = sales.flatMap(sale => {
+        const retMap = new Map<string, number>();
+        for (const sr of sale.saleReturns) {
+            for (const ri of sr.items) {
+                retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + ri.quantity);
+            }
+        }
+
+        return sale.items
+            .map(item => {
+                const returned = retMap.get(item.id) || 0;
+                const remaining = item.quantity - returned;
+                if (remaining <= 0) return null;
+                const unitCost = costMap.get(`${item.productId}_${item.warehouseId}`) || 0;
+                const revenue = remaining * Number(item.unitPrice);
+                const cogs = remaining * unitCost;
+                const profit = revenue - cogs;
+                return {
+                    saleNumber: sale.saleNumber,
+                    customer: sale.customer?.name || '-',
+                    createdAt: sale.createdAt.toISOString(),
+                    productName: item.product.name,
+                    productCode: item.product.code,
+                    quantity: remaining,
+                    unitPrice: Number(item.unitPrice),
+                    unitCost,
+                    revenue,
+                    cogs,
+                    profit,
+                    margin: revenue > 0 ? (profit / revenue) * 100 : 0,
+                };
+            })
+            .filter(Boolean) as {
+                saleNumber: string; customer: string; createdAt: string;
+                productName: string; productCode: string; quantity: number;
+                unitPrice: number; unitCost: number; revenue: number;
+                cogs: number; profit: number; margin: number;
+            }[];
+    });
 
     return { byBill, byItem };
 }
