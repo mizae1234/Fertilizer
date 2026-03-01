@@ -122,7 +122,7 @@ export default function Sidebar({ onCollapsedChange }: { onCollapsedChange?: (co
             {/* Sidebar */}
             <aside
                 className={cn(
-                    'fixed left-0 top-0 z-50 h-screen bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out',
+                    'fixed left-0 top-0 z-50 h-dvh bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out',
                     collapsed ? 'lg:w-[68px]' : 'lg:w-64',
                     'w-64', // mobile always full width
                     'lg:translate-x-0',
@@ -202,7 +202,7 @@ export default function Sidebar({ onCollapsedChange }: { onCollapsedChange?: (co
                 </nav>
 
                 {/* User Info + Logout */}
-                <div className="border-t border-gray-100 p-3 space-y-3">
+                <div className="border-t border-gray-100 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-3">
                     {collapsed ? (
                         <div className="hidden lg:flex flex-col items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">

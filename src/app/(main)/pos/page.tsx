@@ -85,9 +85,12 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType }: 
 
     const paid = lines.reduce((s, l) => s + (l.amount || 0), 0);
     const remaining = total - paid;
+    const hasCash = lines.some(l => l.method === 'CASH' && l.amount > 0);
+    const cashTotal = lines.filter(l => l.method === 'CASH').reduce((s, l) => s + (l.amount || 0), 0);
+    const cashReceivedValid = !hasCash || (typeof cashReceived === 'number' && cashReceived >= cashTotal);
     const isValid = Math.abs(remaining) < 0.01 && lines.every(l =>
         l.amount > 0 && (l.method !== 'CREDIT' || l.dueDate)
-    );
+    ) && cashReceivedValid;
 
     const updateLine = (idx: number, patch: Partial<PaymentLine>) => {
         setLines(lines.map((l, i) => i === idx ? { ...l, ...patch } : l));
@@ -127,9 +130,9 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType }: 
         onConfirm(payments, printType, cashVal);
     };
 
-    // Calculate change for cash-only payment
+    // Calculate change — show whenever there's a cash component
     const isCashOnly = lines.length === 1 && lines[0].method === 'CASH';
-    const changeAmount = isCashOnly && typeof cashReceived === 'number' ? cashReceived - total : 0;
+    const changeAmount = hasCash && typeof cashReceived === 'number' ? cashReceived - cashTotal : 0;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
@@ -236,10 +239,10 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType }: 
                         </div>
                     </div>
 
-                    {/* Cash received / change */}
-                    {isCashOnly && (
-                        <div className="rounded-xl border border-emerald-200 p-3 bg-emerald-50/50">
-                            <p className="text-xs text-gray-500 mb-2">💵 รับเงินมา / เงินทอน</p>
+                    {/* Cash received / change — show whenever there's a CASH payment */}
+                    {hasCash && (
+                        <div className={`rounded-xl border p-3 ${cashReceivedValid ? 'border-emerald-200 bg-emerald-50/50' : 'border-red-300 bg-red-50/50'}`}>
+                            <p className="text-xs text-gray-500 mb-2">💵 รับเงินสดมา <span className="text-red-500">*จำเป็น</span></p>
                             <div className="flex items-center gap-3">
                                 <div className="flex-1">
                                     <label className="text-xs text-gray-400">รับมา</label>
@@ -247,8 +250,9 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType }: 
                                         type="number"
                                         value={cashReceived === 0 ? '' : cashReceived}
                                         onChange={e => setCashReceived(e.target.value ? parseFloat(e.target.value) : '')}
-                                        className="w-full px-3 py-2 rounded-lg border border-emerald-200 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500 text-right"
-                                        placeholder={formatCurrency(total)}
+                                        onFocus={e => e.target.select()}
+                                        className={`w-full px-3 py-2 rounded-lg border text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500 text-right ${!cashReceivedValid ? 'border-red-300' : 'border-emerald-200'}`}
+                                        placeholder={formatCurrency(cashTotal)}
                                         min={0}
                                         step="0.01"
                                     />
@@ -260,6 +264,9 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType }: 
                                     </div>
                                 </div>
                             </div>
+                            {!cashReceivedValid && (
+                                <p className="text-xs text-red-500 mt-2">⚠️ กรุณาคีย์จำนวนเงินสดที่รับมา (ต้อง ≥ {formatCurrency(cashTotal)})</p>
+                            )}
                         </div>
                     )}
                 </div>
