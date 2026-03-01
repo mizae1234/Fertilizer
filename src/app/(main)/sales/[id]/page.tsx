@@ -449,31 +449,55 @@ export default function SaleDetailPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {sale.items.map((item, idx) => (
-                                    <tr key={item.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 text-sm text-gray-500">{idx + 1}</td>
-                                        <td className="px-4 py-3"><p className="text-sm font-medium text-gray-800">{item.product.name}</p><p className="text-xs text-gray-400">{item.product.code}</p></td>
-                                        <td className="px-4 py-3 text-sm text-gray-600">{item.warehouse.name}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            <p className="text-sm font-semibold text-gray-800">{item.quantity}</p>
-                                            <p className="text-xs text-gray-400">
-                                                {item.unitName || item.product.unit}
-                                                {item.unitName && item.unitName !== item.product.unit && (() => {
-                                                    const pu = item.product.productUnits?.find(u => u.unitName === item.unitName);
-                                                    return pu ? ` (×${Number(pu.conversionRate)})` : '';
-                                                })()}
-                                            </p>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitPrice))}</td>
-                                        <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">
-                                            {formatCurrency(Number(item.totalPrice))}
-                                            {Number(item.discount || 0) > 0 && (
-                                                <div className="text-xs text-red-500 font-normal">-{formatCurrency(Number(item.discount))}</div>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-emerald-600 text-right">+{item.points}</td>
-                                    </tr>
-                                ))}
+                                {sale.items.map((item, idx) => {
+                                    // Calculate how many of this item have been returned
+                                    const returnedQty = sale.saleReturns.reduce((sum, sr) =>
+                                        sum + sr.items.filter(ri => ri.saleItemId === item.id).reduce((s, ri) => s + ri.quantity, 0), 0);
+                                    const remainingQty = item.quantity - returnedQty;
+                                    const isFullyReturned = remainingQty <= 0;
+                                    const isPartiallyReturned = returnedQty > 0 && remainingQty > 0;
+                                    return (
+                                        <tr key={item.id} className={`hover:bg-gray-50 ${isFullyReturned ? 'opacity-50 bg-gray-50' : ''}`}>
+                                            <td className="px-4 py-3 text-sm text-gray-500">{idx + 1}</td>
+                                            <td className="px-4 py-3">
+                                                <p className={`text-sm font-medium ${isFullyReturned ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{item.product.name}</p>
+                                                <p className="text-xs text-gray-400">{item.product.code}</p>
+                                                {returnedQty > 0 && (
+                                                    <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-500 border border-red-100">
+                                                        คืนแล้ว {returnedQty}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-600">{item.warehouse.name}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <p className={`text-sm font-semibold ${isFullyReturned ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+                                                    {isPartiallyReturned ? remainingQty : item.quantity}
+                                                </p>
+                                                <p className="text-xs text-gray-400">
+                                                    {item.unitName || item.product.unit}
+                                                    {item.unitName && item.unitName !== item.product.unit && (() => {
+                                                        const pu = item.product.productUnits?.find(u => u.unitName === item.unitName);
+                                                        return pu ? ` (×${Number(pu.conversionRate)})` : '';
+                                                    })()}
+                                                </p>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitPrice))}</td>
+                                            <td className="px-4 py-3 text-sm font-semibold text-right">
+                                                {isFullyReturned ? (
+                                                    <span className="text-gray-400 line-through">{formatCurrency(Number(item.totalPrice))}</span>
+                                                ) : isPartiallyReturned ? (
+                                                    <span className="text-gray-800">{formatCurrency(remainingQty * Number(item.unitPrice))}</span>
+                                                ) : (
+                                                    <span className="text-gray-800">{formatCurrency(Number(item.totalPrice))}</span>
+                                                )}
+                                                {Number(item.discount || 0) > 0 && (
+                                                    <div className="text-xs text-red-500 font-normal">-{formatCurrency(Number(item.discount))}</div>
+                                                )}
+                                            </td>
+                                            <td className={`px-4 py-3 text-sm text-right ${isFullyReturned ? 'text-gray-400' : 'text-emerald-600'}`}>+{isFullyReturned ? 0 : item.points}</td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                             <tfoot>
                                 {discount > 0 && (<>
