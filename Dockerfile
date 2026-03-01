@@ -13,6 +13,9 @@ COPY . .
 # Generate Prisma Client
 RUN npx prisma generate
 
+# Run DB migration (needs DATABASE_URL from .env copied above)
+RUN npx prisma migrate deploy
+
 # Build Next.js
 RUN npm run build
 
