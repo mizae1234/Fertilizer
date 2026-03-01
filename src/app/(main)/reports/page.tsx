@@ -842,6 +842,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
         const rows = [
             { 'รายการ': 'รายได้จากการขาย', 'จำนวน': pnlData.revenue },
             { 'รายการ': 'ต้นทุนขาย (COGS)', 'จำนวน': -pnlData.cogs },
+            ...(pnlData.factoryReturnCost > 0 ? [{ 'รายการ': 'เคลมคืนโรงงาน', 'จำนวน': -pnlData.factoryReturnCost }] : []),
             { 'รายการ': 'กำไรขั้นต้น', 'จำนวน': pnlData.grossProfit },
             ...pnlData.expenseByCategory.map(e => ({ 'รายการ': `ค่าใช้จ่าย: ${e.category}`, 'จำนวน': -e.amount })),
             { 'รายการ': 'ค่าใช้จ่ายรวม', 'จำนวน': -pnlData.expenses },
@@ -919,6 +920,9 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
                                 <Row label="รายได้จากการขาย" value={`+${formatCurrency(pnlData.revenue)}`} color="text-emerald-600" />
                                 <Row label="ต้นทุนขาย (COGS)" value={`-${formatCurrency(pnlData.cogs)}`} color="text-red-600" />
+                                {pnlData.factoryReturnCost > 0 && (
+                                    <Row label="เคลมคืนโรงงาน" value={`-${formatCurrency(pnlData.factoryReturnCost)}`} color="text-orange-600" />
+                                )}
                                 <Row label="กำไรขั้นต้น" value={formatCurrency(pnlData.grossProfit)} bold sub={`${pnlData.grossMargin.toFixed(1)}%`} />
                                 <Row label="ค่าใช้จ่าย" value={`-${formatCurrency(pnlData.expenses)}`} color="text-red-600" />
                                 <div className={`flex justify-between items-center py-2 px-2 rounded-lg ${pnlData.netProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
