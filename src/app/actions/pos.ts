@@ -65,6 +65,7 @@ export async function createSaleFromPOS(data: {
                 status: 'APPROVED',
                 totalAmount,
                 totalPoints,
+                discount: itemDiscountsTotal + billDiscount,
                 paymentMethod,
                 creditDueDate: creditPayment?.dueDate ? new Date(creditPayment.dueDate) : null,
                 payments: data.payments as any,

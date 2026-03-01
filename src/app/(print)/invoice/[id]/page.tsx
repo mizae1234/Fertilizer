@@ -35,6 +35,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     const saleData = JSON.parse(JSON.stringify({
         ...sale,
         totalAmount: Number(sale.totalAmount),
+        discount: Number(sale.discount || 0),
         items: sale.items.map(item => ({
             ...item,
             unitPrice: Number(item.unitPrice),

@@ -16,6 +16,7 @@ interface Sale {
     createdBy: { name: string } | null;
     createdAt: string;
     totalAmount: number;
+    discount: number;
     payments: { method: string; amount: number }[];
     notes: string | null;
     items: SaleItem[];
@@ -155,6 +156,16 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
 
                 {/* Totals */}
                 <div style={{ fontSize: '12px' }}>
+                    {sale.discount > 0 && (<>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                            <span>ยอดรวมสินค้า</span>
+                            <span>{formatCurrency(sale.totalAmount + sale.discount)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#dc2626' }}>
+                            <span>ส่วนลด</span>
+                            <span>-{formatCurrency(sale.discount)}</span>
+                        </div>
+                    </>)}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px' }}>
                         <span>รวมทั้งสิ้น</span>
                         <span>{formatCurrency(sale.totalAmount)}</span>

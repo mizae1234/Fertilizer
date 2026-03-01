@@ -7,6 +7,7 @@ interface SaleData {
     saleNumber: string;
     status: string;
     totalAmount: number;
+    discount: number;
     paymentMethod: string;
     creditDueDate: string | null;
     payments: { method: string; amount: number; dueDate?: string }[] | null;
@@ -262,6 +263,27 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                     </tbody>
                 </table>
 
+                {/* Discount Summary */}
+                {sale.discount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                        <table style={{ borderCollapse: 'collapse', width: 300 }}>
+                            <tbody>
+                                <tr>
+                                    <td style={{ padding: '4px 8px', fontSize: 12, textAlign: 'right', color: '#666' }}>ยอดรวมสินค้า</td>
+                                    <td style={{ padding: '4px 8px', fontSize: 12, textAlign: 'right', width: 100 }}>{formatCurrency(sale.totalAmount + sale.discount)}</td>
+                                </tr>
+                                <tr>
+                                    <td style={{ padding: '4px 8px', fontSize: 12, textAlign: 'right', color: '#dc2626' }}>ส่วนลด</td>
+                                    <td style={{ padding: '4px 8px', fontSize: 12, textAlign: 'right', color: '#dc2626' }}>-{formatCurrency(sale.discount)}</td>
+                                </tr>
+                                <tr style={{ borderTop: '1px solid #ccc' }}>
+                                    <td style={{ padding: '4px 8px', fontSize: 13, textAlign: 'right', fontWeight: 700 }}>ยอดสุทธิ</td>
+                                    <td style={{ padding: '4px 8px', fontSize: 13, textAlign: 'right', fontWeight: 700 }}>{formatCurrency(sale.totalAmount)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                )}
                 {/* Notes */}
                 {sale.notes && (
                     <div style={{ marginBottom: 12, padding: '8px 12px', background: '#f9fafb', borderRadius: 6, border: '1px solid #e5e7eb' }}>

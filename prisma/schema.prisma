@@ -307,6 +307,7 @@ model Sale {
   creditDueDate DateTime?
   payments      Json? // [{ method: "CASH", amount: 200 }, { method: "CREDIT", amount: 800, dueDate: "..." }]
   notes         String?
+  discount      Decimal     @default(0) @db.Decimal(12, 2)
   createdById   String
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
