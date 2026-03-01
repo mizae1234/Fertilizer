@@ -28,6 +28,7 @@ export async function PUT(request: Request) {
                 taxId: body.taxId || '',
                 address: body.address || '',
                 notes: body.notes || '',
+                logoUrl: body.logoUrl ?? undefined,
             },
             create: {
                 id: SHOP_INFO_ID,
@@ -35,6 +36,7 @@ export async function PUT(request: Request) {
                 taxId: body.taxId || '',
                 address: body.address || '',
                 notes: body.notes || '',
+                logoUrl: body.logoUrl || null,
             },
         });
         return NextResponse.json(info);

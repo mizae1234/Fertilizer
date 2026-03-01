@@ -513,6 +513,7 @@ model ShopInfo {
   taxId     String   @default("")
   address   String   @default("") @db.Text
   notes     String   @default("") @db.Text
+  logoUrl   String?  @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

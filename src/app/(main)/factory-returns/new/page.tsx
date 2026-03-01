@@ -44,9 +44,11 @@ export default function NewFactoryReturnPage() {
         Promise.all([
             fetch('/api/vendors').then(r => r.json()),
             fetch('/api/warehouses').then(r => r.json()),
-        ]).then(([v, w]) => {
+            fetch('/api/shop-info').then(r => r.json()).catch(() => null),
+        ]).then(([v, w, shopInfo]) => {
             setVendors(v);
             setWarehouses(w);
+            if (shopInfo?.name) setSenderName(shopInfo.name);
             setLoading(false);
         });
     }, []);

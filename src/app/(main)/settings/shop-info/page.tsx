@@ -8,6 +8,7 @@ export default function ShopInfoPage() {
     const [taxId, setTaxId] = useState('');
     const [address, setAddress] = useState('');
     const [notes, setNotes] = useState('');
+    const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; type: 'success' | 'error'; title?: string }>({ open: false, message: '', type: 'error' });
@@ -21,11 +22,33 @@ export default function ShopInfoPage() {
                     setTaxId(data.taxId || '');
                     setAddress(data.address || '');
                     setNotes(data.notes || '');
+                    setLogoUrl(data.logoUrl || null);
                 }
                 setLoading(false);
             })
             .catch(() => setLoading(false));
     }, []);
+
+    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            setAlertModal({ open: true, message: 'ไฟล์ใหญ่เกินไป (สูงสุด 2MB)', type: 'error', title: 'ข้อผิดพลาด' });
+            return;
+        }
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxW = 400;
+            const scale = Math.min(1, maxW / img.width);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            setLogoUrl(canvas.toDataURL('image/png'));
+        };
+        img.src = URL.createObjectURL(file);
+    };
 
     const handleSave = async () => {
         setSaving(true);
@@ -33,7 +56,7 @@ export default function ShopInfoPage() {
             const res = await fetch('/api/shop-info', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, taxId, address, notes }),
+                body: JSON.stringify({ name, taxId, address, notes, logoUrl }),
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
@@ -57,6 +80,34 @@ export default function ShopInfoPage() {
 
             {/* Form */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 space-y-5 mb-6">
+                {/* Logo Upload */}
+                <div>
+                    <label className="text-xs text-gray-400 mb-2 block">โลโก้ร้าน</label>
+                    <div className="flex items-start gap-4">
+                        <div className="w-28 h-28 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden bg-gray-50 flex-shrink-0">
+                            {logoUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={logoUrl} alt="logo" className="max-w-full max-h-full object-contain" />
+                            ) : (
+                                <span className="text-3xl text-gray-300">🖼️</span>
+                            )}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <label className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-600 text-sm font-medium cursor-pointer hover:bg-emerald-100 transition-colors inline-block text-center">
+                                📤 อัปโหลดโลโก้
+                                <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoUpload} className="hidden" />
+                            </label>
+                            {logoUrl && (
+                                <button onClick={() => setLogoUrl(null)}
+                                    className="px-4 py-2 rounded-xl bg-red-50 text-red-500 text-sm font-medium hover:bg-red-100 transition-colors">
+                                    🗑️ ลบโลโก้
+                                </button>
+                            )}
+                            <p className="text-[11px] text-gray-400">PNG, JPG สูงสุด 2MB</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <label className="text-xs text-gray-400 mb-1 block">ชื่อร้าน</label>
                     <input
