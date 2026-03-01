@@ -27,9 +27,13 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
     const handlePrint = async () => {
         setLoading(true);
         try {
-            // Fetch data
-            const res = await fetch(`/api/factory-returns/${id}`);
+            // Fetch data + shop info
+            const [res, shopRes] = await Promise.all([
+                fetch(`/api/factory-returns/${id}`),
+                fetch('/api/shop-info').catch(() => null),
+            ]);
             const data: FactoryReturnData = await res.json();
+            const shopInfo = shopRes ? await shopRes.json().catch(() => null) : null;
 
             // Dynamic import
             const { default: jsPDF } = await import('jspdf');
@@ -55,7 +59,10 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
         .footer-row td { background: #fff; font-weight: 700; font-size: 13px; border-top: 2px solid #e5e7eb; }
     </style>
 
-    <h1 style="text-align:center;font-size:20px;margin-bottom:8px;font-weight:700;">ใบเคลมสินค้าคืนโรงงาน</h1>
+    ${shopInfo?.logoUrl ? `<div style="text-align:center;margin-bottom:8px;"><img src="${shopInfo.logoUrl}" style="max-height:60px;max-width:200px;object-fit:contain;" /></div>` : ''}
+    ${shopInfo?.name ? `<div style="text-align:center;font-size:14px;font-weight:700;margin-bottom:2px;">${shopInfo.name}</div>` : ''}
+    ${shopInfo?.address ? `<div style="text-align:center;font-size:10px;color:#666;margin-bottom:6px;">${shopInfo.address}</div>` : ''}
+    <h1 style="text-align:center;font-size:18px;margin-bottom:8px;font-weight:700;border-top:1px solid #e5e7eb;padding-top:8px;">ใบเคลมสินค้าคืนโรงงาน</h1>
 
     <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
         <div></div>
