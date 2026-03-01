@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { Suspense } from 'react';
 import DateRangeFilter from '@/components/DateRangeFilter';
+import PageHeader from '@/components/PageHeader';
 
 interface Props { searchParams: Promise<{ page?: string; from?: string; to?: string }> }
 
@@ -24,15 +25,15 @@ export default async function FactoryReturnsPage({ searchParams }: Props) {
 
     return (
         <div className="animate-fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-800">🔙 เคลมคืนโรงงาน</h1>
-                    <p className="text-sm text-gray-500 mt-1">บันทึกการส่งสินค้าคืนผู้ส่งสินค้า/โรงงาน ({total} รายการ)</p>
-                </div>
-                <Link href="/factory-returns/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-medium text-sm hover:from-orange-600 hover:to-red-600 shadow-md shadow-orange-200 text-center">
-                    + สร้างใบเคลมคืน
-                </Link>
-            </div>
+            <PageHeader
+                title="🔙 เคลมคืนโรงงาน"
+                subtitle={`บันทึกการส่งสินค้าคืนผู้ส่งสินค้า/โรงงาน (${total} รายการ)`}
+                actions={
+                    <Link href="/factory-returns/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-medium text-sm hover:from-orange-600 hover:to-red-600 shadow-md shadow-orange-200 text-center">
+                        + สร้างใบเคลมคืน
+                    </Link>
+                }
+            />
 
             {/* Filters */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">

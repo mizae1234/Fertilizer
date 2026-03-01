@@ -4,6 +4,7 @@ import { formatCurrency, formatDateTime } from '@/lib/utils';
 import StatusBadge from '@/components/StatusBadge';
 import { Suspense } from 'react';
 import DateRangeFilter from '@/components/DateRangeFilter';
+import PageHeader from '@/components/PageHeader';
 
 interface Props { searchParams: Promise<{ page?: string; status?: string; from?: string; to?: string; search?: string }> }
 
@@ -62,15 +63,15 @@ export default async function SalesPage({ searchParams }: Props) {
 
     return (
         <div className="animate-fade-in">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800">รายการขาย</h1>
-                    <p className="text-sm text-gray-500 mt-1">ทั้งหมด {total} รายการ</p>
-                </div>
-                <Link href="/pos" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200">
-                    🛒 ไปหน้า POS
-                </Link>
-            </div>
+            <PageHeader
+                title="รายการขาย"
+                subtitle={`ทั้งหมด ${total} รายการ`}
+                actions={
+                    <Link href="/pos" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200">
+                        🛒 ไปหน้า POS
+                    </Link>
+                }
+            />
 
             {/* Filters */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">

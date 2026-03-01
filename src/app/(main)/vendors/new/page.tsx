@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createVendor } from '@/app/actions/vendors';
 import AlertModal from '@/components/AlertModal';
+import PageHeader from '@/components/PageHeader';
+import FormInput from '@/components/FormInput';
+import FormTextarea from '@/components/FormTextarea';
 
 export default function NewVendorPage() {
     const router = useRouter();
@@ -34,53 +37,38 @@ export default function NewVendorPage() {
 
     return (
         <div className="animate-fade-in max-w-xl mx-auto">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-6">เพิ่มผู้ขายใหม่</h1>
+            <PageHeader title="เพิ่มผู้ขายใหม่" />
 
             <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">ชื่อผู้ขาย / บริษัท *</label>
-                    <input
-                        type="text"
-                        value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                        placeholder="ชื่อผู้ขายหรือบริษัท"
-                        required
-                    />
-                </div>
+                <FormInput
+                    label="ชื่อผู้ขาย / บริษัท"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="ชื่อผู้ขายหรือบริษัท"
+                    required
+                />
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">เบอร์โทร</label>
-                    <input
-                        type="text"
-                        value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                        placeholder="0812345678"
-                    />
-                </div>
+                <FormInput
+                    label="เบอร์โทร"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    placeholder="0812345678"
+                />
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">LINE ID</label>
-                    <input
-                        type="text"
-                        value={form.lineId}
-                        onChange={(e) => setForm({ ...form, lineId: e.target.value })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                        placeholder="LINE ID สำหรับติดต่อสั่งซื้อ"
-                    />
-                </div>
+                <FormInput
+                    label="LINE ID"
+                    value={form.lineId}
+                    onChange={(e) => setForm({ ...form, lineId: e.target.value })}
+                    placeholder="LINE ID สำหรับติดต่อสั่งซื้อ"
+                />
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">ที่อยู่</label>
-                    <textarea
-                        value={form.address}
-                        onChange={(e) => setForm({ ...form, address: e.target.value })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                        rows={3}
-                        placeholder="ที่อยู่ผู้ขาย"
-                    />
-                </div>
+                <FormTextarea
+                    label="ที่อยู่"
+                    value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                    rows={3}
+                    placeholder="ที่อยู่ผู้ขาย"
+                />
 
                 <div className="flex gap-3 pt-2">
                     <button

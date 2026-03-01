@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { Suspense } from 'react';
 import DateRangeFilter from '@/components/DateRangeFilter';
+import PageHeader from '@/components/PageHeader';
 
 interface Props { searchParams: Promise<{ page?: string; search?: string; from?: string; to?: string }> }
 
@@ -25,15 +26,15 @@ export default async function StockAdjustmentsPage({ searchParams }: Props) {
 
     return (
         <div className="animate-fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-800">ปรับปรุง Stock</h1>
-                    <p className="text-sm text-gray-500 mt-1">บันทึกเพิ่ม/ลด stock สินค้า ({total} รายการ)</p>
-                </div>
-                <Link href="/stock-adjustments/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 text-white font-medium text-sm hover:from-red-600 hover:to-orange-600 shadow-md shadow-red-200 text-center">
-                    + บันทึกปรับปรุง Stock
-                </Link>
-            </div>
+            <PageHeader
+                title="ปรับปรุง Stock"
+                subtitle={`บันทึกเพิ่ม/ลด stock สินค้า (${total} รายการ)`}
+                actions={
+                    <Link href="/stock-adjustments/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 text-white font-medium text-sm hover:from-red-600 hover:to-orange-600 shadow-md shadow-red-200 text-center">
+                        + บันทึกปรับปรุง Stock
+                    </Link>
+                }
+            />
 
             {/* Filters */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">

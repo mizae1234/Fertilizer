@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { deleteUser } from '@/app/actions/users';
 import AlertModal from '@/components/AlertModal';
+import PageHeader from '@/components/PageHeader';
+import LoadingSpinner from '@/components/LoadingSpinner';
+import EmptyState from '@/components/EmptyState';
 
 interface UserInfo {
     id: string;
@@ -48,25 +51,21 @@ export default function UsersPage() {
 
     return (
         <div className="animate-fade-in max-w-4xl mx-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-800">👤 จัดการผู้ใช้</h1>
-                    <p className="text-sm text-gray-500 mt-1">เพิ่ม แก้ไข ลบ ผู้ใช้ และกำหนดสิทธิ์เมนู</p>
-                </div>
-                <Link
-                    href="/users/new"
-                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200 transition-all"
-                >
-                    + เพิ่มผู้ใช้
-                </Link>
-            </div>
+            <PageHeader
+                title="👤 จัดการผู้ใช้"
+                subtitle="เพิ่ม แก้ไข ลบ ผู้ใช้ และกำหนดสิทธิ์เมนู"
+                actions={
+                    <Link href="/users/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200 transition-all">
+                        + เพิ่มผู้ใช้
+                    </Link>
+                }
+            />
 
             {/* Users List */}
             {loading ? (
-                <div className="text-center py-20 text-gray-400">กำลังโหลด...</div>
+                <LoadingSpinner />
             ) : users.length === 0 ? (
-                <div className="text-center py-20 text-gray-400">ยังไม่มีผู้ใช้</div>
+                <EmptyState icon="👤" title="ยังไม่มีผู้ใช้" />
             ) : (
                 <div className="space-y-3">
                     {users.map(user => (

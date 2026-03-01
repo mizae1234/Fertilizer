@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Suspense } from 'react';
 import OverdueDateFilter from './OverdueDateFilter';
+import PageHeader from '@/components/PageHeader';
 
 interface Props { searchParams: Promise<{ page?: string; from?: string; to?: string; q?: string }> }
 
@@ -122,15 +123,10 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
 
     return (
         <div className="animate-fade-in">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800">📋 บิลค้างจ่าย</h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                        ทั้งหมด {total} รายการ · มูลค่ารวม {formatCurrency(Number(totalAmount._sum.totalAmount || 0))}
-                        {' · '}<span className="text-red-600 font-semibold">ยอดค้างรวม {formatCurrency(totalRemaining)}</span>
-                    </p>
-                </div>
-            </div>
+            <PageHeader
+                title="📋 บิลค้างจ่าย"
+                subtitle={`ทั้งหมด ${total} รายการ · มูลค่ารวม ${formatCurrency(Number(totalAmount._sum.totalAmount || 0))} · ยอดค้างรวม ${formatCurrency(totalRemaining)}`}
+            />
 
             {/* Filters */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">

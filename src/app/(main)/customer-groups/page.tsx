@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { createCustomerGroup, updateCustomerGroup, deleteCustomerGroup } from '@/app/actions/customer-groups';
 import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
+import PageHeader from '@/components/PageHeader';
+import LoadingSpinner from '@/components/LoadingSpinner';
+import EmptyState from '@/components/EmptyState';
 
 interface Group {
     id: string;
@@ -72,14 +75,14 @@ export default function CustomerGroupsPage() {
         } finally { setActionLoading(false); }
     };
 
-    if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>;
+    if (loading) return <LoadingSpinner />;
 
     return (
         <div className="max-w-2xl mx-auto animate-fade-in">
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">กลุ่มลูกค้า</h1>
-                <p className="text-sm text-gray-500 mt-1">จัดการกลุ่มลูกค้าสำหรับตั้งราคาสินค้า ({groups.length} กลุ่ม)</p>
-            </div>
+            <PageHeader
+                title="กลุ่มลูกค้า"
+                subtitle={`จัดการกลุ่มลูกค้าสำหรับตั้งราคาสินค้า (${groups.length} กลุ่ม)`}
+            />
 
             {/* Add new group */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">
@@ -105,7 +108,7 @@ export default function CustomerGroupsPage() {
             {/* Groups list */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                 {groups.length === 0 ? (
-                    <div className="px-4 py-12 text-center text-gray-400">ยังไม่มีกลุ่มลูกค้า</div>
+                    <EmptyState icon="👥" title="ยังไม่มีกลุ่มลูกค้า" />
                 ) : (
                     <div className="divide-y divide-gray-50">
                         {groups.slice((page - 1) * perPage, page * perPage).map(group => (

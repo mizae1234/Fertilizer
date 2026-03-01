@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import ProductFilter from './ProductFilter';
 import ExportProductsButton from './ExportProductsButton';
 import { isServerAdmin } from '@/lib/server-auth';
+import PageHeader from '@/components/PageHeader';
 
 interface Props {
     searchParams: Promise<{ page?: string; search?: string; warehouse?: string; group?: string }>;
@@ -74,21 +75,18 @@ export default async function ProductsPage({ searchParams }: Props) {
 
     return (
         <div className="animate-fade-in">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800">สินค้า</h1>
-                    <p className="text-sm text-gray-500 mt-1">จัดการสินค้าทั้งหมด ({total} รายการ)</p>
-                </div>
-                <div className="flex gap-2">
-                    <ExportProductsButton />
-                    <Link
-                        href="/products/new"
-                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200"
-                    >
-                        + เพิ่มสินค้า
-                    </Link>
-                </div>
-            </div>
+            <PageHeader
+                title="สินค้า"
+                subtitle={`จัดการสินค้าทั้งหมด (${total} รายการ)`}
+                actions={
+                    <div className="flex gap-2">
+                        <ExportProductsButton />
+                        <Link href="/products/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200">
+                            + เพิ่มสินค้า
+                        </Link>
+                    </div>
+                }
+            />
 
             {/* Filters */}
             <Suspense fallback={<div className="mb-4 h-11 bg-gray-100 rounded-xl animate-pulse" />}>

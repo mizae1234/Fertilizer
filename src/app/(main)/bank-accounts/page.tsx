@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import PageHeader from '@/components/PageHeader';
+import LoadingSpinner from '@/components/LoadingSpinner';
+import EmptyState from '@/components/EmptyState';
 
 interface BankAccount {
     id: string;
@@ -132,18 +135,18 @@ export default function BankAccountsPage() {
 
     return (
         <div className="animate-fade-in max-w-4xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800">🏦 จัดการบัญชีร้านค้า</h1>
-                    <p className="text-sm text-gray-500 mt-1">เพิ่ม/แก้ไขบัญชีธนาคารสำหรับรับชำระ</p>
-                </div>
-                {!showForm && (
-                    <button onClick={() => { resetForm(); setShowForm(true); }}
-                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200">
-                        ➕ เพิ่มบัญชี
-                    </button>
-                )}
-            </div>
+            <PageHeader
+                title="🏦 จัดการบัญชีร้านค้า"
+                subtitle="เพิ่ม/แก้ไขบัญชีธนาคารสำหรับรับชำระ"
+                actions={
+                    !showForm ? (
+                        <button onClick={() => { resetForm(); setShowForm(true); }}
+                            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200">
+                            ➕ เพิ่มบัญชี
+                        </button>
+                    ) : undefined
+                }
+            />
 
             {/* Form */}
             {showForm && (
@@ -220,15 +223,9 @@ export default function BankAccountsPage() {
 
             {/* Account List */}
             {loading ? (
-                <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
-                </div>
+                <LoadingSpinner />
             ) : accounts.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-12 text-center">
-                    <p className="text-4xl mb-3">🏦</p>
-                    <p className="text-gray-500">ยังไม่มีบัญชีธนาคาร</p>
-                    <p className="text-sm text-gray-400 mt-1">กดปุ่ม &quot;เพิ่มบัญชี&quot; เพื่อเริ่มต้น</p>
-                </div>
+                <EmptyState icon="🏦" title="ยังไม่มีบัญชีธนาคาร" description='กดปุ่ม "เพิ่มบัญชี" เพื่อเริ่มต้น' />
             ) : (
                 <div className="space-y-4">
                     {accounts.map(acc => (

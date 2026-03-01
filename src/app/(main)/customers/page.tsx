@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import CustomerFilter from './CustomerFilter';
+import PageHeader from '@/components/PageHeader';
 
 interface Props {
     searchParams: Promise<{ page?: string; search?: string }>;
@@ -40,18 +41,15 @@ export default async function CustomersPage({ searchParams }: Props) {
 
     return (
         <div className="animate-fade-in">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800">ลูกค้า</h1>
-                    <p className="text-sm text-gray-500 mt-1">จัดการข้อมูลลูกค้า ({total} ราย)</p>
-                </div>
-                <Link
-                    href="/customers/new"
-                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200"
-                >
-                    + ลงทะเบียนลูกค้า
-                </Link>
-            </div>
+            <PageHeader
+                title="ลูกค้า"
+                subtitle={`จัดการข้อมูลลูกค้า (${total} ราย)`}
+                actions={
+                    <Link href="/customers/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200">
+                        + ลงทะเบียนลูกค้า
+                    </Link>
+                }
+            />
 
             <Suspense fallback={<div className="mb-4 h-11 bg-gray-100 rounded-xl animate-pulse" />}>
                 <CustomerFilter />

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
+import PageHeader from '@/components/PageHeader';
 
 interface Props {
     searchParams: Promise<{ page?: string; search?: string }>;
@@ -53,18 +54,15 @@ export default async function BundlesPage({ searchParams }: Props) {
 
     return (
         <div className="animate-fade-in">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800">🎁 ชุดสินค้า</h1>
-                    <p className="text-sm text-gray-500 mt-1">จัดกลุ่มสินค้าขายเป็นชุด ({total} ชุด)</p>
-                </div>
-                <Link
-                    href="/bundles/new"
-                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200"
-                >
-                    + สร้างชุดสินค้า
-                </Link>
-            </div>
+            <PageHeader
+                title="🎁 ชุดสินค้า"
+                subtitle={`จัดกลุ่มสินค้าขายเป็นชุด (${total} ชุด)`}
+                actions={
+                    <Link href="/bundles/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200">
+                        + สร้างชุดสินค้า
+                    </Link>
+                }
+            />
 
             {/* Search */}
             <form className="mb-4">

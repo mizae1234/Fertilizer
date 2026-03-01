@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createWarehouse } from '@/app/actions/warehouses';
 import AlertModal from '@/components/AlertModal';
+import PageHeader from '@/components/PageHeader';
+import FormInput from '@/components/FormInput';
 
 export default function NewWarehousePage() {
     const router = useRouter();
@@ -27,31 +29,23 @@ export default function NewWarehousePage() {
 
     return (
         <div className="max-w-lg mx-auto animate-fade-in">
-            <h1 className="text-2xl font-bold text-gray-800 mb-6">เพิ่มคลังสินค้าใหม่</h1>
+            <PageHeader title="เพิ่มคลังสินค้าใหม่" />
 
             <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md border border-gray-100 p-6 space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">ชื่อคลังสินค้า *</label>
-                    <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                        placeholder="เช่น คลังหลัก, คลังสาขา 1"
-                        required
-                    />
-                </div>
+                <FormInput
+                    label="ชื่อคลังสินค้า"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="เช่น คลังหลัก, คลังสาขา 1"
+                    required
+                />
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">ที่ตั้ง</label>
-                    <input
-                        type="text"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                        placeholder="เช่น กรุงเทพฯ, เชียงใหม่"
-                    />
-                </div>
+                <FormInput
+                    label="ที่ตั้ง"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="เช่น กรุงเทพฯ, เชียงใหม่"
+                />
 
                 <div className="flex gap-3 pt-4">
                     <button

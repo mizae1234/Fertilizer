@@ -4,6 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createCustomer } from '@/app/actions/customers';
 import AlertModal from '@/components/AlertModal';
+import PageHeader from '@/components/PageHeader';
+import FormInput from '@/components/FormInput';
+import FormSelect from '@/components/FormSelect';
+import FormTextarea from '@/components/FormTextarea';
 
 interface CustomerGroup { id: string; name: string; }
 
@@ -34,30 +38,42 @@ export default function NewCustomerPage() {
 
     return (
         <div className="max-w-lg mx-auto animate-fade-in">
-            <h1 className="text-2xl font-bold text-gray-800 mb-6">ลงทะเบียนลูกค้าใหม่</h1>
+            <PageHeader title="ลงทะเบียนลูกค้าใหม่" />
             <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md border border-gray-100 p-6 space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">ชื่อลูกค้า *</label>
-                    <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm" required />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">เบอร์โทร *</label>
-                    <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm" placeholder="0812345678" required />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">กลุ่มลูกค้า *</label>
-                    <select value={form.customerGroupId} onChange={e => setForm({ ...form, customerGroupId: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm">
-                        {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">ที่อยู่</label>
-                    <textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm resize-none" rows={2} placeholder="ที่อยู่สำหรับออกใบกำกับ" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">เลขประจำตัวผู้เสียภาษี</label>
-                    <input type="text" value={form.taxId} onChange={e => setForm({ ...form, taxId: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm" placeholder="เลข 13 หลัก" />
-                </div>
+                <FormInput
+                    label="ชื่อลูกค้า"
+                    value={form.name}
+                    onChange={e => setForm({ ...form, name: e.target.value })}
+                    required
+                />
+                <FormInput
+                    label="เบอร์โทร"
+                    type="tel"
+                    value={form.phone}
+                    onChange={e => setForm({ ...form, phone: e.target.value })}
+                    placeholder="0812345678"
+                    required
+                />
+                <FormSelect
+                    label="กลุ่มลูกค้า"
+                    value={form.customerGroupId}
+                    onChange={e => setForm({ ...form, customerGroupId: e.target.value })}
+                    options={groups.map(g => ({ value: g.id, label: g.name }))}
+                    required
+                />
+                <FormTextarea
+                    label="ที่อยู่"
+                    value={form.address}
+                    onChange={e => setForm({ ...form, address: e.target.value })}
+                    rows={2}
+                    placeholder="ที่อยู่สำหรับออกใบกำกับ"
+                />
+                <FormInput
+                    label="เลขประจำตัวผู้เสียภาษี"
+                    value={form.taxId}
+                    onChange={e => setForm({ ...form, taxId: e.target.value })}
+                    placeholder="เลข 13 หลัก"
+                />
                 <div className="flex gap-3 pt-4">
                     <button type="button" onClick={() => router.back()} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-medium text-sm hover:bg-gray-50">ยกเลิก</button>
                     <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200 disabled:opacity-50">{loading ? 'กำลังบันทึก...' : 'บันทึก'}</button>
