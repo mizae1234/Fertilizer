@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { generateNumber } from '@/lib/utils';
+import { generateNumber } from '@/lib/generateNumber';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 
@@ -76,7 +76,7 @@ export async function createExpense(data: {
 
     const expense = await prisma.expense.create({
         data: {
-            expenseNumber: generateNumber('EXP'),
+            expenseNumber: await generateNumber('EXP'),
             category: data.category.trim(),
             amount: data.amount,
             description: data.description?.trim() || null,

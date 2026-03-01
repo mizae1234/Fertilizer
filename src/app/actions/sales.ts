@@ -40,6 +40,22 @@ export async function getSaleDetail(id: string) {
                     warehouse: { select: { name: true } },
                 },
             },
+            saleReturns: {
+                include: {
+                    createdBy: { select: { name: true } },
+                    items: {
+                        include: {
+                            product: { select: { name: true, code: true, unit: true } },
+                            warehouse: { select: { name: true } },
+                        },
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+            },
+            saleEditLogs: {
+                include: { user: { select: { name: true } } },
+                orderBy: { createdAt: 'desc' },
+            },
         },
     });
 }
@@ -141,6 +157,7 @@ export async function updateSale(id: string, data: {
     customerId?: string | null;
     notes?: string | null;
     billDiscount?: number;
+    userId: string;
     items: {
         productId: string;
         warehouseId: string;
@@ -152,7 +169,7 @@ export async function updateSale(id: string, data: {
 }) {
     const existing = await prisma.sale.findUnique({
         where: { id },
-        include: { items: true },
+        include: { items: { include: { product: { select: { name: true, code: true } } } } },
     });
     if (!existing) throw new Error('ไม่พบรายการขาย');
 
@@ -162,6 +179,28 @@ export async function updateSale(id: string, data: {
     const totalDiscount = itemDiscountsTotal + billDiscount;
     const totalAmount = subtotal - totalDiscount;
     const totalPoints = data.items.reduce((s, i) => s + i.points, 0);
+
+    // Build audit log snapshot
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const changes: Record<string, any> = {};
+    if ((data.customerId || null) !== existing.customerId) {
+        changes.customerId = { old: existing.customerId, new: data.customerId || null };
+    }
+    if (data.notes !== undefined && data.notes !== existing.notes) {
+        changes.notes = { old: existing.notes, new: data.notes };
+    }
+    if (totalAmount !== Number(existing.totalAmount)) {
+        changes.totalAmount = { old: Number(existing.totalAmount), new: totalAmount };
+    }
+    if (totalDiscount !== Number(existing.discount)) {
+        changes.discount = { old: Number(existing.discount), new: totalDiscount };
+    }
+    changes.oldItems = existing.items.map(i => ({
+        product: i.product.name, qty: i.quantity, price: Number(i.unitPrice),
+    }));
+    changes.newItems = data.items.map(i => ({
+        productId: i.productId, qty: i.quantity, price: i.unitPrice,
+    }));
 
     await prisma.$transaction(async (tx) => {
         // If APPROVED, reverse old stock first
@@ -225,6 +264,16 @@ export async function updateSale(id: string, data: {
                 });
             }
         }
+
+        // Create audit log
+        await tx.saleEditLog.create({
+            data: {
+                saleId: id,
+                userId: data.userId,
+                action: 'UPDATE',
+                changes,
+            },
+        });
     });
 
     // Return updated sale data directly so client doesn't need a second fetch
@@ -247,7 +296,7 @@ export async function updateSale(id: string, data: {
     return updated;
 }
 
-export async function cancelSale(id: string) {
+export async function cancelSale(id: string, userId?: string) {
     const sale = await prisma.sale.findUnique({
         where: { id },
         include: { items: true },
@@ -294,6 +343,24 @@ export async function cancelSale(id: string) {
             }
         }
         await tx.sale.update({ where: { id }, data: { status: 'CANCELLED' } });
+
+        // Create audit log
+        await tx.saleEditLog.create({
+            data: {
+                saleId: id,
+                userId: userId || sale.createdById,
+                action: 'CANCEL',
+                changes: {
+                    previousStatus: sale.status,
+                    totalAmount: Number(sale.totalAmount),
+                    items: sale.items.map(i => ({
+                        productId: i.productId,
+                        quantity: i.quantity,
+                        unitPrice: Number(i.unitPrice),
+                    })),
+                },
+            },
+        });
     });
 
     revalidatePath('/sales');

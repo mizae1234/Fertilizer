@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { generateNumber } from '@/lib/utils';
+import { generateNumber } from '@/lib/generateNumber';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 
@@ -66,7 +66,7 @@ export async function createTransfer(data: {
 
     const transfer = await prisma.stockTransfer.create({
         data: {
-            transferNumber: generateNumber('TF'),
+            transferNumber: await generateNumber('TF'),
             fromWarehouseId: data.fromWarehouseId,
             toWarehouseId: data.toWarehouseId,
             status: 'PENDING',

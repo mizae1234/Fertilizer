@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { generateNumber } from '@/lib/utils';
+import { generateNumber } from '@/lib/generateNumber';
 
 export async function getStockAdjustments(page = 1, search = '', from = '', to = '') {
     const perPage = 15;
@@ -57,7 +57,7 @@ export async function createStockAdjustment(data: {
     if (!data.adjustmentType) data.adjustmentType = 'decrease';
     if (!data.items.length) throw new Error('กรุณาเพิ่มรายการสินค้า');
 
-    const adjNumber = generateNumber('ADJ');
+    const adjNumber = await generateNumber('ADJ');
 
     await prisma.$transaction(async (tx) => {
         for (const item of data.items) {

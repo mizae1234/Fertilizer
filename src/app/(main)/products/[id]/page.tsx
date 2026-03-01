@@ -86,6 +86,7 @@ const txTypeLabels: Record<string, { label: string; color: string; icon: string 
     GOODS_RECEIVE: { label: 'รับสินค้า', color: 'text-emerald-700 bg-emerald-50', icon: '📥' },
     SALE: { label: 'ขาย', color: 'text-blue-700 bg-blue-50', icon: '💰' },
     SALE_CANCEL: { label: 'ยกเลิกบิล', color: 'text-rose-700 bg-rose-50', icon: '❌' },
+    SALE_RETURN: { label: 'คืนสินค้า', color: 'text-orange-700 bg-orange-50', icon: '📦' },
     TRANSFER_IN: { label: 'โอนเข้า', color: 'text-purple-700 bg-purple-50', icon: '⬅️' },
     TRANSFER_OUT: { label: 'โอนออก', color: 'text-orange-700 bg-orange-50', icon: '➡️' },
     ADJUSTMENT: { label: 'ปรับ', color: 'text-gray-700 bg-gray-50', icon: '🔧' },

@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { generateNumber } from '@/lib/utils';
+
 
 export async function getBundles(page = 1, search = '') {
     const perPage = 10;

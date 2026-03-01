@@ -3,11 +3,27 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { updateSale, cancelSale } from '@/app/actions/sales';
+import { createSaleReturn } from '@/app/actions/sale-returns';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { useUser } from '@/hooks/useUser';
+
+interface SaleReturnData {
+    id: string; returnNumber: string; reason: string | null; totalAmount: string; createdAt: string;
+    createdBy: { name: string };
+    items: {
+        id: string; saleItemId: string; quantity: number; unitPrice: string; totalPrice: string;
+        product: { name: string; code: string; unit: string };
+        warehouse: { name: string };
+    }[];
+}
+
+interface SaleEditLogData {
+    id: string; action: string; changes: Record<string, any>; createdAt: string;
+    user: { name: string };
+}
 
 interface SaleDetail {
     id: string; saleNumber: string; status: string;
@@ -23,6 +39,8 @@ interface SaleDetail {
         product: { name: string; code: string; unit: string; productUnits: { unitName: string; conversionRate: string }[] };
         warehouse: { name: string };
     }[];
+    saleReturns: SaleReturnData[];
+    saleEditLogs: SaleEditLogData[];
 }
 
 interface Product { id: string; code: string; name: string; unit: string; pointsPerUnit: number; productStocks: { warehouseId: string; quantity: number }[]; }
@@ -36,6 +54,17 @@ interface EditItem {
     unitPrice: number;
     points: number;
     itemDiscount: number;
+}
+
+interface ReturnItem {
+    saleItemId: string;
+    productId: string;
+    warehouseId: string;
+    productName: string;
+    unit: string;
+    maxQty: number;
+    unitPrice: number;
+    returnQty: number;
 }
 
 export default function SaleDetailPage() {
@@ -65,13 +94,23 @@ export default function SaleDetailPage() {
     const [actionLoading, setActionLoading] = useState('');
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; type: 'success' | 'error'; title?: string }>({ open: false, message: '', type: 'error' });
 
+    // Return state
+    const [showReturnModal, setShowReturnModal] = useState(false);
+    const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
+    const [returnReason, setReturnReason] = useState('');
+    const [returnSaving, setReturnSaving] = useState(false);
+
     const showAlert = useCallback((message: string, type: 'success' | 'error' = 'error', title?: string) => {
         setAlertModal({ open: true, message, type, title });
     }, []);
 
-    useEffect(() => {
-        fetch(`/api/sales/${id}`).then(r => r.json()).then(data => { setSale(data); setLoading(false); });
+    const fetchSale = useCallback(async () => {
+        const data = await fetch(`/api/sales/${id}`).then(r => r.json());
+        setSale(data);
+        setLoading(false);
     }, [id]);
+
+    useEffect(() => { fetchSale(); }, [fetchSale]);
 
     const startEditing = async () => {
         if (!sale) return;
@@ -131,6 +170,7 @@ export default function SaleDetailPage() {
     const handleSave = async () => {
         if (items.length === 0) { showAlert('กรุณาเพิ่มรายการสินค้า', 'error'); return; }
         if (items.some(i => !i.productId)) { showAlert('กรุณาเลือกสินค้าทุกรายการ', 'error'); return; }
+        if (!user?.userId) { showAlert('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่', 'error'); return; }
         setSaving(true);
         try {
             const updated = await updateSale(id, {
@@ -138,6 +178,7 @@ export default function SaleDetailPage() {
                 notes: editNotes || null,
                 items,
                 billDiscount: editBillDiscount,
+                userId: user.userId,
             });
             if (updated) {
                 // JSON round-trip to serialize Date/Decimal objects
@@ -146,6 +187,7 @@ export default function SaleDetailPage() {
             }
             setIsEditing(false);
             showAlert('บันทึกการแก้ไขเรียบร้อย', 'success', 'สำเร็จ');
+            fetchSale(); // Refresh to get updated logs
         } catch (error) {
             showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
         } finally { setSaving(false); }
@@ -154,13 +196,80 @@ export default function SaleDetailPage() {
     const handleDelete = async () => {
         setActionLoading('delete');
         try {
-            await cancelSale(id);
-            const data = await fetch(`/api/sales/${id}`).then(r => r.json());
-            setSale(data);
+            await cancelSale(id, user?.userId);
+            await fetchSale();
             showAlert('ยกเลิกบิลเรียบร้อย', 'success', 'สำเร็จ');
         } catch (error) {
             showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
         } finally { setActionLoading(''); setShowDelete(false); }
+    };
+
+    // ========== Sale Return ==========
+    const openReturnModal = () => {
+        if (!sale) return;
+
+        // Calculate already-returned quantities per saleItem
+        const returnedMap = new Map<string, number>();
+        if (sale.saleReturns) {
+            for (const sr of sale.saleReturns) {
+                for (const ri of sr.items) {
+                    returnedMap.set(ri.saleItemId, (returnedMap.get(ri.saleItemId) || 0) + ri.quantity);
+                }
+            }
+        }
+
+        const items: ReturnItem[] = sale.items
+            .map(item => {
+                const returned = returnedMap.get(item.id) || 0;
+                const maxQty = item.quantity - returned;
+                return {
+                    saleItemId: item.id,
+                    productId: item.productId,
+                    warehouseId: item.warehouseId,
+                    productName: item.product.name,
+                    unit: item.unitName || item.product.unit,
+                    maxQty,
+                    unitPrice: Number(item.unitPrice),
+                    returnQty: 0,
+                };
+            })
+            .filter(i => i.maxQty > 0);
+
+        if (items.length === 0) {
+            showAlert('สินค้าในบิลนี้ถูกคืนครบหมดแล้ว', 'error');
+            return;
+        }
+
+        setReturnItems(items);
+        setReturnReason('');
+        setShowReturnModal(true);
+    };
+
+    const handleReturnSubmit = async () => {
+        const itemsToReturn = returnItems.filter(i => i.returnQty > 0);
+        if (itemsToReturn.length === 0) { showAlert('กรุณาระบุจำนวนที่ต้องการคืน', 'error'); return; }
+        if (!user?.userId) { showAlert('ไม่พบผู้ใช้งาน', 'error'); return; }
+
+        setReturnSaving(true);
+        try {
+            await createSaleReturn({
+                saleId: id,
+                reason: returnReason || undefined,
+                userId: user.userId,
+                items: itemsToReturn.map(i => ({
+                    saleItemId: i.saleItemId,
+                    productId: i.productId,
+                    warehouseId: i.warehouseId,
+                    quantity: i.returnQty,
+                    unitPrice: i.unitPrice,
+                })),
+            });
+            setShowReturnModal(false);
+            showAlert('คืนสินค้าเรียบร้อย', 'success', 'สำเร็จ');
+            await fetchSale();
+        } catch (error) {
+            showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
+        } finally { setReturnSaving(false); }
     };
 
     if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>;
@@ -178,6 +287,15 @@ export default function SaleDetailPage() {
         ? items.reduce((s, i) => s + i.points, 0)
         : sale.totalPoints;
 
+    const formatEditAction = (action: string) => {
+        switch (action) {
+            case 'UPDATE': return { label: 'แก้ไขบิล', color: 'bg-blue-100 text-blue-700', icon: '✏️' };
+            case 'CANCEL': return { label: 'ยกเลิกบิล', color: 'bg-red-100 text-red-700', icon: '🚫' };
+            case 'RETURN': return { label: 'คืนสินค้า', color: 'bg-amber-100 text-amber-700', icon: '📦' };
+            default: return { label: action, color: 'bg-gray-100 text-gray-700', icon: '📝' };
+        }
+    };
+
     return (
         <div className="max-w-4xl mx-auto animate-fade-in">
             {/* Back */}
@@ -192,7 +310,7 @@ export default function SaleDetailPage() {
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{sale.saleNumber}</h1>
                     <p className="text-sm text-gray-500 mt-1">รายการขาย</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                     <StatusBadge status={sale.status} className="text-sm px-3 py-1.5" />
                     {!isEditing && (
                         <>
@@ -205,6 +323,12 @@ export default function SaleDetailPage() {
                                 🖨️ ใบเสร็จ A4
                             </button>
                         </>
+                    )}
+                    {!isEditing && sale.status === 'APPROVED' && user?.role === 'ADMIN' && (
+                        <button onClick={openReturnModal}
+                            className="px-3 py-1.5 rounded-lg bg-orange-50 text-orange-600 text-sm font-medium hover:bg-orange-100">
+                            📦 คืนสินค้า
+                        </button>
                     )}
                     {!isEditing && sale.status !== 'CANCELLED' && user?.role === 'ADMIN' && (
                         <button onClick={startEditing} className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100">
@@ -449,6 +573,85 @@ export default function SaleDetailPage() {
                 </div>
             )}
 
+            {/* ========== Sale Returns History ========== */}
+            {!isEditing && sale.saleReturns && sale.saleReturns.length > 0 && (
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden mb-6">
+                    <div className="px-4 sm:px-6 py-4 border-b border-gray-100">
+                        <h2 className="font-semibold text-gray-800">📦 ประวัติคืนสินค้า ({sale.saleReturns.length} ครั้ง)</h2>
+                    </div>
+                    <div className="divide-y divide-gray-50">
+                        {sale.saleReturns.map(sr => (
+                            <div key={sr.id} className="p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-semibold text-orange-600">{sr.returnNumber}</span>
+                                        <span className="text-xs text-gray-400">{formatDateTime(sr.createdAt)}</span>
+                                    </div>
+                                    <span className="text-sm font-semibold text-orange-600">{formatCurrency(Number(sr.totalAmount))}</span>
+                                </div>
+                                {sr.reason && <p className="text-xs text-gray-500 mb-2">เหตุผล: {sr.reason}</p>}
+                                <div className="space-y-1">
+                                    {sr.items.map(ri => (
+                                        <div key={ri.id} className="flex justify-between text-xs text-gray-600">
+                                            <span>{ri.product.name} ({ri.product.code})</span>
+                                            <span>คืน {ri.quantity} {ri.product.unit} × {formatCurrency(Number(ri.unitPrice))}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-gray-400 mt-1">โดย {sr.createdBy.name}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ========== Edit History ========== */}
+            {!isEditing && sale.saleEditLogs && sale.saleEditLogs.length > 0 && (
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden mb-6">
+                    <div className="px-4 sm:px-6 py-4 border-b border-gray-100">
+                        <h2 className="font-semibold text-gray-800">📋 ประวัติการเปลี่ยนแปลง ({sale.saleEditLogs.length} รายการ)</h2>
+                    </div>
+                    <div className="divide-y divide-gray-50">
+                        {sale.saleEditLogs.map(log => {
+                            const actionInfo = formatEditAction(log.action);
+                            return (
+                                <div key={log.id} className="p-4">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${actionInfo.color}`}>
+                                                {actionInfo.icon} {actionInfo.label}
+                                            </span>
+                                            <span className="text-xs text-gray-400">{log.user.name}</span>
+                                        </div>
+                                        <span className="text-xs text-gray-400">{formatDateTime(log.createdAt)}</span>
+                                    </div>
+                                    {log.action === 'UPDATE' && log.changes && (
+                                        <div className="mt-2 text-xs text-gray-500 space-y-0.5">
+                                            {log.changes.totalAmount && (
+                                                <p>ยอดรวม: {formatCurrency(log.changes.totalAmount.old)} → {formatCurrency(log.changes.totalAmount.new)}</p>
+                                            )}
+                                            {log.changes.discount && (
+                                                <p>ส่วนลด: {formatCurrency(log.changes.discount.old)} → {formatCurrency(log.changes.discount.new)}</p>
+                                            )}
+                                        </div>
+                                    )}
+                                    {log.action === 'RETURN' && log.changes && (
+                                        <div className="mt-2 text-xs text-gray-500">
+                                            <p>ใบคืน: {log.changes.returnNumber} | ยอดคืน: {formatCurrency(log.changes.totalAmount)}</p>
+                                        </div>
+                                    )}
+                                    {log.action === 'CANCEL' && (
+                                        <div className="mt-2 text-xs text-gray-500">
+                                            <p>ยกเลิกจากสถานะ: {log.changes?.previousStatus || '-'}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Cancel button — hide if already cancelled */}
             {sale.status !== 'CANCELLED' && user?.role === 'ADMIN' && (
                 <div className="mt-4">
@@ -456,6 +659,75 @@ export default function SaleDetailPage() {
                         className="w-full py-2.5 rounded-xl border border-gray-200 text-gray-500 font-medium text-sm hover:bg-gray-50 hover:text-red-500 hover:border-red-200 disabled:opacity-50 transition-colors">
                         {actionLoading === 'delete' ? 'กำลังยกเลิก...' : '🚫 ยกเลิกบิล'}
                     </button>
+                </div>
+            )}
+
+            {/* ========== Return Modal ========== */}
+            {showReturnModal && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-gray-100">
+                            <h3 className="text-lg font-bold text-gray-800">📦 คืนสินค้า</h3>
+                            <p className="text-sm text-gray-500 mt-1">เลือกสินค้าที่ต้องการคืนและระบุจำนวน</p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            {returnItems.map((item, idx) => (
+                                <div key={item.saleItemId} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-gray-800 truncate">{item.productName}</p>
+                                        <p className="text-xs text-gray-400">คืนได้สูงสุด {item.maxQty} {item.unit} | ราคา {formatCurrency(item.unitPrice)}/{item.unit}</p>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={item.maxQty}
+                                        value={item.returnQty || ''}
+                                        onChange={e => {
+                                            const val = Math.min(Number(e.target.value) || 0, item.maxQty);
+                                            setReturnItems(prev => {
+                                                const copy = [...prev];
+                                                copy[idx] = { ...copy[idx], returnQty: val };
+                                                return copy;
+                                            });
+                                        }}
+                                        placeholder="0"
+                                        className="w-20 px-2 py-2 rounded-lg border border-gray-200 text-sm text-center focus:ring-2 focus:ring-orange-400 outline-none"
+                                    />
+                                </div>
+                            ))}
+
+                            <div>
+                                <label className="text-sm text-gray-600 mb-1 block">เหตุผลการคืน (ไม่บังคับ)</label>
+                                <textarea
+                                    value={returnReason}
+                                    onChange={e => setReturnReason(e.target.value)}
+                                    rows={2}
+                                    placeholder="เช่น สินค้าชำรุด, สั่งผิด..."
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                                />
+                            </div>
+
+                            {/* Return total */}
+                            {returnItems.some(i => i.returnQty > 0) && (
+                                <div className="flex justify-between items-center p-3 rounded-lg bg-orange-50 border border-orange-100">
+                                    <span className="text-sm font-medium text-orange-700">ยอดคืนรวม</span>
+                                    <span className="text-lg font-bold text-orange-600">
+                                        {formatCurrency(returnItems.reduce((s, i) => s + i.returnQty * i.unitPrice, 0))}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-6 border-t border-gray-100 flex gap-3">
+                            <button onClick={() => setShowReturnModal(false)}
+                                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50">
+                                ยกเลิก
+                            </button>
+                            <button onClick={handleReturnSubmit} disabled={returnSaving || !returnItems.some(i => i.returnQty > 0)}
+                                className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 shadow-md shadow-orange-200 disabled:opacity-50">
+                                {returnSaving ? '⏳ กำลังบันทึก...' : '📦 ยืนยันคืนสินค้า'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 

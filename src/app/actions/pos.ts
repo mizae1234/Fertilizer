@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { generateNumber } from '@/lib/utils';
+import { generateNumber } from '@/lib/generateNumber';
 
 export async function createSaleFromPOS(data: {
     customerId?: string;
@@ -59,7 +59,7 @@ export async function createSaleFromPOS(data: {
     // Retry on saleNumber collision
     let lastError: Error | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {
-        const saleNumber = generateNumber('SL');
+        const saleNumber = await generateNumber('SL');
         try {
             const sale = await prisma.$transaction(async (tx) => {
                 const newSale = await tx.sale.create({

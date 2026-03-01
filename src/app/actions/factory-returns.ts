@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { generateNumber } from '@/lib/utils';
+import { generateNumber } from '@/lib/generateNumber';
 
 export async function createFactoryReturn(data: {
     vendorId: string;
@@ -22,7 +22,7 @@ export async function createFactoryReturn(data: {
     if (!data.userId) throw new Error('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่');
 
     const totalAmount = data.items.reduce((sum, item) => item.quantity * item.unitCost + sum, 0);
-    const returnNumber = generateNumber('FR');
+    const returnNumber = await generateNumber('FR');
 
     const result = await prisma.$transaction(async (tx) => {
         const factoryReturn = await tx.factoryReturn.create({

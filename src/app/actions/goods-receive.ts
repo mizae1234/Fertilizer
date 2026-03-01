@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { generateNumber } from '@/lib/utils';
+import { generateNumber } from '@/lib/generateNumber';
 
 export async function getGoodsReceives(page = 1, status = '') {
     const perPage = 10;
@@ -72,7 +72,7 @@ export async function createGoodsReceive(data: {
 
     const gr = await prisma.goodsReceive.create({
         data: {
-            grNumber: generateNumber('GR'),
+            grNumber: await generateNumber('GR'),
             poNumber: data.poNumber || null,
             receivedDate: data.receivedDate ? new Date(data.receivedDate) : new Date(),
             vendorId: data.vendorId,

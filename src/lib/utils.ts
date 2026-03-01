@@ -33,18 +33,6 @@ export function formatDateTime(date: Date | string): string {
         timeZone: 'Asia/Bangkok',
     });
 }
-
-export function generateNumber(prefix: string): string {
-    const now = new Date();
-    const year = now.getFullYear().toString().slice(-2);
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    // Use time-based component (HHMMSSmmm compressed) + small random for uniqueness
-    const timePart = (now.getHours() * 3600000 + now.getMinutes() * 60000 + now.getSeconds() * 1000 + now.getMilliseconds())
-        .toString(36).toUpperCase();
-    const random = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-    return `${prefix}${year}${month}-${timePart}${random}`;
-}
-
 export function cn(...classes: (string | undefined | null | false)[]): string {
     return classes.filter(Boolean).join(' ');
 }
