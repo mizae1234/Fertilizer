@@ -35,6 +35,7 @@ interface EditItem {
     quantity: number;
     unitPrice: number;
     points: number;
+    itemDiscount: number;
 }
 
 export default function SaleDetailPage() {
@@ -51,6 +52,7 @@ export default function SaleDetailPage() {
     const [items, setItems] = useState<EditItem[]>([]);
     const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
     const [editNotes, setEditNotes] = useState<string>('');
+    const [editBillDiscount, setEditBillDiscount] = useState(0);
     const [saving, setSaving] = useState(false);
 
     // Reference data
@@ -84,12 +86,17 @@ export default function SaleDetailPage() {
         setCustomers(custs);
         setSelectedCustomerId(sale.customerId || '');
         setEditNotes(sale.notes || '');
+        // Calculate bill-level discount = total discount - sum of item discounts
+        const totalDiscount = Number(sale.discount || 0);
+        const itemDiscountsSum = sale.items.reduce((s, i) => s + Number(i.discount || 0), 0);
+        setEditBillDiscount(Math.max(0, totalDiscount - itemDiscountsSum));
         setItems(sale.items.map(i => ({
             productId: i.productId,
             warehouseId: i.warehouseId,
             quantity: i.quantity,
             unitPrice: Number(i.unitPrice),
             points: i.points,
+            itemDiscount: Number(i.discount || 0),
         })));
         setIsEditing(true);
     };
@@ -114,7 +121,7 @@ export default function SaleDetailPage() {
 
     const addItem = () => {
         if (warehouses.length === 0) return;
-        setItems(prev => [...prev, { productId: '', warehouseId: warehouses[0].id, quantity: 1, unitPrice: 0, points: 0 }]);
+        setItems(prev => [...prev, { productId: '', warehouseId: warehouses[0].id, quantity: 1, unitPrice: 0, points: 0, itemDiscount: 0 }]);
     };
 
     const removeItem = (index: number) => {
@@ -130,6 +137,7 @@ export default function SaleDetailPage() {
                 customerId: selectedCustomerId || null,
                 notes: editNotes || null,
                 items,
+                billDiscount: editBillDiscount,
             });
             if (updated) {
                 // JSON round-trip to serialize Date/Decimal objects
@@ -158,8 +166,11 @@ export default function SaleDetailPage() {
     if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>;
     if (!sale) return <div className="text-center py-12 text-gray-400">ไม่พบข้อมูล</div>;
 
+    const editSubtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+    const editItemDiscountsTotal = items.reduce((s, i) => s + (i.itemDiscount || 0), 0);
+    const editTotalDiscount = editItemDiscountsTotal + editBillDiscount;
     const totalAmount = isEditing
-        ? items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
+        ? editSubtotal - editTotalDiscount
         : Number(sale.totalAmount);
     const discount = Number(sale.discount || 0);
     const subtotal = totalAmount + discount;
@@ -280,8 +291,20 @@ export default function SaleDetailPage() {
                                             className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
                                     </div>
                                 </div>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <label className="text-xs text-gray-500 shrink-0">ส่วนลด (฿)</label>
+                                    <input type="number" min={0} step="0.01" value={item.itemDiscount || ''}
+                                        onChange={e => updateItem(idx, 'itemDiscount', e.target.value)}
+                                        placeholder="0"
+                                        className="w-24 px-2 py-1 rounded-lg border border-gray-200 text-sm text-red-500 focus:ring-2 focus:ring-red-300 outline-none" />
+                                </div>
                                 <div className="flex justify-between text-xs text-gray-500">
-                                    <span>รวม: {formatCurrency(item.quantity * item.unitPrice)}</span>
+                                    <span>
+                                        รวม: {formatCurrency(item.quantity * item.unitPrice)}
+                                        {(item.itemDiscount || 0) > 0 && (
+                                            <span className="text-red-500 ml-1">(-{formatCurrency(item.itemDiscount)})</span>
+                                        )}
+                                    </span>
                                     <span>แต้ม: +{item.points}</span>
                                 </div>
                             </div>
@@ -377,13 +400,43 @@ export default function SaleDetailPage() {
             {/* Edit Totals + Actions */}
             {isEditing && (
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <span className="text-sm font-semibold text-gray-700">รวมทั้งหมด</span>
-                        <div className="text-right">
-                            <p className="text-xl font-bold text-emerald-600">{formatCurrency(totalAmount)}</p>
-                            <p className="text-xs text-gray-500">แต้ม: +{totalPoints}</p>
+                    {/* Bill-level discount */}
+                    <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100">
+                        <label className="text-sm text-gray-600 shrink-0">🏷️ ส่วนลดทั้งบิล</label>
+                        <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-400">฿</span>
+                            <input type="number" min={0} step="0.01" value={editBillDiscount || ''}
+                                onChange={e => setEditBillDiscount(parseFloat(e.target.value) || 0)}
+                                placeholder="0"
+                                className="w-28 px-2 py-1.5 rounded-lg border border-gray-200 text-sm text-red-500 font-medium focus:ring-2 focus:ring-red-300 outline-none text-right" />
                         </div>
                     </div>
+
+                    {/* Totals breakdown */}
+                    <div className="space-y-1 mb-4">
+                        <div className="flex justify-between text-sm text-gray-600">
+                            <span>ยอดรวมสินค้า</span>
+                            <span>{formatCurrency(editSubtotal)}</span>
+                        </div>
+                        {editItemDiscountsTotal > 0 && (
+                            <div className="flex justify-between text-sm text-red-500">
+                                <span>ส่วนลดรายสินค้า</span>
+                                <span>-{formatCurrency(editItemDiscountsTotal)}</span>
+                            </div>
+                        )}
+                        {editBillDiscount > 0 && (
+                            <div className="flex justify-between text-sm text-red-500">
+                                <span>ส่วนลดทั้งบิล</span>
+                                <span>-{formatCurrency(editBillDiscount)}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between font-bold text-lg pt-2 border-t border-gray-200">
+                            <span className="text-gray-800">รวมทั้งสิ้น</span>
+                            <span className="text-emerald-600">{formatCurrency(totalAmount)}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 text-right">แต้ม: +{totalPoints}</div>
+                    </div>
+
                     <div className="flex gap-3">
                         <button onClick={() => setIsEditing(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50">
                             ยกเลิก

@@ -140,12 +140,14 @@ export async function rejectSale(id: string) {
 export async function updateSale(id: string, data: {
     customerId?: string | null;
     notes?: string | null;
+    billDiscount?: number;
     items: {
         productId: string;
         warehouseId: string;
         quantity: number;
         unitPrice: number;
         points: number;
+        itemDiscount?: number;
     }[];
 }) {
     const existing = await prisma.sale.findUnique({
@@ -154,7 +156,11 @@ export async function updateSale(id: string, data: {
     });
     if (!existing) throw new Error('ไม่พบรายการขาย');
 
-    const totalAmount = data.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+    const subtotal = data.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+    const itemDiscountsTotal = data.items.reduce((s, i) => s + (i.itemDiscount || 0), 0);
+    const billDiscount = data.billDiscount || 0;
+    const totalDiscount = itemDiscountsTotal + billDiscount;
+    const totalAmount = subtotal - totalDiscount;
     const totalPoints = data.items.reduce((s, i) => s + i.points, 0);
 
     await prisma.$transaction(async (tx) => {
@@ -183,6 +189,7 @@ export async function updateSale(id: string, data: {
                 notes: data.notes !== undefined ? data.notes : undefined,
                 totalAmount,
                 totalPoints,
+                discount: totalDiscount,
                 items: {
                     create: data.items.map(i => ({
                         productId: i.productId,
@@ -190,6 +197,7 @@ export async function updateSale(id: string, data: {
                         quantity: i.quantity,
                         unitPrice: i.unitPrice,
                         totalPrice: i.quantity * i.unitPrice,
+                        discount: i.itemDiscount || 0,
                         points: i.points,
                     })),
                 },
@@ -227,7 +235,7 @@ export async function updateSale(id: string, data: {
             createdBy: { select: { name: true } },
             items: {
                 include: {
-                    product: { select: { name: true, code: true, unit: true } },
+                    product: { select: { name: true, code: true, unit: true, productUnits: { select: { unitName: true, conversionRate: true } } } },
                     warehouse: { select: { name: true } },
                 },
             },
