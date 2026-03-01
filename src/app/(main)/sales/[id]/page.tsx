@@ -152,7 +152,7 @@ export default function SaleDetailPage() {
                 copy[index] = { ...copy[index], quantity: qty, points: (prod?.pointsPerUnit || 0) * qty };
             } else {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (copy[index] as any)[field] = field === 'unitPrice' ? Number(value) || 0 : value;
+                (copy[index] as any)[field] = (field === 'unitPrice' || field === 'itemDiscount') ? Number(value) || 0 : value;
             }
             return copy;
         });
