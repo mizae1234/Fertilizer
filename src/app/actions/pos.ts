@@ -19,7 +19,6 @@ export async function createSaleFromPOS(data: {
     payments: { method: string; amount: number; dueDate?: string }[];
     notes?: string;
 }) {
-    const t0 = Date.now();
 
     if (!data.userId) {
         throw new Error('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่');
@@ -130,8 +129,6 @@ export async function createSaleFromPOS(data: {
 
         return newSale;
     });
-
-    console.log(`[POS] createSaleFromPOS TOTAL: ${Date.now() - t0}ms (${data.items.length} items)`);
 
     // Serialize Decimal values before returning to client
     return { id: sale.id, saleNumber: sale.saleNumber, totalAmount: Number(sale.totalAmount) };
