@@ -4,6 +4,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "3000"
     volumes:
