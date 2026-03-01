@@ -26,15 +26,23 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
             fetch(`/api/users/${id}`).then(r => r.json()),
             fetch('/api/warehouses').then(r => r.json()),
         ]).then(([data, wh]) => {
-            setUsername(data.username);
-            setName(data.name);
-            setRole(data.role);
+            if (data.error || !data.username) {
+                setAlertModal({ open: true, message: data.error || 'ไม่พบข้อมูลผู้ใช้', type: 'error', title: 'โหลดข้อมูลไม่ได้' });
+                setLoading(false);
+                return;
+            }
+            setUsername(data.username || '');
+            setName(data.name || '');
+            setRole(data.role || 'STAFF');
             setSelectedMenus(data.allowedMenus ?? [...ALL_MENU_HREFS]);
             setDefaultWarehouseId(data.defaultWarehouseId || '');
             setPrintSetting(data.printSetting || 'bill');
             setWarehouses(wh);
             setLoading(false);
-        }).catch(() => setLoading(false));
+        }).catch((err) => {
+            console.error('Load user error:', err);
+            setLoading(false);
+        });
     }, [id]);
 
     const isAdmin = role === 'ADMIN';
