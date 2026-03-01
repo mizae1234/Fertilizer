@@ -129,6 +129,30 @@ export async function createSaleReturn(data: {
                     },
                 });
 
+                // Deduct totalAmount and totalPoints from the sale
+                const returnPoints = data.items.reduce((sum, ri) => {
+                    const saleItem = sale.items.find(si => si.id === ri.saleItemId);
+                    if (!saleItem || saleItem.quantity === 0) return sum;
+                    // Proportional points: (returnQty / saleItemQty) * saleItemPoints
+                    return sum + Math.round((ri.quantity / saleItem.quantity) * Number(saleItem.points));
+                }, 0);
+
+                await tx.sale.update({
+                    where: { id: data.saleId },
+                    data: {
+                        totalAmount: { decrement: totalAmount },
+                        totalPoints: { decrement: returnPoints },
+                    },
+                });
+
+                // Deduct points from customer if applicable
+                if (sale.customerId && returnPoints > 0) {
+                    await tx.customer.update({
+                        where: { id: sale.customerId },
+                        data: { totalPoints: { decrement: returnPoints } },
+                    });
+                }
+
                 return newReturn;
             });
 

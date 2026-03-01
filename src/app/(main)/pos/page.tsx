@@ -261,10 +261,12 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType }: 
                                         value={cashReceived === 0 ? '' : cashReceived}
                                         onChange={e => setCashReceived(e.target.value ? parseFloat(e.target.value) : '')}
                                         onFocus={e => e.target.select()}
+                                        onKeyDown={e => { if (e.key === 'Enter' && isValid && !loading) handleConfirm(); }}
                                         className={`w-full px-3 py-2 rounded-lg border text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500 text-right ${!cashReceivedValid ? 'border-red-300' : 'border-emerald-200'}`}
                                         placeholder={formatCurrency(cashTotal)}
                                         min={0}
                                         step="0.01"
+                                        autoFocus
                                     />
                                 </div>
                                 <div className="flex-1">
