@@ -44,3 +44,11 @@ export async function deleteWarehouse(id: string) {
     });
     revalidatePath('/warehouses');
 }
+
+export async function setMainWarehouse(id: string) {
+    await prisma.$transaction([
+        prisma.warehouse.updateMany({ where: { isMain: true }, data: { isMain: false } }),
+        prisma.warehouse.update({ where: { id }, data: { isMain: true } }),
+    ]);
+    revalidatePath('/warehouses');
+}

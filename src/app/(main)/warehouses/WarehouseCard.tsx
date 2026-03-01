@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { updateWarehouse, deleteWarehouse } from '@/app/actions/warehouses';
+import { updateWarehouse, deleteWarehouse, setMainWarehouse } from '@/app/actions/warehouses';
 import AlertModal from '@/components/AlertModal';
 import ConfirmModal from '@/components/ConfirmModal';
 
@@ -17,6 +17,7 @@ interface Warehouse {
     name: string;
     location: string | null;
     isActive: boolean;
+    isMain: boolean;
     _count: { productStocks: number };
     productStocks: { quantity: number }[];
 }
@@ -143,6 +144,20 @@ export default function WarehouseCard({ wh, isMain }: { wh: Warehouse; isMain?: 
 
                     {/* Action Buttons */}
                     <div className="flex gap-2 mt-4 pt-3 border-t border-gray-100">
+                        {!isMain && (
+                            <button onClick={async () => {
+                                try {
+                                    await setMainWarehouse(wh.id);
+                                    setAlertModal({ open: true, message: `ตั้ง "${wh.name}" เป็นคลังหลักแล้ว`, type: 'success', title: 'สำเร็จ' });
+                                    router.refresh();
+                                } catch (error) {
+                                    setAlertModal({ open: true, message: (error as Error).message, type: 'error', title: 'เกิดข้อผิดพลาด' });
+                                }
+                            }}
+                                className="flex-1 px-3 py-1.5 rounded-lg text-sm font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 transition-colors">
+                                ⭐ ตั้งเป็นคลังหลัก
+                            </button>
+                        )}
                         <button onClick={() => setEditing(true)}
                             className="flex-1 px-3 py-1.5 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors">
                             ✏️ แก้ไข

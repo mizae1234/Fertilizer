@@ -18,7 +18,7 @@ export default async function WarehousesPage({ searchParams }: Props) {
         prisma.warehouse.findMany({
             where,
             select: {
-                id: true, name: true, location: true, isActive: true, createdAt: true,
+                id: true, name: true, location: true, isActive: true, isMain: true, createdAt: true,
                 _count: { select: { productStocks: true } },
                 productStocks: {
                     select: { quantity: true },
@@ -30,14 +30,6 @@ export default async function WarehousesPage({ searchParams }: Props) {
         }),
         prisma.warehouse.count({ where }),
     ]);
-
-    // Find the main warehouse (first active by createdAt)
-    const mainWarehouse = await prisma.warehouse.findFirst({
-        where: { isActive: true, deletedAt: null },
-        orderBy: { createdAt: 'asc' },
-        select: { id: true },
-    });
-    const mainWarehouseId = mainWarehouse?.id || '';
 
     const totalPages = Math.ceil(total / perPage);
 
@@ -55,7 +47,7 @@ export default async function WarehousesPage({ searchParams }: Props) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {warehouses.map((wh) => (
-                    <WarehouseCard key={wh.id} wh={JSON.parse(JSON.stringify(wh))} isMain={wh.id === mainWarehouseId} />
+                    <WarehouseCard key={wh.id} wh={JSON.parse(JSON.stringify(wh))} isMain={wh.isMain} />
                 ))}
             </div>
 

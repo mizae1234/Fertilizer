@@ -59,6 +59,7 @@ model Warehouse {
   name      String
   location  String?
   isActive  Boolean   @default(true)
+  isMain    Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
