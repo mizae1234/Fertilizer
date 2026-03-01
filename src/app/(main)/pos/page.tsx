@@ -70,6 +70,11 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType }: 
     const [printType, setPrintType] = useState<'bill' | 'invoice' | 'none'>(defaultPrintType || 'bill');
     const [cashReceived, setCashReceived] = useState<number | ''>(0);
 
+    // Sync printType when defaultPrintType prop updates
+    useEffect(() => {
+        if (defaultPrintType) setPrintType(defaultPrintType);
+    }, [defaultPrintType]);
+
     // Fetch bank accounts on mount
     useEffect(() => {
         fetch('/api/bank-accounts').then(r => r.json()).then((data: BankAccountInfo[]) => {
