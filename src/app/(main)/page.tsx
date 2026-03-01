@@ -3,6 +3,7 @@ import { formatCurrency } from '@/lib/utils';
 import DashboardCard from '@/components/DashboardCard';
 import StatusBadge from '@/components/StatusBadge';
 import Link from 'next/link';
+import { isServerAdmin } from '@/lib/server-auth';
 
 async function getDashboardData() {
     const [
@@ -64,6 +65,7 @@ async function getDashboardData() {
 
 export default async function DashboardPage() {
     const data = await getDashboardData();
+    const adminUser = await isServerAdmin();
 
     return (
         <div className="animate-fade-in">
@@ -89,13 +91,23 @@ export default async function DashboardPage() {
                     color="orange"
                     subtitle="รายการ"
                 />
-                <DashboardCard
-                    title="ยอดขายวันนี้"
-                    value={formatCurrency(Number(data.todaySalesAmount))}
-                    icon="💰"
-                    color="emerald"
-                    subtitle={`${data.todaySalesCount} รายการ`}
-                />
+                {adminUser ? (
+                    <DashboardCard
+                        title="ยอดขายวันนี้"
+                        value={formatCurrency(Number(data.todaySalesAmount))}
+                        icon="💰"
+                        color="emerald"
+                        subtitle={`${data.todaySalesCount} รายการ`}
+                    />
+                ) : (
+                    <DashboardCard
+                        title="สร้างบิลวันนี้"
+                        value={data.todaySalesCount}
+                        icon="🧾"
+                        color="emerald"
+                        subtitle="รายการ"
+                    />
+                )}
                 <DashboardCard
                     title="รายการรับเข้ารอตรวจสอบ"
                     value={data.pendingGRs}
@@ -200,7 +212,7 @@ export default async function DashboardPage() {
                                 href="/goods-receive/new"
                                 className="block w-full py-2.5 rounded-xl bg-white/20 text-white text-center font-medium text-sm hover:bg-white/30 transition-colors"
                             >
-                                📥 บันทึกรับสินค้า
+                                📥 นำเข้าสินค้า
                             </Link>
                             <Link
                                 href="/transfers/new"

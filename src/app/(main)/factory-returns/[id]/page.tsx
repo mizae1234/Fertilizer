@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { notFound } from 'next/navigation';
 import PrintFactoryReturnButton from './PrintFactoryReturnButton';
+import CancelFactoryReturnButton from './CancelFactoryReturnButton';
 import { isServerAdmin } from '@/lib/server-auth';
 
 interface Props { params: Promise<{ id: string }> }
@@ -26,14 +27,26 @@ export default async function FactoryReturnDetailPage({ params }: Props) {
 
     if (!fr) notFound();
 
+    const isCancelled = fr.status === 'CANCELLED';
+
     return (
         <div className="animate-fade-in max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{fr.returnNumber}</h1>
-                    <p className="text-sm text-gray-500 mt-1">ใบเคลมคืนโรงงาน</p>
+                <div className="flex items-center gap-3">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{fr.returnNumber}</h1>
+                            {isCancelled ? (
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">❌ ยกเลิกแล้ว</span>
+                            ) : (
+                                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">✅ สำเร็จ</span>
+                            )}
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1">ใบเคลมคืนโรงงาน</p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {!isCancelled && adminUser && <CancelFactoryReturnButton id={id} returnNumber={fr.returnNumber} />}
                     <PrintFactoryReturnButton id={id} />
                     <Link href="/factory-returns" className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
                         ← กลับ
@@ -41,16 +54,26 @@ export default async function FactoryReturnDetailPage({ params }: Props) {
                 </div>
             </div>
 
+            {isCancelled && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 flex items-center gap-3">
+                    <span className="text-2xl">⚠️</span>
+                    <div>
+                        <p className="text-sm font-semibold text-red-700">รายการนี้ถูกยกเลิกแล้ว</p>
+                        <p className="text-xs text-red-500">Stock ถูกคืนกลับเรียบร้อยแล้ว</p>
+                    </div>
+                </div>
+            )}
+
             {/* Summary */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-4">
+            <div className={`bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-4 ${isCancelled ? 'opacity-60' : ''}`}>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                        <p className="text-xs text-gray-500">ผู้ส่งสินค้า</p>
+                        <p className="text-xs text-gray-500">ผู้ขาย/โรงงาน/บริษัท</p>
                         <p className="text-sm font-semibold text-gray-800">{fr.vendor.name}</p>
                     </div>
                     {adminUser && <div>
                         <p className="text-xs text-gray-500">มูลค่ารวม</p>
-                        <p className="text-sm font-bold text-orange-600">{formatCurrency(Number(fr.totalAmount))}</p>
+                        <p className={`text-sm font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-orange-600'}`}>{formatCurrency(Number(fr.totalAmount))}</p>
                     </div>}
                     <div>
                         <p className="text-xs text-gray-500">สร้างโดย</p>
@@ -70,7 +93,7 @@ export default async function FactoryReturnDetailPage({ params }: Props) {
             </div>
 
             {/* Items */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden mb-4">
+            <div className={`bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden mb-4 ${isCancelled ? 'opacity-60' : ''}`}>
                 <div className="px-5 py-4 border-b border-gray-100">
                     <h2 className="text-base font-bold text-gray-800">รายการสินค้า ({fr.items.length} รายการ)</h2>
                 </div>
@@ -108,7 +131,7 @@ export default async function FactoryReturnDetailPage({ params }: Props) {
                         <tr className="border-t-2 border-gray-200">
                             {adminUser && <>
                                 <td colSpan={4} className="px-4 py-3 text-right text-sm font-bold text-gray-700">ยอดรวมทั้งหมด</td>
-                                <td className="px-4 py-3 text-right text-lg font-bold text-orange-600">{formatCurrency(Number(fr.totalAmount))}</td>
+                                <td className={`px-4 py-3 text-right text-lg font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-orange-600'}`}>{formatCurrency(Number(fr.totalAmount))}</td>
                             </>}
                         </tr>
                     </tfoot>
@@ -142,3 +165,4 @@ export default async function FactoryReturnDetailPage({ params }: Props) {
         </div>
     );
 }
+

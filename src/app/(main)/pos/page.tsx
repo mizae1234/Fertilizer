@@ -1060,7 +1060,8 @@ export default function POSPage() {
                                                         <button onClick={() => updateCartQty(idx, item.quantity - 1)}
                                                             className="w-6 h-6 lg:w-7 lg:h-7 rounded bg-gray-50 border border-gray-200 text-gray-600 text-xs flex items-center justify-center">−</button>
                                                         <input type="number" value={item.quantity}
-                                                            onChange={e => { const val = parseInt(e.target.value) || 0; if (val >= 0 && val <= item.availableStock) updateCartQty(idx, val); }}
+                                                            onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
+                                                            onChange={e => { const val = parseInt(e.target.value); if (!isNaN(val) && val >= 1 && val <= item.availableStock) updateCartQty(idx, val); }}
                                                             onBlur={e => { const val = parseInt(e.target.value) || 1; updateCartQty(idx, Math.max(1, Math.min(val, item.availableStock))); }}
                                                             onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                                                             className="font-bold text-xs lg:text-sm text-center w-8 lg:w-10 rounded border border-gray-200 py-0.5 outline-none focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"

@@ -250,10 +250,24 @@ export async function cancelSale(id: string) {
     await prisma.$transaction(async (tx) => {
         // If APPROVED, restore stock and record the cancellation
         if (sale.status === 'APPROVED') {
+            // Look up the original SALE stock transactions to get base-unit quantities
+            // (POS may sell in ลัง but deducts base-unit qty, e.g. 1 ลัง = 6 แกลลอน)
+            const saleStockTxs = await tx.stockTransaction.findMany({
+                where: { reference: sale.saleNumber, type: 'SALE' },
+            });
+
             for (const item of sale.items) {
+                // Find the matching stock transaction for this product+warehouse
+                const matchingTx = saleStockTxs.find(
+                    st => st.productId === item.productId && st.warehouseId === item.warehouseId
+                );
+                // Use the absolute value of the stock transaction quantity (which is in base units)
+                // Fallback to item.quantity if no stock transaction found
+                const baseQtyToRestore = matchingTx ? Math.abs(matchingTx.quantity) : item.quantity;
+
                 await tx.productStock.update({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
-                    data: { quantity: { increment: item.quantity } },
+                    data: { quantity: { increment: baseQtyToRestore } },
                 });
 
                 // Create SALE_CANCEL stock transaction (positive qty = stock returned)
@@ -262,7 +276,7 @@ export async function cancelSale(id: string) {
                         productId: item.productId,
                         warehouseId: item.warehouseId,
                         type: 'SALE_CANCEL',
-                        quantity: item.quantity,
+                        quantity: baseQtyToRestore,
                         unitCost: item.unitPrice,
                         reference: sale.saleNumber,
                         userId: sale.createdById,

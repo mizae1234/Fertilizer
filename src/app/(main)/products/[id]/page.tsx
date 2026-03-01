@@ -556,10 +556,10 @@ export default function ProductDetailPage() {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">Stock ขั้นต่ำ</label>
-                        <input type="number" value={infoForm.minStock || ''} onChange={e => setInfoForm({ ...infoForm, minStock: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                        <input type="number" value={infoForm.minStock === 0 ? '' : infoForm.minStock} onChange={e => setInfoForm({ ...infoForm, minStock: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
                             onFocus={e => e.target.select()}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                            min={0} />
+                            min={0} placeholder="0" />
                     </div>
                 </div>
 
@@ -576,10 +576,10 @@ export default function ProductDetailPage() {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">แต้ม/หน่วย</label>
-                        <input type="number" value={pointsValue} onChange={e => setPointsValue(e.target.value)}
+                        <input type="number" value={pointsValue === '0' ? '' : pointsValue} onChange={e => setPointsValue(e.target.value)}
                             onFocus={e => e.target.select()}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                            min={0} />
+                            min={0} placeholder="0" />
                     </div>
                 </div>
 
@@ -656,7 +656,7 @@ export default function ProductDetailPage() {
             {/* Units - Inline Rows */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
                 <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-semibold text-gray-800">📦 หน่วยขายเพิ่มเติม</h2>
+                    <h2 className="font-semibold text-gray-800">📦 รูปแบบราคา</h2>
                     <button type="button"
                         onClick={() => {
                             setNewUnitRows(prev => [...prev, { unitName: '', conversionRate: 1, sellingPrice: 0, isBaseUnit: false }]);
@@ -666,7 +666,7 @@ export default function ProductDetailPage() {
                     </button>
                 </div>
                 {((!product.productUnits || product.productUnits.length === 0) && newUnitRows.length === 0) ? (
-                    <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีหน่วยเพิ่มเติม — เช่น ลัง, โหล ฯลฯ</p>
+                    <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีรูปแบบราคา — เช่น ลัง, โหล ฯลฯ</p>
                 ) : (
                     <div className="space-y-3">
                         {product.productUnits.map(unit => (
@@ -682,7 +682,7 @@ export default function ProductDetailPage() {
                                     <input type="number" value={Number(unit.conversionRate) || ''}
                                         onChange={e => updateExistingUnit(unit.id, { conversionRate: parseFloat(e.target.value) || 0 })}
                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                        placeholder="จำนวน" min={0.0001} step="0.0001" />
+                                        placeholder="จำนวนสต้อกที่ตัดขาย" min={0.0001} step="0.0001" />
                                 </div>
                                 <div className="w-28">
                                     <input type="number" value={Number(unit.sellingPrice) || ''}
@@ -712,7 +712,7 @@ export default function ProductDetailPage() {
                                     <input type="number" value={u.conversionRate || ''}
                                         onChange={e => { const nr = [...newUnitRows]; nr[idx] = { ...nr[idx], conversionRate: parseFloat(e.target.value) || 0 }; setNewUnitRows(nr); }}
                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                        placeholder="จำนวน" min={0.0001} step="0.0001" />
+                                        placeholder="จำนวนสต้อกที่ตัดขาย" min={0.0001} step="0.0001" />
                                 </div>
                                 <div className="w-28">
                                     <input type="number" value={u.sellingPrice || ''}
@@ -732,7 +732,7 @@ export default function ProductDetailPage() {
                         <datalist id="unit-name-suggestions">
                             {unitNames.map(u => <option key={u} value={u} />)}
                         </datalist>
-                        <p className="text-[10px] text-gray-400">* ระบุจำนวนหน่วยหลัก ต่อ 1 หน่วยนี้ | กด 💾 เพื่อบันทึกแต่ละแถว</p>
+                        <p className="text-[10px] text-gray-400">* ระบุจำนวนสต้อกที่ตัดขาย ต่อ 1 หน่วยนี้ | กด 💾 เพื่อบันทึกแต่ละแถว</p>
                     </div>
                 )}
             </div>

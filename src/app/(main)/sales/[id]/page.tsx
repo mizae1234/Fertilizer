@@ -7,6 +7,7 @@ import StatusBadge from '@/components/StatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { useUser } from '@/hooks/useUser';
 
 interface SaleDetail {
     id: string; saleNumber: string; status: string;
@@ -40,6 +41,7 @@ export default function SaleDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
+    const user = useUser();
 
     const [sale, setSale] = useState<SaleDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -191,7 +193,7 @@ export default function SaleDetailPage() {
                             </button>
                         </>
                     )}
-                    {!isEditing && sale.status !== 'CANCELLED' && (
+                    {!isEditing && sale.status !== 'CANCELLED' && user?.role === 'ADMIN' && (
                         <button onClick={startEditing} className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100">
                             ✏️ แก้ไข
                         </button>
@@ -373,7 +375,7 @@ export default function SaleDetailPage() {
             )}
 
             {/* Cancel button — hide if already cancelled */}
-            {sale.status !== 'CANCELLED' && (
+            {sale.status !== 'CANCELLED' && user?.role === 'ADMIN' && (
                 <div className="mt-4">
                     <button onClick={() => setShowDelete(true)} disabled={actionLoading !== ''}
                         className="w-full py-2.5 rounded-xl border border-gray-200 text-gray-500 font-medium text-sm hover:bg-gray-50 hover:text-red-500 hover:border-red-200 disabled:opacity-50 transition-colors">

@@ -66,7 +66,7 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
     </div>
 
     <div style="background:#f8f9fa;border:1px solid #ddd;border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:12px;">
-        <div style="margin-bottom:4px;"><strong>ผู้ส่งสินค้า:</strong> ${data.vendor.name}</div>
+        <div style="margin-bottom:4px;"><strong>ผู้ขาย/โรงงาน/บริษัท:</strong> ${data.vendor.name}</div>
         <div><strong>ผู้สร้าง:</strong> ${data.createdBy.name}</div>
         ${data.notes ? `<div style="margin-top:4px;"><strong>หมายเหตุ:</strong> ${data.notes}</div>` : ''}
     </div>

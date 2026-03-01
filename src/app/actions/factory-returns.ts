@@ -111,3 +111,55 @@ export async function getFactoryReturns(page = 1, from = '', to = '') {
 
     return { records, totalPages: Math.ceil(total / perPage), total };
 }
+
+export async function cancelFactoryReturn(id: string) {
+    const fr = await prisma.factoryReturn.findUnique({
+        where: { id },
+        include: { items: true },
+    });
+    if (!fr) throw new Error('ไม่พบรายการเคลมคืน');
+    if (fr.status === 'CANCELLED') throw new Error('รายการนี้ถูกยกเลิกแล้ว');
+
+    await prisma.$transaction(async (tx) => {
+        // Look up original FACTORY_RETURN stock transactions for base-unit quantities
+        const originalTxs = await tx.stockTransaction.findMany({
+            where: { reference: fr.returnNumber, type: 'FACTORY_RETURN' },
+        });
+
+        for (const item of fr.items) {
+            // Find matching stock transaction for this product+warehouse
+            const matchingTx = originalTxs.find(
+                st => st.productId === item.productId && st.warehouseId === item.warehouseId
+            );
+            const qtyToRestore = matchingTx ? Math.abs(matchingTx.quantity) : item.quantity;
+
+            // Restore stock
+            await tx.productStock.update({
+                where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
+                data: { quantity: { increment: qtyToRestore } },
+            });
+
+            // Create cancellation stock transaction
+            await tx.stockTransaction.create({
+                data: {
+                    productId: item.productId,
+                    warehouseId: item.warehouseId,
+                    type: 'FACTORY_RETURN',
+                    quantity: qtyToRestore,
+                    unitCost: item.unitCost,
+                    reference: fr.returnNumber,
+                    userId: fr.createdById,
+                    notes: `ยกเลิกเคลมคืนโรงงาน ${fr.returnNumber}`,
+                },
+            });
+        }
+
+        await tx.factoryReturn.update({
+            where: { id },
+            data: { status: 'CANCELLED' },
+        });
+    });
+
+    revalidatePath('/factory-returns');
+    revalidatePath(`/factory-returns/${id}`);
+}

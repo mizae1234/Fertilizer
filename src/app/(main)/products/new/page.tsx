@@ -235,10 +235,12 @@ export default function NewProductPage() {
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">แต้ม/หน่วย</label>
                             <input
                                 type="number"
-                                value={form.pointsPerUnit}
-                                onChange={(e) => setForm({ ...form, pointsPerUnit: parseInt(e.target.value) || 0 })}
+                                value={form.pointsPerUnit === 0 ? '' : form.pointsPerUnit}
+                                onChange={(e) => setForm({ ...form, pointsPerUnit: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
+                                onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                                 min={0}
+                                placeholder="0"
                             />
                         </div>
                     </div>
@@ -247,10 +249,12 @@ export default function NewProductPage() {
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">Stock ขั้นต่ำ</label>
                             <input
                                 type="number"
-                                value={form.minStock}
-                                onChange={(e) => setForm({ ...form, minStock: parseInt(e.target.value) || 10 })}
+                                value={form.minStock === 0 ? '' : form.minStock}
+                                onChange={(e) => setForm({ ...form, minStock: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
+                                onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                                 min={0}
+                                placeholder="0"
                             />
                         </div>
                     </div>
@@ -259,7 +263,7 @@ export default function NewProductPage() {
                 {/* Additional Units Section */}
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="font-semibold text-gray-800">📦 หน่วยขายเพิ่มเติม</h2>
+                        <h2 className="font-semibold text-gray-800">📦 รูปแบบราคา</h2>
                         <button type="button"
                             onClick={() => setUnits(prev => [...prev, { unitName: '', conversionRate: 1, sellingPrice: 0, isBaseUnit: false }])}
                             className="text-xs text-emerald-600 font-medium hover:underline">
@@ -267,7 +271,7 @@ export default function NewProductPage() {
                         </button>
                     </div>
                     {units.length === 0 ? (
-                        <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีหน่วยเพิ่มเติม — เช่น ลัง, โหล ฯลฯ</p>
+                        <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีรูปแบบราคา — เช่น ลัง, โหล ฯลฯ</p>
                     ) : (
                         <div className="space-y-3">
                             {units.map((u, idx) => (
@@ -296,7 +300,7 @@ export default function NewProductPage() {
                                                 setUnits(newUnits);
                                             }}
                                             className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                            placeholder="จำนวน"
+                                            placeholder="จำนวนสต้อกที่ตัดขาย"
                                             min={0.0001}
                                             step="0.0001"
                                         />
@@ -323,7 +327,7 @@ export default function NewProductPage() {
                             <datalist id="unit-name-suggestions-new">
                                 {unitNames.map(u => <option key={u} value={u} />)}
                             </datalist>
-                            <p className="text-[10px] text-gray-400">* ระบุจำนวน base unit ต่อ 1 หน่วยนี้</p>
+                            <p className="text-[10px] text-gray-400">* ระบุจำนวนสต้อกที่ตัดขาย ต่อ 1 หน่วยนี้</p>
                         </div>
                     )}
                 </div>

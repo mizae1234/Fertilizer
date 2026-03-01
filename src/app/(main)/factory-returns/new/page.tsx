@@ -99,7 +99,7 @@ export default function NewFactoryReturnPage() {
 
     const handleSubmit = async () => {
         if (!vendorId) {
-            setAlertModal({ show: true, title: 'ข้อผิดพลาด', message: 'กรุณาเลือกผู้ส่งสินค้า', type: 'error' });
+            setAlertModal({ show: true, title: 'ข้อผิดพลาด', message: 'กรุณาเลือกผู้ขาย/โรงงาน/บริษัท', type: 'error' });
             return;
         }
         if (items.length === 0) {
@@ -171,10 +171,10 @@ export default function NewFactoryReturnPage() {
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">ผู้ส่งสินค้า <span className="text-red-500">*</span></label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">ผู้ขาย/โรงงาน/บริษัท <span className="text-red-500">*</span></label>
                         <select value={vendorId} onChange={e => setVendorId(e.target.value)}
                             className="w-full px-4 py-2.5 border-0 border-b-2 border-gray-200 focus:border-orange-500 outline-none text-sm bg-gray-50/50 rounded-t-lg transition-colors">
-                            <option value="">เลือกผู้ส่งสินค้า...</option>
+                            <option value="">เลือกผู้ขาย/โรงงาน/บริษัท...</option>
                             {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                         </select>
                     </div>

@@ -50,7 +50,7 @@ export default async function FactoryReturnsPage({ searchParams }: Props) {
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เลขที่</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้ส่งสินค้า</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้ขาย/โรงงาน/บริษัท</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">รายการ</th>
                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">มูลค่ารวม</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สร้างโดย</th>
