@@ -623,7 +623,7 @@ export default function POSPage() {
         setLoading(true);
         try {
             // Expand bundle items into individual product items for stock deduction
-            const saleItems: { productId: string; warehouseId: string; quantity: number; unitPrice: number; points: number; conversionRate: number; unitName?: string }[] = [];
+            const saleItems: { productId: string; warehouseId: string; quantity: number; unitPrice: number; points: number; conversionRate: number; unitName?: string; itemDiscount?: number }[] = [];
             for (const c of cart) {
                 if (c.isBundle && c.bundleItems) {
                     for (const si of c.bundleItems) {
@@ -640,6 +640,7 @@ export default function POSPage() {
                         quantity: c.quantity, unitPrice: c.unitPrice, points: c.points,
                         conversionRate: c.conversionRate,
                         unitName: c.selectedUnitName,
+                        itemDiscount: c.itemDiscount || 0,
                     });
                 }
             }
@@ -649,6 +650,7 @@ export default function POSPage() {
                 userId,
                 payments,
                 notes: saleNotes.trim() || undefined,
+                discount: billDiscount,
             });
             setShowPaymentModal(false);
             setCart([]);

@@ -14,20 +14,28 @@ export async function createSaleFromPOS(data: {
         points: number;
         conversionRate?: number;
         unitName?: string;
+        itemDiscount?: number;
     }[];
     userId: string;
     payments: { method: string; amount: number; dueDate?: string }[];
     notes?: string;
+    discount?: number;
 }) {
 
     if (!data.userId) {
         throw new Error('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่');
     }
 
-    const totalAmount = data.items.reduce(
+    const subtotal = data.items.reduce(
         (sum, item) => sum + item.quantity * item.unitPrice,
         0
     );
+    const itemDiscountsTotal = data.items.reduce(
+        (sum, item) => sum + (item.itemDiscount || 0),
+        0
+    );
+    const billDiscount = data.discount || 0;
+    const totalAmount = subtotal - itemDiscountsTotal - billDiscount;
 
     // Validate payments sum
     const paymentSum = data.payments.reduce((s, p) => s + p.amount, 0);
