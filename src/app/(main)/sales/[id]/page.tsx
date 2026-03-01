@@ -494,7 +494,7 @@ export default function SaleDetailPage() {
                                                     <div className="text-xs text-red-500 font-normal">-{formatCurrency(Number(item.discount))}</div>
                                                 )}
                                             </td>
-                                            <td className={`px-4 py-3 text-sm text-right ${isFullyReturned ? 'text-gray-400' : 'text-emerald-600'}`}>+{isFullyReturned ? 0 : item.points}</td>
+                                            <td className={`px-4 py-3 text-sm text-right ${isFullyReturned ? 'text-gray-400' : 'text-emerald-600'}`}>+{isFullyReturned ? 0 : isPartiallyReturned ? Math.round(item.points * remainingQty / item.quantity) : item.points}</td>
                                         </tr>
                                     );
                                 })}
