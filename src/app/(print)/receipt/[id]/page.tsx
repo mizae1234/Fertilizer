@@ -17,10 +17,30 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
                     product: { select: { name: true, code: true, unit: true } },
                 },
             },
+            saleReturns: {
+                include: { items: true },
+            },
         },
     });
 
     if (!sale) notFound();
+
+    // Build returned quantity map per saleItemId
+    const returnedMap = new Map<string, number>();
+    for (const sr of sale.saleReturns) {
+        for (const ri of sr.items) {
+            returnedMap.set(ri.saleItemId, (returnedMap.get(ri.saleItemId) || 0) + ri.quantity);
+        }
+    }
+
+    // Adjust items: reduce quantities, filter out fully returned
+    const adjustedItems = sale.items
+        .map(item => {
+            const returned = returnedMap.get(item.id) || 0;
+            const remaining = item.quantity - returned;
+            return { ...item, quantity: remaining, totalPrice: remaining * Number(item.unitPrice) };
+        })
+        .filter(item => item.quantity > 0);
 
     // Find default receipt template
     let template = await prisma.receiptTemplate.findFirst({
@@ -36,7 +56,7 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
         ...sale,
         totalAmount: Number(sale.totalAmount),
         discount: Number(sale.discount || 0),
-        items: sale.items.map(item => ({
+        items: adjustedItems.map(item => ({
             ...item,
             unitPrice: Number(item.unitPrice),
             totalPrice: Number(item.totalPrice),
