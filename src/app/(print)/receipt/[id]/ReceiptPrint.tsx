@@ -107,7 +107,7 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
                 {template?.showLogo && template?.logoUrl && (
                     <div style={{ textAlign: 'center', marginBottom: '6px' }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={template.logoUrl} alt="logo" style={{ maxHeight: '80px', maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />
+                        <img src={template.logoUrl} alt="logo" style={{ maxHeight: '120px', maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />
                     </div>
                 )}
 
@@ -178,7 +178,7 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
                             <span>ยอดรวมสินค้า</span>
                             <span>{formatCurrency(sale.totalAmount + sale.discount)}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                             <span>ส่วนลด</span>
                             <span>-{formatCurrency(sale.discount)}</span>
                         </div>
