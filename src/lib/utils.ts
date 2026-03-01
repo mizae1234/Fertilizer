@@ -36,8 +36,11 @@ export function generateNumber(prefix: string): string {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `${prefix}${year}${month}-${random}`;
+    // Use time-based component (HHMMSSmmm compressed) + small random for uniqueness
+    const timePart = (now.getHours() * 3600000 + now.getMinutes() * 60000 + now.getSeconds() * 1000 + now.getMilliseconds())
+        .toString(36).toUpperCase();
+    const random = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+    return `${prefix}${year}${month}-${timePart}${random}`;
 }
 
 export function cn(...classes: (string | undefined | null | false)[]): string {

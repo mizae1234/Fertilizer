@@ -55,91 +55,104 @@ export async function createSaleFromPOS(data: {
         : 'SPLIT';
 
     const totalPoints = data.items.reduce((sum, item) => sum + item.points, 0);
-    const saleNumber = generateNumber('SL');
 
-    const sale = await prisma.$transaction(async (tx) => {
-        const newSale = await tx.sale.create({
-            data: {
-                saleNumber,
-                customerId: data.customerId || null,
-                status: 'APPROVED',
-                totalAmount,
-                totalPoints,
-                discount: itemDiscountsTotal + billDiscount,
-                paymentMethod,
-                creditDueDate: creditPayment?.dueDate ? new Date(creditPayment.dueDate) : null,
-                payments: data.payments as any,
-                notes: data.notes || null,
-                createdById: data.userId,
-                items: {
-                    create: data.items.map((item) => ({
-                        productId: item.productId,
-                        warehouseId: item.warehouseId,
-                        quantity: item.quantity,
-                        unitPrice: item.unitPrice,
-                        totalPrice: item.quantity * item.unitPrice,
-                        discount: item.itemDiscount || 0,
-                        points: item.points,
-                        unitName: item.unitName || null,
-                    })),
-                },
-            },
-        });
-
-        // Deduct stock + create stock transactions in parallel per item
-        await Promise.all(data.items.map(async (item) => {
-            const stockToDeduct = item.quantity * (item.conversionRate || 1);
-            await tx.productStock.upsert({
-                where: {
-                    productId_warehouseId: {
-                        productId: item.productId,
-                        warehouseId: item.warehouseId,
+    // Retry on saleNumber collision
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const saleNumber = generateNumber('SL');
+        try {
+            const sale = await prisma.$transaction(async (tx) => {
+                const newSale = await tx.sale.create({
+                    data: {
+                        saleNumber,
+                        customerId: data.customerId || null,
+                        status: 'APPROVED',
+                        totalAmount,
+                        totalPoints,
+                        discount: itemDiscountsTotal + billDiscount,
+                        paymentMethod,
+                        creditDueDate: creditPayment?.dueDate ? new Date(creditPayment.dueDate) : null,
+                        payments: data.payments as any,
+                        notes: data.notes || null,
+                        createdById: data.userId,
+                        items: {
+                            create: data.items.map((item) => ({
+                                productId: item.productId,
+                                warehouseId: item.warehouseId,
+                                quantity: item.quantity,
+                                unitPrice: item.unitPrice,
+                                totalPrice: item.quantity * item.unitPrice,
+                                discount: item.itemDiscount || 0,
+                                points: item.points,
+                                unitName: item.unitName || null,
+                            })),
+                        },
                     },
-                },
-                update: {
-                    quantity: { decrement: stockToDeduct },
-                },
-                create: {
-                    productId: item.productId,
-                    warehouseId: item.warehouseId,
-                    quantity: -stockToDeduct,
-                },
+                });
+
+                // Deduct stock + create stock transactions in parallel per item
+                await Promise.all(data.items.map(async (item) => {
+                    const stockToDeduct = item.quantity * (item.conversionRate || 1);
+                    await tx.productStock.upsert({
+                        where: {
+                            productId_warehouseId: {
+                                productId: item.productId,
+                                warehouseId: item.warehouseId,
+                            },
+                        },
+                        update: {
+                            quantity: { decrement: stockToDeduct },
+                        },
+                        create: {
+                            productId: item.productId,
+                            warehouseId: item.warehouseId,
+                            quantity: -stockToDeduct,
+                        },
+                    });
+
+                    await tx.stockTransaction.create({
+                        data: {
+                            productId: item.productId,
+                            warehouseId: item.warehouseId,
+                            type: 'SALE',
+                            quantity: -stockToDeduct,
+                            unitCost: item.unitPrice,
+                            reference: saleNumber,
+                            userId: data.userId,
+                            notes: `ขายสินค้า ${saleNumber}${(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
+                        },
+                    });
+                }));
+
+                // Award customer points
+                if (data.customerId && totalPoints > 0) {
+                    await tx.customer.update({
+                        where: { id: data.customerId },
+                        data: { totalPoints: { increment: totalPoints } },
+                    });
+
+                    await tx.pointTransaction.create({
+                        data: {
+                            customerId: data.customerId,
+                            points: totalPoints,
+                            type: 'EARN',
+                            reference: saleNumber,
+                        },
+                    });
+                }
+
+                return newSale;
             });
 
-            await tx.stockTransaction.create({
-                data: {
-                    productId: item.productId,
-                    warehouseId: item.warehouseId,
-                    type: 'SALE',
-                    quantity: -stockToDeduct,
-                    unitCost: item.unitPrice,
-                    reference: saleNumber,
-                    userId: data.userId,
-                    notes: `ขายสินค้า ${saleNumber}${(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
-                },
-            });
-        }));
-
-        // Award customer points
-        if (data.customerId && totalPoints > 0) {
-            await tx.customer.update({
-                where: { id: data.customerId },
-                data: { totalPoints: { increment: totalPoints } },
-            });
-
-            await tx.pointTransaction.create({
-                data: {
-                    customerId: data.customerId,
-                    points: totalPoints,
-                    type: 'EARN',
-                    reference: saleNumber,
-                },
-            });
+            // Serialize Decimal values before returning to client
+            return { id: sale.id, saleNumber: sale.saleNumber, totalAmount: Number(sale.totalAmount) };
+        } catch (e: any) {
+            if (e.message?.includes('Unique constraint') && attempt < 2) {
+                lastError = e;
+                continue;
+            }
+            throw e;
         }
-
-        return newSale;
-    });
-
-    // Serialize Decimal values before returning to client
-    return { id: sale.id, saleNumber: sale.saleNumber, totalAmount: Number(sale.totalAmount) };
+    }
+    throw lastError || new Error('ไม่สามารถสร้างบิลขายได้ กรุณาลองใหม่');
 }
