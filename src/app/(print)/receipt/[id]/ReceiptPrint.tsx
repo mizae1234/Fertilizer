@@ -85,7 +85,7 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
 
                 body {
                     font-family: 'Sarabun', 'Tahoma', sans-serif;
-                    font-size: 12px;
+                    font-size: 14px;
                     line-height: 1.4;
                     color: #000;
                     background: #fff;
@@ -107,7 +107,7 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
                 {template?.showLogo && template?.logoUrl && (
                     <div style={{ textAlign: 'center', marginBottom: '6px' }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={template.logoUrl} alt="logo" style={{ maxHeight: '50px', maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />
+                        <img src={template.logoUrl} alt="logo" style={{ maxHeight: '80px', maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />
                     </div>
                 )}
 
@@ -115,17 +115,17 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
                 <div style={{ textAlign: 'center', marginBottom: '8px' }}>
                     {template?.headerText ? (
                         template.headerText.split('\n').map((line, i) => (
-                            <div key={i} style={{ fontSize: i === 0 ? '16px' : '11px', fontWeight: i === 0 ? 'bold' : 'normal' }}>{line}</div>
+                            <div key={i} style={{ fontSize: i === 0 ? '18px' : '13px', fontWeight: i === 0 ? 'bold' : 'normal' }}>{line}</div>
                         ))
                     ) : (
-                        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{shopName}</div>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{shopName}</div>
                     )}
                 </div>
 
                 <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
 
                 {/* Bill Info */}
-                <div style={{ fontSize: '11px', marginBottom: '4px' }}>
+                <div style={{ fontSize: '13px', marginBottom: '4px' }}>
                     {(template?.showBillNo !== false) && (
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span>บิลเลขที่: {sale.saleNumber}</span>
@@ -146,20 +146,20 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
                 <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
 
                 {/* Items */}
-                <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+                <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
                     <thead>
                         <tr style={{ borderBottom: '1px solid #000' }}>
                             <th style={{ textAlign: 'left', paddingBottom: '2px' }}>สินค้า</th>
                             <th style={{ textAlign: 'right', paddingBottom: '2px', width: '35px' }}>จำนวน</th>
-                            <th style={{ textAlign: 'right', paddingBottom: '2px', width: '45px' }}>ราคา</th>
-                            <th style={{ textAlign: 'right', paddingBottom: '2px', width: '50px' }}>รวม</th>
+                            <th style={{ textAlign: 'right', paddingBottom: '2px', width: '50px' }}>ราคา</th>
+                            <th style={{ textAlign: 'right', paddingBottom: '2px', width: '55px' }}>รวม</th>
                         </tr>
                     </thead>
                     <tbody>
                         {sale.items.map((item, i) => (
                             <tr key={i}>
                                 <td style={{ paddingTop: '2px' }}>
-                                    <div style={{ fontSize: '11px' }}>{item.product.name}</div>
+                                    <div style={{ fontSize: '13px' }}>{item.product.name}</div>
                                 </td>
                                 <td style={{ textAlign: 'right', paddingTop: '2px' }}>{item.quantity}</td>
                                 <td style={{ textAlign: 'right', paddingTop: '2px' }}>{formatCurrency(item.unitPrice)}</td>
@@ -172,25 +172,25 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
                 <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
 
                 {/* Totals */}
-                <div style={{ fontSize: '12px' }}>
+                <div style={{ fontSize: '14px' }}>
                     {sale.discount > 0 && (<>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                             <span>ยอดรวมสินค้า</span>
                             <span>{formatCurrency(sale.totalAmount + sale.discount)}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#dc2626' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold' }}>
                             <span>ส่วนลด</span>
                             <span>-{formatCurrency(sale.discount)}</span>
                         </div>
                     </>)}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '16px' }}>
                         <span>รวมทั้งสิ้น</span>
                         <span>{formatCurrency(sale.totalAmount)}</span>
                     </div>
 
                     {/* Payment breakdown */}
                     {(sale.payments || []).map((p, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                             <span>{methodLabel(p.method)}</span>
                             <span>{formatCurrency(p.amount)}</span>
                         </div>
@@ -222,10 +222,10 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
                 )}
 
                 {/* Footer */}
-                <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '8px', whiteSpace: 'pre-wrap' }}>
+                <div style={{ textAlign: 'center', fontSize: '12px', marginTop: '8px', whiteSpace: 'pre-wrap' }}>
                     {template?.footer || 'ขอบคุณที่ใช้บริการ'}
                 </div>
-                <div style={{ textAlign: 'center', fontSize: '9px', color: '#666', marginTop: '4px' }}>
+                <div style={{ textAlign: 'center', fontSize: '11px', color: '#000', marginTop: '4px' }}>
                     {sale.saleNumber}
                 </div>
             </div>
