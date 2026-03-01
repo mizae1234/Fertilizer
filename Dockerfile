@@ -13,9 +13,6 @@ COPY . .
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Run DB migration (source .env to load DATABASE_URL)
-RUN set -a && . ./.env && set +a && npx prisma migrate deploy
-
 # Build Next.js
 RUN npm run build
 
