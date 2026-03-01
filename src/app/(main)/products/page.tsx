@@ -4,6 +4,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Suspense } from 'react';
 import ProductFilter from './ProductFilter';
 import ExportProductsButton from './ExportProductsButton';
+import ImportProductsButton from './ImportProductsButton';
 import { isServerAdmin } from '@/lib/server-auth';
 import PageHeader from '@/components/PageHeader';
 
@@ -80,6 +81,7 @@ export default async function ProductsPage({ searchParams }: Props) {
                 subtitle={`จัดการสินค้าทั้งหมด (${total} รายการ)`}
                 actions={
                     <div className="flex gap-2">
+                        <ImportProductsButton />
                         <ExportProductsButton />
                         <Link href="/products/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200">
                             + เพิ่มสินค้า
