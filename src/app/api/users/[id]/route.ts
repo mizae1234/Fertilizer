@@ -6,22 +6,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         const { id } = await params;
         const user = await prisma.user.findUnique({
             where: { id },
-            select: {
-                id: true,
-                username: true,
-                name: true,
-                role: true,
-                allowedMenus: true,
-                defaultWarehouseId: true,
-                printSetting: true,
-            },
         });
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
-        return NextResponse.json(user);
+        // Return safe fields (exclude password)
+        return NextResponse.json({
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            role: user.role,
+            allowedMenus: user.allowedMenus,
+            defaultWarehouseId: user.defaultWarehouseId,
+            printSetting: user.printSetting || 'bill',
+        });
     } catch (error) {
         console.error('Error fetching user:', error);
-        return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to fetch user: ' + (error as Error).message }, { status: 500 });
     }
 }
