@@ -417,6 +417,8 @@ export default function POSPage() {
 
         const existing = cart.find(c => c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === '');
         if (existing) {
+            const maxQty = existing.conversionRate > 1 ? Math.floor(existing.availableStock / existing.conversionRate) : existing.availableStock;
+            if (existing.quantity >= maxQty) { triggerPulse(product.id); return; }
             setCart(cart.map(c =>
                 c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === ''
                     ? { ...c, quantity: c.quantity + 1, points: (c.quantity + 1) * c.conversionRate * c.pointsPerUnit }
@@ -1048,17 +1050,21 @@ export default function POSPage() {
                                                     <div className="flex items-center gap-1 shrink-0">
                                                         <button onClick={() => updateCartQty(idx, item.quantity - 1)}
                                                             className="w-6 h-6 lg:w-7 lg:h-7 rounded bg-gray-50 border border-gray-200 text-gray-600 text-xs flex items-center justify-center">−</button>
-                                                        <input type="number" value={item.quantity}
-                                                            onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
-                                                            onChange={e => { const val = parseInt(e.target.value); if (!isNaN(val) && val >= 1 && val <= item.availableStock) updateCartQty(idx, val); }}
-                                                            onBlur={e => { const val = parseInt(e.target.value) || 1; updateCartQty(idx, Math.max(1, Math.min(val, item.availableStock))); }}
-                                                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                                                            className="font-bold text-xs lg:text-sm text-center w-8 lg:w-10 rounded border border-gray-200 py-0.5 outline-none focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                            min={1} max={item.availableStock}
-                                                        />
-                                                        <button onClick={() => updateCartQty(idx, item.quantity + 1)}
-                                                            disabled={item.quantity >= item.availableStock}
-                                                            className="w-6 h-6 lg:w-7 lg:h-7 rounded bg-gray-50 border border-gray-200 text-gray-600 text-xs flex items-center justify-center disabled:opacity-50">+</button>
+                                                        {(() => {
+                                                            const maxQty = item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock; return (<>
+                                                                <input type="number" value={item.quantity}
+                                                                    onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
+                                                                    onChange={e => { const val = parseInt(e.target.value); if (!isNaN(val) && val >= 1 && val <= maxQty) updateCartQty(idx, val); }}
+                                                                    onBlur={e => { const val = parseInt(e.target.value) || 1; updateCartQty(idx, Math.max(1, Math.min(val, maxQty))); }}
+                                                                    onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                                                    className="font-bold text-xs lg:text-sm text-center w-8 lg:w-10 rounded border border-gray-200 py-0.5 outline-none focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                    min={1} max={maxQty}
+                                                                />
+                                                                <button onClick={() => updateCartQty(idx, item.quantity + 1)}
+                                                                    disabled={item.quantity >= maxQty}
+                                                                    className="w-6 h-6 lg:w-7 lg:h-7 rounded bg-gray-50 border border-gray-200 text-gray-600 text-xs flex items-center justify-center disabled:opacity-50">+</button>
+                                                            </>);
+                                                        })()}
                                                     </div>
                                                     <p className="text-xs lg:text-sm font-bold text-emerald-600 shrink-0 min-w-[60px] lg:min-w-[80px] text-right">{formatCurrency(item.quantity * item.unitPrice)}</p>
                                                     <button onClick={() => removeFromCart(idx)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
