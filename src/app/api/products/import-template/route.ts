@@ -14,6 +14,7 @@ export async function GET() {
         'cost',
         'price',
         'packaging',
+        'productGroup',
     ];
 
     const thaiHeaders = [
@@ -27,6 +28,7 @@ export async function GET() {
         'ราคาทุน',
         'ราคาขาย',
         'บรรจุภัณฑ์',
+        'หมวดหมู่สินค้า',
     ];
 
     // Example row
@@ -41,22 +43,24 @@ export async function GET() {
         450,
         550,
         'ถุง 50 กก.',
+        'ปุ๋ยเคมี',
     ];
 
     const ws = XLSX.utils.aoa_to_sheet([thaiHeaders, headers, example]);
 
     // Set col widths
     ws['!cols'] = [
-        { wch: 12 }, // code
-        { wch: 30 }, // name
-        { wch: 25 }, // description
-        { wch: 10 }, // unit
-        { wch: 12 }, // pointsPerUnit
-        { wch: 12 }, // minStock
-        { wch: 15 }, // brand
-        { wch: 12 }, // cost
-        { wch: 12 }, // price
-        { wch: 18 }, // packaging
+        { wch: 12 },
+        { wch: 30 },
+        { wch: 25 },
+        { wch: 10 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 15 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 18 },
+        { wch: 18 },
     ];
 
     const wb = XLSX.utils.book_new();

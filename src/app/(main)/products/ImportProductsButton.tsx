@@ -15,6 +15,7 @@ interface PreviewRow {
     cost: number;
     price: number;
     packaging: string;
+    productGroup: string;
 }
 
 export default function ImportProductsButton() {
@@ -47,7 +48,7 @@ export default function ImportProductsButton() {
             }
 
             // Find header row
-            const fieldNames = ['code', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging'];
+            const fieldNames = ['code', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging', 'productGroup'];
             let headerRowIdx = 0;
             for (let i = 0; i < Math.min(rows.length, 5); i++) {
                 const row = rows[i].map((c: any) => String(c).trim().toLowerCase());
@@ -90,6 +91,7 @@ export default function ImportProductsButton() {
                     cost: parseFloat(getValue('cost') || '0') || 0,
                     price: parseFloat(getValue('price') || '0') || 0,
                     packaging: getValue('packaging'),
+                    productGroup: getValue('productGroup'),
                 });
             }
 
@@ -207,6 +209,7 @@ export default function ImportProductsButton() {
                                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">รหัส</th>
                                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">ชื่อสินค้า</th>
                                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">หน่วย</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">หมวดหมู่</th>
                                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">ยี่ห้อ</th>
                                             <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">ทุน</th>
                                             <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">ราคาขาย</th>
@@ -222,6 +225,7 @@ export default function ImportProductsButton() {
                                                 <td className="px-3 py-2 font-mono text-gray-600">{row.code || <span className="text-gray-300 italic">อัตโนมัติ</span>}</td>
                                                 <td className="px-3 py-2 font-medium text-gray-800">{row.name}</td>
                                                 <td className="px-3 py-2 text-gray-600">{row.unit}</td>
+                                                <td className="px-3 py-2 text-gray-600">{row.productGroup || <span className="text-gray-300">-</span>}</td>
                                                 <td className="px-3 py-2 text-gray-600">{row.brand || '-'}</td>
                                                 <td className="px-3 py-2 text-right text-gray-600">{row.cost.toLocaleString()}</td>
                                                 <td className="px-3 py-2 text-right font-semibold text-gray-800">{row.price.toLocaleString()}</td>

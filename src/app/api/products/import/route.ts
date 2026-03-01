@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
         // Find the header row (look for the row that contains 'code' and 'name')
         let headerRowIdx = 0;
-        const fieldNames = ['code', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging'];
+        const fieldNames = ['code', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging', 'productGroup'];
         for (let i = 0; i < Math.min(rows.length, 5); i++) {
             const row = rows[i].map((c: any) => String(c).trim().toLowerCase());
             if (row.includes('code') && row.includes('name')) {
@@ -66,6 +66,10 @@ export async function POST(request: Request) {
         const dataRows = rows.slice(headerRowIdx + 1);
         const results = { created: 0, skipped: 0, errors: [] as string[] };
 
+        // Cache product groups by name for lookup
+        const allGroups = await prisma.productGroup.findMany({ select: { id: true, name: true } });
+        const groupMap = new Map(allGroups.map(g => [g.name.toLowerCase(), g.id]));
+
         for (let i = 0; i < dataRows.length; i++) {
             const row = dataRows[i];
             if (!row || row.length === 0) continue;
@@ -97,6 +101,21 @@ export async function POST(request: Request) {
                 continue;
             }
 
+            // Resolve productGroup
+            let productGroupId: string | null = null;
+            const groupName = getValue('productGroup');
+            if (groupName) {
+                const key = groupName.toLowerCase();
+                if (groupMap.has(key)) {
+                    productGroupId = groupMap.get(key)!;
+                } else {
+                    // Auto-create group
+                    const newGroup = await prisma.productGroup.create({ data: { name: groupName } });
+                    groupMap.set(key, newGroup.id);
+                    productGroupId = newGroup.id;
+                }
+            }
+
             try {
                 await prisma.product.create({
                     data: {
@@ -110,6 +129,7 @@ export async function POST(request: Request) {
                         cost: parseFloat(getValue('cost') || '0') || 0,
                         price: parseFloat(getValue('price') || '0') || 0,
                         packaging: getValue('packaging') || null,
+                        productGroupId,
                     },
                 });
                 existingCodes.add(code.toLowerCase());
