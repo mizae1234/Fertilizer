@@ -339,19 +339,22 @@ export default function POSPage() {
 
     useEffect(() => {
         let userDefaultWhId = '';
-        let userPrintSetting = 'bill';
+        let currentUserId = '';
         try {
             const token = document.cookie.split('; ').find(c => c.startsWith('token='))?.split('=')[1];
             if (token) {
                 const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(token.split('.')[1]), c => c.charCodeAt(0))));
-                if (payload.userId) setUserId(payload.userId);
+                if (payload.userId) { setUserId(payload.userId); currentUserId = payload.userId; }
                 if (payload.defaultWarehouseId) userDefaultWhId = payload.defaultWarehouseId;
-                if (payload.printSetting) {
-                    userPrintSetting = payload.printSetting;
-                    setUserPrintSetting(payload.printSetting);
-                }
             }
         } catch { /* ignore */ }
+
+        // Fetch latest printSetting from API (not JWT, so changes take effect without re-login)
+        if (currentUserId) {
+            fetch(`/api/users/${currentUserId}`).then(r => r.json()).then(data => {
+                if (data.printSetting) setUserPrintSetting(data.printSetting);
+            }).catch(() => { });
+        }
 
         Promise.all([
             fetch('/api/warehouses').then(r => r.json()),
