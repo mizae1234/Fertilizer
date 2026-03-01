@@ -1,13 +1,34 @@
 services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fertilizer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-fertilizer_pos}
+      TZ: Asia/Bangkok
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fertilizer}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   web:
     build: .
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fertilizer}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-fertilizer_pos}?schema=public&options=-c%20timezone%3DAsia%2FBangkok
     expose:
       - "3000"
     volumes:
       - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
 
   caddy:
     image: caddy:2-alpine
@@ -23,6 +44,7 @@ services:
       - web
 
 volumes:
+  pg_data:
   caddy_data:
   caddy_config:
   uploads_data:
