@@ -451,7 +451,7 @@ export default function SaleDetailPage() {
                             <tbody className="divide-y divide-gray-50">
                                 {sale.items.map((item, idx) => {
                                     // Calculate how many of this item have been returned
-                                    const returnedQty = sale.saleReturns.reduce((sum, sr) =>
+                                    const returnedQty = (sale.saleReturns || []).reduce((sum, sr) =>
                                         sum + sr.items.filter(ri => ri.saleItemId === item.id).reduce((s, ri) => s + ri.quantity, 0), 0);
                                     const remainingQty = item.quantity - returnedQty;
                                     const isFullyReturned = remainingQty <= 0;
