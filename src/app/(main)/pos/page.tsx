@@ -57,16 +57,18 @@ const PAYMENT_METHODS = [
     { value: 'CREDIT', label: '📋 เครดิต', color: 'amber' },
 ];
 
-function PaymentModal({ total, loading, onConfirm, onClose }: {
+function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType }: {
     total: number; loading: boolean;
-    onConfirm: (payments: { method: string; amount: number; dueDate?: string }[], printType: 'bill' | 'invoice') => void;
+    onConfirm: (payments: { method: string; amount: number; dueDate?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number) => void;
     onClose: () => void;
+    defaultPrintType?: 'bill' | 'invoice' | 'none';
 }) {
     const [lines, setLines] = useState<PaymentLine[]>([
         { method: 'CASH', amount: total, dueDate: '' }
     ]);
     const [bankAccounts, setBankAccounts] = useState<BankAccountInfo[]>([]);
-    const [printType, setPrintType] = useState<'bill' | 'invoice'>('bill');
+    const [printType, setPrintType] = useState<'bill' | 'invoice' | 'none'>(defaultPrintType || 'bill');
+    const [cashReceived, setCashReceived] = useState<number | ''>(0);
 
     // Fetch bank accounts on mount
     useEffect(() => {
@@ -116,8 +118,13 @@ function PaymentModal({ total, loading, onConfirm, onClose }: {
             amount: l.amount,
             ...(l.method === 'CREDIT' && l.dueDate ? { dueDate: l.dueDate } : {}),
         }));
-        onConfirm(payments, printType);
+        const cashVal = typeof cashReceived === 'number' && cashReceived > 0 ? cashReceived : undefined;
+        onConfirm(payments, printType, cashVal);
     };
+
+    // Calculate change for cash-only payment
+    const isCashOnly = lines.length === 1 && lines[0].method === 'CASH';
+    const changeAmount = isCashOnly && typeof cashReceived === 'number' ? cashReceived - total : 0;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
@@ -217,8 +224,39 @@ function PaymentModal({ total, loading, onConfirm, onClose }: {
                                 className={`flex-1 rounded-lg text-xs font-medium py-2 transition-all ${printType === 'invoice' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-emerald-300'}`}>
                                 📄 ใบกำกับ
                             </button>
+                            <button type="button" onClick={() => setPrintType('none')}
+                                className={`flex-1 rounded-lg text-xs font-medium py-2 transition-all ${printType === 'none' ? 'bg-gray-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-400'}`}>
+                                🚫 ไม่ปริ้น
+                            </button>
                         </div>
                     </div>
+
+                    {/* Cash received / change */}
+                    {isCashOnly && (
+                        <div className="rounded-xl border border-emerald-200 p-3 bg-emerald-50/50">
+                            <p className="text-xs text-gray-500 mb-2">💵 รับเงินมา / เงินทอน</p>
+                            <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                    <label className="text-xs text-gray-400">รับมา</label>
+                                    <input
+                                        type="number"
+                                        value={cashReceived === 0 ? '' : cashReceived}
+                                        onChange={e => setCashReceived(e.target.value ? parseFloat(e.target.value) : '')}
+                                        className="w-full px-3 py-2 rounded-lg border border-emerald-200 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500 text-right"
+                                        placeholder={formatCurrency(total)}
+                                        min={0}
+                                        step="0.01"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-xs text-gray-400">เงินทอน</label>
+                                    <div className={`px-3 py-2 rounded-lg text-sm font-bold text-right ${changeAmount >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                                        {changeAmount >= 0 ? formatCurrency(changeAmount) : `-${formatCurrency(Math.abs(changeAmount))}`}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer: Remaining + Confirm */}
@@ -273,6 +311,7 @@ export default function POSPage() {
         } catch { return []; }
     });
     const [userId, setUserId] = useState('');
+    const [userPrintSetting, setUserPrintSetting] = useState('bill');
     const [search, setSearch] = useState('');
     const [customerSearch, setCustomerSearch] = useState('');
     const [loading, setLoading] = useState(false);
@@ -300,12 +339,17 @@ export default function POSPage() {
 
     useEffect(() => {
         let userDefaultWhId = '';
+        let userPrintSetting = 'bill';
         try {
             const token = document.cookie.split('; ').find(c => c.startsWith('token='))?.split('=')[1];
             if (token) {
                 const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(token.split('.')[1]), c => c.charCodeAt(0))));
                 if (payload.userId) setUserId(payload.userId);
                 if (payload.defaultWarehouseId) userDefaultWhId = payload.defaultWarehouseId;
+                if (payload.printSetting) {
+                    userPrintSetting = payload.printSetting;
+                    setUserPrintSetting(payload.printSetting);
+                }
             }
         } catch { /* ignore */ }
 
@@ -619,7 +663,7 @@ export default function POSPage() {
         setShowPaymentModal(true);
     };
 
-    const confirmPayment = async (payments: { method: string; amount: number; dueDate?: string }[], printType: 'bill' | 'invoice') => {
+    const confirmPayment = async (payments: { method: string; amount: number; dueDate?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number) => {
         setLoading(true);
         try {
             // Expand bundle items into individual product items for stock deduction
@@ -661,11 +705,11 @@ export default function POSPage() {
             setShowNotes(false);
 
             // Auto-print based on selected print type
-            if (result?.id) {
+            if (result?.id && printType !== 'none') {
                 if (printType === 'bill') {
-                    window.open(`/receipt/${result.id}`, '_blank');
+                    const url = cashReceived ? `/receipt/${result.id}?cashReceived=${cashReceived}` : `/receipt/${result.id}`;
+                    window.open(url, '_blank');
                 } else {
-                    // Open A4 invoice in new tab
                     window.open(`/invoice/${result.id}`, '_blank');
                 }
             }
@@ -1177,6 +1221,7 @@ export default function POSPage() {
                     loading={loading}
                     onConfirm={confirmPayment}
                     onClose={() => setShowPaymentModal(false)}
+                    defaultPrintType={userPrintSetting as 'bill' | 'invoice' | 'none'}
                 />
             )}
 

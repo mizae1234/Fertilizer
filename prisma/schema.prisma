@@ -38,6 +38,7 @@ model User {
   role                UserRole   @default(STAFF)
   allowedMenus        Json? // string[] of allowed menu hrefs, null = all access
   defaultWarehouseId  String?
+  printSetting        String     @default("bill") // "bill" | "invoice" | "none"
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
   deletedAt           DateTime?

@@ -2,8 +2,10 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import ReceiptPrint from './ReceiptPrint';
 
-export default async function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ReceiptPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ cashReceived?: string }> }) {
     const { id } = await params;
+    const { cashReceived: cashReceivedStr } = await searchParams;
+    const cashReceived = cashReceivedStr ? parseFloat(cashReceivedStr) : undefined;
 
     const sale = await prisma.sale.findUnique({
         where: { id },
@@ -54,5 +56,5 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
         showCustomer: template.showCustomer ?? true,
     } : null;
 
-    return <ReceiptPrint sale={saleData} template={templateData} />;
+    return <ReceiptPrint sale={saleData} template={templateData} cashReceived={cashReceived} />;
 }

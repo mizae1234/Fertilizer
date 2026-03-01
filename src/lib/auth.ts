@@ -10,6 +10,7 @@ export interface JWTPayload {
     role: string;
     allowedMenus: string[] | null;
     defaultWarehouseId?: string | null;
+    printSetting?: string; // "bill" | "invoice" | "none"
 }
 
 export function signToken(payload: JWTPayload): string {

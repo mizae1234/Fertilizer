@@ -13,6 +13,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
                 role: true,
                 allowedMenus: true,
                 defaultWarehouseId: true,
+                printSetting: true,
             },
         });
         if (!user) {

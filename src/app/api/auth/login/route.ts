@@ -42,6 +42,7 @@ export async function POST(request: Request) {
             role: user.role,
             allowedMenus,
             defaultWarehouseId: user.defaultWarehouseId,
+            printSetting: user.printSetting || 'bill',
         });
 
         return NextResponse.json({

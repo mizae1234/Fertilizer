@@ -57,7 +57,7 @@ function methodLabel(m: string) {
     }
 }
 
-export default function ReceiptPrint({ sale, template }: { sale: Sale; template: Template }) {
+export default function ReceiptPrint({ sale, template, cashReceived }: { sale: Sale; template: Template; cashReceived?: number }) {
     // Auto print when loaded
     useEffect(() => {
         const timer = setTimeout(() => window.print(), 300);
@@ -196,7 +196,18 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
                         </div>
                     ))}
 
-                    {change > 0 && (
+                    {cashReceived && cashReceived > 0 ? (
+                        <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginTop: '2px' }}>
+                                <span>รับเงินมา</span>
+                                <span>{formatCurrency(cashReceived)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '2px' }}>
+                                <span>เงินทอน</span>
+                                <span>{formatCurrency(cashReceived - sale.totalAmount)}</span>
+                            </div>
+                        </>
+                    ) : change > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '2px' }}>
                             <span>เงินทอน</span>
                             <span>{formatCurrency(change)}</span>

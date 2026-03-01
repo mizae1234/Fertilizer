@@ -13,6 +13,7 @@ export default function NewUserPage() {
     const [name, setName] = useState('');
     const [role, setRole] = useState<'ADMIN' | 'STAFF'>('STAFF');
     const [selectedMenus, setSelectedMenus] = useState<string[]>([...ALL_MENU_HREFS]);
+    const [printSetting, setPrintSetting] = useState('bill');
     const [saving, setSaving] = useState(false);
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; type: 'success' | 'error'; title?: string }>({ open: false, message: '', type: 'error' });
 
@@ -51,6 +52,7 @@ export default function NewUserPage() {
                 name: name.trim(),
                 role,
                 allowedMenus: isAdmin ? null : selectedMenus,
+                printSetting,
             });
             setAlertModal({ open: true, message: 'สร้างผู้ใช้สำเร็จ', type: 'success', title: 'สำเร็จ' });
         } catch (error) {
@@ -119,6 +121,18 @@ export default function NewUserPage() {
                         >
                             <option value="STAFF">พนักงาน (STAFF)</option>
                             <option value="ADMIN">ผู้ดูแลระบบ (ADMIN)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-400 mb-1 block">🖨️ การปริ้นหลังชำระเงิน</label>
+                        <select
+                            value={printSetting}
+                            onChange={e => setPrintSetting(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                        >
+                            <option value="bill">🧾 ปริ้นบิล (ค่าเริ่มต้น)</option>
+                            <option value="invoice">📄 ปริ้นใบกำกับ</option>
+                            <option value="none">🚫 ไม่ปริ้น</option>
                         </select>
                     </div>
                 </div>

@@ -29,6 +29,7 @@ export async function getUserById(id: string) {
             name: true,
             role: true,
             allowedMenus: true,
+            printSetting: true,
         },
     });
 }
@@ -39,6 +40,7 @@ export async function createUser(data: {
     name: string;
     role: 'ADMIN' | 'STAFF';
     allowedMenus: string[] | null;
+    printSetting?: string;
 }) {
     // Check if username already exists
     const existing = await prisma.user.findUnique({ where: { username: data.username } });
@@ -55,6 +57,7 @@ export async function createUser(data: {
             name: data.name,
             role: data.role,
             allowedMenus: data.allowedMenus === null ? Prisma.JsonNull : data.allowedMenus,
+            printSetting: data.printSetting || 'bill',
         },
     });
 
@@ -71,6 +74,7 @@ export async function updateUser(
         role?: 'ADMIN' | 'STAFF';
         allowedMenus?: string[] | null;
         defaultWarehouseId?: string | null;
+        printSetting?: string;
     }
 ) {
     // If username is changing, check uniqueness
@@ -88,6 +92,7 @@ export async function updateUser(
     if (data.password) updateData.password = await hashPassword(data.password);
     if ('allowedMenus' in data) updateData.allowedMenus = data.allowedMenus === null ? Prisma.JsonNull : data.allowedMenus;
     if ('defaultWarehouseId' in data) updateData.defaultWarehouseId = data.defaultWarehouseId;
+    if ('printSetting' in data) updateData.printSetting = data.printSetting;
 
     const user = await prisma.user.update({
         where: { id },

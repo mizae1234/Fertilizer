@@ -15,6 +15,7 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
     const [role, setRole] = useState<'ADMIN' | 'STAFF'>('STAFF');
     const [selectedMenus, setSelectedMenus] = useState<string[]>([]);
     const [defaultWarehouseId, setDefaultWarehouseId] = useState<string>('');
+    const [printSetting, setPrintSetting] = useState('bill');
     const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -30,6 +31,7 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
             setRole(data.role);
             setSelectedMenus(data.allowedMenus ?? [...ALL_MENU_HREFS]);
             setDefaultWarehouseId(data.defaultWarehouseId || '');
+            setPrintSetting(data.printSetting || 'bill');
             setWarehouses(wh);
             setLoading(false);
         }).catch(() => setLoading(false));
@@ -71,6 +73,7 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                 ...(password ? { password } : {}),
                 allowedMenus: isAdmin ? null : selectedMenus,
                 defaultWarehouseId: defaultWarehouseId || null,
+                printSetting,
             });
             setAlertModal({ open: true, message: 'แก้ไขผู้ใช้สำเร็จ', type: 'success', title: 'สำเร็จ' });
         } catch (error) {
@@ -149,6 +152,18 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                         >
                             <option value="">ไม่ระบุ</option>
                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-400 mb-1 block">🖨️ การปริ้นหลังชำระเงิน</label>
+                        <select
+                            value={printSetting}
+                            onChange={e => setPrintSetting(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                        >
+                            <option value="bill">🧾 ปริ้นบิล (ค่าเริ่มต้น)</option>
+                            <option value="invoice">📄 ปริ้นใบกำกับ</option>
+                            <option value="none">🚫 ไม่ปริ้น</option>
                         </select>
                     </div>
                 </div>
