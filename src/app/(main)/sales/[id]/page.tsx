@@ -11,13 +11,13 @@ import { useUser } from '@/hooks/useUser';
 
 interface SaleDetail {
     id: string; saleNumber: string; status: string;
-    totalAmount: string; totalPoints: number; createdAt: string;
+    totalAmount: string; discount: string; totalPoints: number; createdAt: string;
     customerId: string | null;
     notes: string | null;
     customer: { name: string; phone: string } | null;
     createdBy: { name: string };
     items: {
-        id: string; quantity: number; unitPrice: string; totalPrice: string; points: number;
+        id: string; quantity: number; unitPrice: string; totalPrice: string; discount: string; points: number;
         unitName: string | null;
         productId: string; warehouseId: string;
         product: { name: string; code: string; unit: string; productUnits: { unitName: string; conversionRate: string }[] };
@@ -161,6 +161,8 @@ export default function SaleDetailPage() {
     const totalAmount = isEditing
         ? items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
         : Number(sale.totalAmount);
+    const discount = Number(sale.discount || 0);
+    const subtotal = totalAmount + discount;
     const totalPoints = isEditing
         ? items.reduce((s, i) => s + i.points, 0)
         : sale.totalPoints;
@@ -219,6 +221,9 @@ export default function SaleDetailPage() {
                     <div>
                         <p className="text-xs text-gray-500">มูลค่ารวม</p>
                         <p className="text-sm font-semibold text-gray-800">{formatCurrency(totalAmount)}</p>
+                        {discount > 0 && (
+                            <p className="text-xs text-red-500 mt-0.5">ส่วนลด: -{formatCurrency(discount)}</p>
+                        )}
                     </div>
                     <div>
                         <p className="text-xs text-gray-500">แต้มสะสม</p>
@@ -313,14 +318,31 @@ export default function SaleDetailPage() {
                                             </p>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitPrice))}</td>
-                                        <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(item.totalPrice))}</td>
+                                        <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">
+                                            {formatCurrency(Number(item.totalPrice))}
+                                            {Number(item.discount || 0) > 0 && (
+                                                <div className="text-xs text-red-500 font-normal">-{formatCurrency(Number(item.discount))}</div>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3 text-sm text-emerald-600 text-right">+{item.points}</td>
                                     </tr>
                                 ))}
                             </tbody>
                             <tfoot>
+                                {discount > 0 && (<>
+                                    <tr className="border-t border-gray-200">
+                                        <td colSpan={5} className="px-4 py-2 text-right text-sm text-gray-600">ยอดรวมก่อนส่วนลด</td>
+                                        <td className="px-4 py-2 text-right text-sm text-gray-600">{formatCurrency(subtotal)}</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td colSpan={5} className="px-4 py-2 text-right text-sm text-red-500 font-medium">ส่วนลด</td>
+                                        <td className="px-4 py-2 text-right text-sm text-red-500 font-medium">-{formatCurrency(discount)}</td>
+                                        <td></td>
+                                    </tr>
+                                </>)}
                                 <tr className="border-t-2 border-gray-200">
-                                    <td colSpan={5} className="px-4 py-3 text-right text-sm font-semibold text-gray-800">รวมทั้งหมด</td>
+                                    <td colSpan={5} className="px-4 py-3 text-right text-sm font-semibold text-gray-800">รวมทั้งสิ้น</td>
                                     <td className="px-4 py-3 text-right text-lg font-bold text-emerald-600">{formatCurrency(totalAmount)}</td>
                                     <td className="px-4 py-3 text-right text-sm font-bold text-emerald-600">+{totalPoints}</td>
                                 </tr>

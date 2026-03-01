@@ -24,11 +24,15 @@ interface Sale {
 
 interface TemplateData {
     shopName: string;
-    address: string | null;
-    phone: string | null;
-    taxId: string | null;
+    headerText: string | null;
     footer: string | null;
+    showLogo: boolean;
     logoUrl: string | null;
+    showQr: boolean;
+    qrCodeUrl: string | null;
+    showBillNo: boolean;
+    showStaff: boolean;
+    showCustomer: boolean;
 }
 
 type Template = TemplateData | null;
@@ -99,26 +103,39 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
             </div>
 
             <div style={{ width: '72mm', margin: '0 auto', padding: '4mm 0' }}>
+                {/* Logo */}
+                {template?.showLogo && template?.logoUrl && (
+                    <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={template.logoUrl} alt="logo" style={{ maxHeight: '50px', maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />
+                    </div>
+                )}
+
                 {/* Header */}
                 <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{shopName}</div>
-                    {template?.address && <div style={{ fontSize: '10px' }}>{template.address}</div>}
-                    {template?.phone && <div style={{ fontSize: '10px' }}>โทร: {template.phone}</div>}
-                    {template?.taxId && <div style={{ fontSize: '10px' }}>เลขผู้เสียภาษี: {template.taxId}</div>}
+                    {template?.headerText ? (
+                        template.headerText.split('\n').map((line, i) => (
+                            <div key={i} style={{ fontSize: i === 0 ? '16px' : '11px', fontWeight: i === 0 ? 'bold' : 'normal' }}>{line}</div>
+                        ))
+                    ) : (
+                        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{shopName}</div>
+                    )}
                 </div>
 
                 <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
 
                 {/* Bill Info */}
                 <div style={{ fontSize: '11px', marginBottom: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>บิลเลขที่: {sale.saleNumber}</span>
-                    </div>
+                    {(template?.showBillNo !== false) && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>บิลเลขที่: {sale.saleNumber}</span>
+                        </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>{formatDate(sale.createdAt)}</span>
-                        <span>พนง: {sale.createdBy?.name || '-'}</span>
+                        {(template?.showStaff !== false) && <span>พนง: {sale.createdBy?.name || '-'}</span>}
                     </div>
-                    {sale.customer && (
+                    {(template?.showCustomer !== false) && sale.customer && (
                         <div>
                             <div>ลูกค้า: {sale.customer.name}</div>
                             {sale.customer.phone && <div>โทร: {sale.customer.phone}</div>}
@@ -189,6 +206,14 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
 
                 <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
 
+                {/* QR Code */}
+                {template?.showQr && template?.qrCodeUrl && (
+                    <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={template.qrCodeUrl} alt="QR Code" style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }} />
+                    </div>
+                )}
+
                 {/* Notes */}
                 {sale.notes && (
                     <div style={{ fontSize: '10px', marginBottom: '4px' }}>
@@ -197,7 +222,7 @@ export default function ReceiptPrint({ sale, template }: { sale: Sale; template:
                 )}
 
                 {/* Footer */}
-                <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '8px' }}>
+                <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '8px', whiteSpace: 'pre-wrap' }}>
                     {template?.footer || 'ขอบคุณที่ใช้บริการ'}
                 </div>
                 <div style={{ textAlign: 'center', fontSize: '9px', color: '#666', marginTop: '4px' }}>

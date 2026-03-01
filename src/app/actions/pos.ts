@@ -78,6 +78,7 @@ export async function createSaleFromPOS(data: {
                         quantity: item.quantity,
                         unitPrice: item.unitPrice,
                         totalPrice: item.quantity * item.unitPrice,
+                        discount: item.itemDiscount || 0,
                         points: item.points,
                         unitName: item.unitName || null,
                     })),

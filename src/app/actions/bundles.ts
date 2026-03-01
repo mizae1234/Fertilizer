@@ -62,26 +62,43 @@ export async function createBundle(data: {
     bundleCost: number;
     items: { productId: string; quantity: number }[];
 }) {
-    const lastBundle = await prisma.productBundle.findFirst({ orderBy: { code: 'desc' }, select: { code: true } });
-    const lastNum = lastBundle ? parseInt(lastBundle.code.replace('BD', '')) || 0 : 0;
-    const code = 'BD' + String(lastNum + 1).padStart(4, '0');
-    const bundle = await prisma.productBundle.create({
-        data: {
-            code,
-            name: data.name,
-            description: data.description || null,
-            bundlePrice: data.bundlePrice,
-            bundleCost: data.bundleCost,
-            items: {
-                create: data.items.map((item) => ({
-                    productId: item.productId,
-                    quantity: item.quantity,
-                })),
-            },
-        },
-    });
-    revalidatePath('/bundles');
-    return bundle;
+    // Robust code generation with retry on unique constraint
+    const maxAttempts = 5;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            // Count ALL bundles (including soft-deleted) to get next number
+            const allBundles = await prisma.productBundle.findMany({
+                select: { code: true },
+                orderBy: { code: 'desc' },
+                take: 1,
+            });
+            const lastNum = allBundles.length > 0 ? parseInt(allBundles[0].code.replace('BD', '')) || 0 : 0;
+            const code = 'BD' + String(lastNum + 1 + attempt).padStart(4, '0');
+
+            const bundle = await prisma.productBundle.create({
+                data: {
+                    code,
+                    name: data.name,
+                    description: data.description || null,
+                    bundlePrice: data.bundlePrice,
+                    bundleCost: data.bundleCost,
+                    items: {
+                        create: data.items.map((item) => ({
+                            productId: item.productId,
+                            quantity: item.quantity,
+                        })),
+                    },
+                },
+            });
+            revalidatePath('/bundles');
+            return bundle;
+        } catch (e: any) {
+            // If it's NOT a unique constraint error, throw immediately
+            if (!e.message?.includes('Unique constraint')) throw e;
+            // Otherwise retry with next number
+            if (attempt === maxAttempts - 1) throw new Error('ไม่สามารถสร้างรหัสชุดสินค้าได้ กรุณาลองใหม่อีกครั้ง');
+        }
+    }
 }
 
 export async function updateBundle(

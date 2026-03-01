@@ -42,12 +42,16 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
     }));
 
     const templateData = template ? {
-        shopName: template.headerText || 'Fertilizer POS',
-        address: null,
-        phone: null,
-        taxId: null,
+        shopName: template.name || 'Fertilizer POS',
+        headerText: template.headerText || null,
         footer: template.footerText || null,
+        showLogo: template.showLogo ?? false,
         logoUrl: template.logoUrl || null,
+        showQr: template.showQr ?? false,
+        qrCodeUrl: template.qrCodeUrl || null,
+        showBillNo: template.showBillNo ?? true,
+        showStaff: template.showStaff ?? true,
+        showCustomer: template.showCustomer ?? true,
     } : null;
 
     return <ReceiptPrint sale={saleData} template={templateData} />;
