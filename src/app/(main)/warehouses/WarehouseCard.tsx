@@ -21,7 +21,7 @@ interface Warehouse {
     productStocks: { quantity: number }[];
 }
 
-export default function WarehouseCard({ wh }: { wh: Warehouse }) {
+export default function WarehouseCard({ wh, isMain }: { wh: Warehouse; isMain?: boolean }) {
     const router = useRouter();
     const [editing, setEditing] = useState(false);
     const [name, setName] = useState(wh.name);
@@ -115,6 +115,11 @@ export default function WarehouseCard({ wh }: { wh: Warehouse }) {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                            {isMain && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                                    ⭐ คลังหลัก
+                                </span>
+                            )}
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${wh.isActive
                                 ? 'bg-emerald-100 text-emerald-700'
                                 : 'bg-gray-100 text-gray-500'
