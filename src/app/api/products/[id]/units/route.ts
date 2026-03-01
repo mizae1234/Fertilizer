@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+function getUserId(request: Request): string | null {
+    try {
+        const cookieHeader = request.headers.get('cookie') || '';
+        const tokenMatch = cookieHeader.split('; ').find(c => c.startsWith('token='));
+        if (tokenMatch) {
+            const token = tokenMatch.split('=')[1];
+            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+            return payload.userId || null;
+        }
+    } catch { /* ignore */ }
+    return null;
+}
+
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
@@ -58,6 +71,16 @@ export async function POST(
                 conversionRate,
                 sellingPrice,
                 isBaseUnit: isBaseUnit || false,
+            },
+        });
+        await prisma.productLog.create({
+            data: {
+                productId: id,
+                userId: getUserId(request),
+                action: 'ADD_UNIT',
+                field: 'productUnit',
+                newValue: `${unitName} (x${conversionRate}) ราคา ${sellingPrice}`,
+                details: `เพิ่มหน่วยขาย "${unitName}" อัตราแปลง ${conversionRate} ราคา ${sellingPrice}`,
             },
         });
         return NextResponse.json(unit, { status: 201 });

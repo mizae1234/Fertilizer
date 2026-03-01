@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+function getUserId(request: Request): string | null {
+    try {
+        const cookieHeader = request.headers.get('cookie') || '';
+        const tokenMatch = cookieHeader.split('; ').find(c => c.startsWith('token='));
+        if (tokenMatch) {
+            const token = tokenMatch.split('=')[1];
+            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+            return payload.userId || null;
+        }
+    } catch { /* ignore */ }
+    return null;
+}
+
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string; unitId: string }> }
@@ -49,6 +62,24 @@ export async function PUT(
             where: { id: unitId },
             data: { unitName, conversionRate, sellingPrice, isBaseUnit },
         });
+        // Log changes
+        const changes: string[] = [];
+        if (existing.unitName !== unitName) changes.push(`ชื่อ: "${existing.unitName}" → "${unitName}"`);
+        if (Number(existing.conversionRate) !== Number(conversionRate)) changes.push(`อัตราแปลง: ${existing.conversionRate} → ${conversionRate}`);
+        if (Number(existing.sellingPrice) !== Number(sellingPrice)) changes.push(`ราคา: ${existing.sellingPrice} → ${sellingPrice}`);
+        if (changes.length > 0) {
+            await prisma.productLog.create({
+                data: {
+                    productId: id,
+                    userId: getUserId(request),
+                    action: 'UPDATE_UNIT',
+                    field: 'productUnit',
+                    oldValue: `${existing.unitName} (x${existing.conversionRate}) ราคา ${existing.sellingPrice}`,
+                    newValue: `${unitName} (x${conversionRate}) ราคา ${sellingPrice}`,
+                    details: `แก้ไขหน่วยขาย "${unitName}": ${changes.join(', ')}`,
+                },
+            });
+        }
         return NextResponse.json(unit);
     } catch (error: any) {
         if (error?.code === 'P2002') {
@@ -80,5 +111,15 @@ export async function DELETE(
     }
 
     await prisma.productUnit.delete({ where: { id: unitId } });
+    await prisma.productLog.create({
+        data: {
+            productId: id,
+            userId: getUserId(request),
+            action: 'DELETE_UNIT',
+            field: 'productUnit',
+            oldValue: `${existing.unitName} (x${existing.conversionRate}) ราคา ${existing.sellingPrice}`,
+            details: `ลบหน่วยขาย "${existing.unitName}"`,
+        },
+    });
     return NextResponse.json({ success: true });
 }
