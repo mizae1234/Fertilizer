@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
 
 export default function ExportProductsButton() {
     const [loading, setLoading] = useState(false);
@@ -11,45 +12,39 @@ export default function ExportProductsButton() {
             const res = await fetch('/api/products/export');
             const products = await res.json();
 
-            // BOM for Excel to recognize UTF-8
-            const BOM = '\uFEFF';
-            const headers = ['รหัส', 'ชื่อสินค้า', 'หมวดหมู่', 'ยี่ห้อ', 'บรรจุภัณฑ์', 'หน่วย', 'ต้นทุน', 'ราคาขาย', 'Stock รวม', 'Stock แยกคลัง'];
-
             const rows = products.map((p: any) => {
                 const totalStock = p.productStocks.reduce((s: number, ps: any) => s + ps.quantity, 0);
                 const stockDetail = p.productStocks.map((ps: any) => `${ps.warehouse.name}: ${ps.quantity}`).join(' | ');
-                return [
-                    p.code,
-                    p.name,
-                    p.productGroup?.name || '',
-                    p.brand || '',
-                    p.packaging || '',
-                    p.unit,
-                    Number(p.cost),
-                    Number(p.price),
-                    totalStock,
-                    stockDetail,
-                ];
+                return {
+                    'รหัส': p.code,
+                    'ชื่อสินค้า': p.name,
+                    'หมวดหมู่': p.productGroup?.name || '',
+                    'ยี่ห้อ': p.brand || '',
+                    'บรรจุภัณฑ์': p.packaging || '',
+                    'หน่วย': p.unit,
+                    'ต้นทุน': Number(p.cost),
+                    'ราคาขาย': Number(p.price),
+                    'Stock รวม': totalStock,
+                    'Stock แยกคลัง': stockDetail,
+                };
             });
 
-            const csvContent = BOM + [
-                headers.join(','),
-                ...rows.map((row: any[]) =>
-                    row.map(cell => {
-                        const s = String(cell);
-                        return s.includes(',') || s.includes('"') || s.includes('\n')
-                            ? `"${s.replace(/"/g, '""')}"`
-                            : s;
-                    }).join(',')
-                ),
-            ].join('\n');
+            const ws = XLSX.utils.json_to_sheet(rows);
+            ws['!cols'] = [
+                { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 15 },
+                { wch: 15 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+                { wch: 12 }, { wch: 30 },
+            ];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Products');
 
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+            const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+            const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             const date = new Date().toISOString().slice(0, 10);
-            a.download = `products_${date}.csv`;
+            a.download = `products_${date}.xlsx`;
             a.click();
             URL.revokeObjectURL(url);
         } catch (e) {

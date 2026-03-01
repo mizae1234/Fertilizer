@@ -52,9 +52,9 @@ export default function ImportProductsButton() {
                 <button
                     onClick={handleDownloadTemplate}
                     className="px-3 py-2.5 rounded-l-xl border border-gray-200 text-gray-600 font-medium text-sm hover:bg-gray-50 transition-colors"
-                    title="ดาวน์โหลด Template"
+                    title="ดาวน์โหลด Template สำหรับนำเข้าสินค้า"
                 >
-                    📄
+                    📄 Template
                 </button>
                 <label className={`px-3 py-2.5 rounded-r-xl border border-l-0 border-gray-200 text-gray-600 font-medium text-sm hover:bg-gray-50 transition-colors cursor-pointer ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
                     <input
