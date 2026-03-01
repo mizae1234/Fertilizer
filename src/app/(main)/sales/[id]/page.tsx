@@ -171,6 +171,9 @@ export default function SaleDetailPage() {
         if (items.length === 0) { showAlert('กรุณาเพิ่มรายการสินค้า', 'error'); return; }
         if (items.some(i => !i.productId)) { showAlert('กรุณาเลือกสินค้าทุกรายการ', 'error'); return; }
         if (!user?.userId) { showAlert('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่', 'error'); return; }
+        const sub = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+        const totalDisc = items.reduce((s, i) => s + (i.itemDiscount || 0), 0) + editBillDiscount;
+        if (totalDisc > sub) { showAlert(`ส่วนลดรวม (${totalDisc.toLocaleString()}) เกินยอดสินค้า (${sub.toLocaleString()})`, 'error'); return; }
         setSaving(true);
         try {
             const updated = await updateSale(id, {
