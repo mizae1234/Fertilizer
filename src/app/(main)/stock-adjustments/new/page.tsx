@@ -323,7 +323,15 @@ export default function NewStockAdjustmentPage() {
                                 <label className="text-xs text-gray-400 mb-1 block">เหตุผล *</label>
                                 <select
                                     value={reasons.includes(item.reason) ? item.reason : 'อื่นๆ'}
-                                    onChange={e => updateItem(idx, 'reason', e.target.value)}
+                                    onChange={e => {
+                                        if (e.target.value === 'อื่นๆ') {
+                                            updateItem(idx, 'reason', 'อื่นๆ');
+                                            updateItem(idx, 'customReason', '');
+                                        } else {
+                                            updateItem(idx, 'reason', e.target.value);
+                                            updateItem(idx, 'customReason', undefined);
+                                        }
+                                    }}
                                     className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                 >
                                     {reasons.map(r => (
@@ -332,12 +340,13 @@ export default function NewStockAdjustmentPage() {
                                 </select>
                             </div>
                             {/* Custom reason */}
-                            {item.reason === 'อื่นๆ' && (
+                            {(!reasons.includes(item.reason) || item.reason === 'อื่นๆ') && (
                                 <div className="sm:col-span-2">
                                     <label className="text-xs text-gray-400 mb-1 block">ระบุเหตุผล</label>
                                     <input
                                         type="text"
                                         placeholder="ระบุเหตุผล..."
+                                        value={item.reason === 'อื่นๆ' ? '' : item.reason}
                                         onChange={e => updateItem(idx, 'reason', e.target.value || 'อื่นๆ')}
                                         className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                     />
