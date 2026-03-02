@@ -875,10 +875,12 @@ export default function POSPage() {
         }
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setHighlightedIndex(prev => (prev + 1) % searchResults.length);
+            const next = (highlightedIndex + 1) % searchResults.length;
+            setHighlightedIndex(next);
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setHighlightedIndex(prev => (prev <= 0 ? searchResults.length - 1 : prev - 1));
+            const next = highlightedIndex <= 0 ? searchResults.length - 1 : highlightedIndex - 1;
+            setHighlightedIndex(next);
         } else if (e.key === 'Enter' && highlightedIndex >= 0 && highlightedIndex < searchResults.length) {
             e.preventDefault();
             const r = searchResults[highlightedIndex];
@@ -887,6 +889,13 @@ export default function POSPage() {
             setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1);
         }
     };
+
+    // Auto-scroll highlighted item into view
+    useEffect(() => {
+        if (highlightedIndex < 0) return;
+        const el = document.querySelector(`[data-search-index="${highlightedIndex}"]`);
+        if (el) el.scrollIntoView({ block: 'nearest' });
+    }, [highlightedIndex]);
 
     // Global keyboard shortcuts
     useEffect(() => {
@@ -977,6 +986,7 @@ export default function POSPage() {
                                                     const inCart = cart.find(c => c.productId === p.id);
                                                     return (
                                                         <button key={p.id}
+                                                            data-search-index={i}
                                                             onClick={() => { addToCart(p); setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1); }}
                                                             className={`w-full text-left px-4 py-3 hover:bg-emerald-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0 ${i === highlightedIndex ? 'bg-emerald-100' : inCart ? 'bg-emerald-50/50' : ''}`}>
                                                             {p.imageUrl ? (
@@ -1000,6 +1010,7 @@ export default function POSPage() {
                                                     return (
                                                         <button key={b.id}
                                                             onClick={() => { addBundleToCart(b); setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1); }}
+                                                            data-search-index={i}
                                                             className={`w-full text-left px-4 py-3 hover:bg-purple-50 flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0 ${i === highlightedIndex ? 'bg-purple-100' : ''}`}>
                                                             <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-sm shrink-0">🎁</div>
                                                             <div className="flex-1 min-w-0">
@@ -1074,6 +1085,7 @@ export default function POSPage() {
                                                 return (
                                                     <button key={p.id}
                                                         onClick={() => { addToCart(p); setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1); }}
+                                                        data-search-index={i}
                                                         className={`w-full text-left px-3 py-2.5 hover:bg-emerald-50 flex items-center gap-2 transition-colors border-b border-gray-50 last:border-0 ${i === highlightedIndex ? 'bg-emerald-100' : inCart ? 'bg-emerald-50/50' : ''}`}>
                                                         {p.imageUrl ? (
                                                             <img src={p.imageUrl} alt={p.name} className="w-8 h-8 rounded-md object-cover shrink-0 border border-gray-200" />
@@ -1093,6 +1105,7 @@ export default function POSPage() {
                                                 return (
                                                     <button key={b.id}
                                                         onClick={() => { addBundleToCart(b); setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1); }}
+                                                        data-search-index={i}
                                                         className={`w-full text-left px-3 py-2.5 hover:bg-purple-50 flex items-center gap-2 transition-colors border-b border-gray-50 last:border-0 ${i === highlightedIndex ? 'bg-purple-100' : ''}`}>
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-medium text-purple-800 truncate">🎁 {b.name}</p>
