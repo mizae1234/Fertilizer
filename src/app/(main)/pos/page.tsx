@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSaleFromPOS } from '@/app/actions/pos';
 import { formatCurrency } from '@/lib/utils';
@@ -394,15 +394,31 @@ export default function POSPage() {
         });
     }, []);
 
-    const loadProducts = useCallback(async (warehouseId: string) => {
-        const res = await fetch(`/api/products?warehouseId=${warehouseId}`);
-        const data = await res.json();
-        setProducts(data);
-    }, []);
+    // Server-side product search with debounce
+    const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const [searchLoading, setSearchLoading] = useState(false);
 
     useEffect(() => {
-        if (defaultWarehouseId) loadProducts(defaultWarehouseId);
-    }, [defaultWarehouseId, loadProducts]);
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+
+        if (search.length < 2) {
+            setProducts([]);
+            return;
+        }
+
+        setSearchLoading(true);
+        searchTimerRef.current = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/products?search=${encodeURIComponent(search)}&warehouseId=${defaultWarehouseId}`);
+                const data = await res.json();
+                setProducts(data);
+                setShowSearchResults(true);
+            } catch { /* ignore */ }
+            setSearchLoading(false);
+        }, 300);
+
+        return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+    }, [search, defaultWarehouseId]);
 
     useEffect(() => {
         if (customerSearch) {
@@ -811,7 +827,7 @@ export default function POSPage() {
 
             // Show success and reload products for updated stock
             setAlertModal({ open: true, message: `สร้างบิลขาย ${result?.saleNumber || ''} เรียบร้อย ตัด stock แล้ว`, type: 'success', title: 'ชำระเงินสำเร็จ!' });
-            if (defaultWarehouseId) loadProducts(defaultWarehouseId);
+            if (defaultWarehouseId) { setProducts([]); setSearch(''); }
         } catch (error) {
             const msg = (error as Error).message;
             if (msg.includes('เข้าสู่ระบบ')) {
@@ -823,14 +839,9 @@ export default function POSPage() {
         } finally { setLoading(false); }
     };
 
-    const filteredProducts = products.filter(p =>
-        !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase())
-    );
-
     const filteredBundles = bundles.filter(b =>
         !search || b.name.toLowerCase().includes(search.toLowerCase()) || b.code.toLowerCase().includes(search.toLowerCase())
     );
-
 
     const [showSearchResults, setShowSearchResults] = useState(false);
 
@@ -848,8 +859,8 @@ export default function POSPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const searchResults = search.length > 0
-        ? [...filteredProducts.map(p => ({ type: 'product' as const, data: p })),
+    const searchResults = search.length >= 2
+        ? [...products.map(p => ({ type: 'product' as const, data: p })),
         ...filteredBundles.map(b => ({ type: 'bundle' as const, data: b }))]
         : [];
 
