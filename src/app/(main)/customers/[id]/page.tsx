@@ -22,7 +22,7 @@ interface Sale {
 }
 interface CustomerGroup { id: string; name: string; }
 interface Customer {
-    id: string; name: string; phone: string; totalPoints: number; createdAt: string;
+    id: string; name: string; phone: string; totalPoints: number; createdAt: string; customerGroupId: string;
     address: string | null; taxId: string | null;
     customerGroup: { id: string; name: string };
     pointTransactions: PointTransaction[];
@@ -67,14 +67,16 @@ export default function CustomerDetailPage() {
 
     useEffect(() => { loadCustomer(); }, [loadCustomer]);
     useEffect(() => {
-        fetch('/api/customer-groups').then(r => r.json()).then(setGroups);
+        fetch('/api/customer-groups').then(r => r.json()).then((data: CustomerGroup[]) => {
+            setGroups(data);
+        });
     }, []);
 
     const startEditing = () => {
-        if (!customer) return;
+        if (!customer || groups.length === 0) return;
         setEditName(customer.name);
         setEditPhone(customer.phone);
-        setEditGroupId(customer.customerGroup.id);
+        setEditGroupId(customer.customerGroupId);
         setEditAddress(customer.address || '');
         setEditTaxId(customer.taxId || '');
         setEditing(true);
