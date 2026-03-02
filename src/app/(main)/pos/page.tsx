@@ -806,6 +806,7 @@ export default function POSPage() {
                 payments,
                 notes: saleNotes.trim() || undefined,
                 discount: billDiscount,
+                cashReceived: cashReceived && typeof cashReceived === 'number' ? cashReceived : undefined,
             });
             setShowPaymentModal(false);
             setCart([]);

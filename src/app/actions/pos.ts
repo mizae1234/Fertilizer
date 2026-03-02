@@ -20,6 +20,7 @@ export async function createSaleFromPOS(data: {
     payments: { method: string; amount: number; dueDate?: string }[];
     notes?: string;
     discount?: number;
+    cashReceived?: number;
 }) {
 
     if (!data.userId) {
@@ -74,6 +75,7 @@ export async function createSaleFromPOS(data: {
                         creditDueDate: creditPayment?.dueDate ? new Date(creditPayment.dueDate) : null,
                         payments: data.payments as any,
                         notes: data.notes || null,
+                        cashReceived: data.cashReceived || null,
                         createdById: data.userId,
                         items: {
                             create: data.items.map((item) => ({

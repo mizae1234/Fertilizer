@@ -5,7 +5,7 @@ import ReceiptPrint from './ReceiptPrint';
 export default async function ReceiptPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ cashReceived?: string }> }) {
     const { id } = await params;
     const { cashReceived: cashReceivedStr } = await searchParams;
-    const cashReceived = cashReceivedStr ? parseFloat(cashReceivedStr) : undefined;
+    const cashReceivedParam = cashReceivedStr ? parseFloat(cashReceivedStr) : undefined;
 
     const sale = await prisma.sale.findUnique({
         where: { id },
@@ -75,6 +75,8 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
         showStaff: template.showStaff ?? true,
         showCustomer: template.showCustomer ?? true,
     } : null;
+
+    const cashReceived = sale.cashReceived ? Number(sale.cashReceived) : cashReceivedParam;
 
     return <ReceiptPrint sale={saleData} template={templateData} cashReceived={cashReceived} />;
 }
