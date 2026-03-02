@@ -33,7 +33,7 @@ export async function GET(request: Request) {
                     orderBy: [{ isBaseUnit: 'desc' }, { conversionRate: 'asc' }],
                 },
             },
-            take: 200,
+            take: 2000,
             orderBy: { name: 'asc' },
         });
 
