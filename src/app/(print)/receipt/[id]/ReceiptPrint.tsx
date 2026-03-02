@@ -38,7 +38,7 @@ interface TemplateData {
 type Template = TemplateData | null;
 
 function formatCurrency(n: number) {
-    return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 function formatDate(d: string) {
