@@ -81,8 +81,8 @@ export default function CustomerDetailPage() {
     };
 
     const handleSave = async () => {
-        if (!editName.trim() || !editPhone.trim()) {
-            setAlertModal({ open: true, message: 'กรุณากรอกชื่อและเบอร์โทร', type: 'error', title: 'ข้อมูลไม่ครบ' });
+        if (!editName.trim()) {
+            setAlertModal({ open: true, message: 'กรุณากรอกชื่อลูกค้า', type: 'error', title: 'ข้อมูลไม่ครบ' });
             return;
         }
         setSaving(true);
