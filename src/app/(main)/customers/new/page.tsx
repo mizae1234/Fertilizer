@@ -52,7 +52,6 @@ export default function NewCustomerPage() {
                     value={form.phone}
                     onChange={e => setForm({ ...form, phone: e.target.value })}
                     placeholder="0812345678"
-                    required
                 />
                 <FormSelect
                     label="กลุ่มลูกค้า"

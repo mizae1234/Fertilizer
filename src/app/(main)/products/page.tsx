@@ -112,12 +112,13 @@ export default async function ProductsPage({ searchParams }: Props) {
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     {warehouseFilter ? `Stock (${warehouses.find(w => w.id === warehouseFilter)?.name || ''})` : 'Stock รวม'}
                                 </th>
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">สถานะ</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {products.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="px-4 py-12 text-center text-gray-400">ไม่พบสินค้า</td>
+                                    <td colSpan={10} className="px-4 py-12 text-center text-gray-400">ไม่พบสินค้า</td>
                                 </tr>
                             ) : (
                                 products.map((product) => {
@@ -166,6 +167,11 @@ export default async function ProductsPage({ searchParams }: Props) {
                                                         ))}
                                                     </div>
                                                 )}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${product.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                                                    {product.isActive ? 'ใช้งาน' : 'ไม่ใช้งาน'}
+                                                </span>
                                             </td>
                                         </tr>
                                     );
