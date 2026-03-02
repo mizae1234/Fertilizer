@@ -3,7 +3,8 @@ export function formatCurrency(amount: number | string): string {
     return new Intl.NumberFormat('th-TH', {
         style: 'currency',
         currency: 'THB',
-        minimumFractionDigits: 2,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
     }).format(num);
 }
 
