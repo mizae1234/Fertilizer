@@ -69,6 +69,20 @@ export async function updateCustomer(
 }
 
 export async function deleteCustomer(id: string) {
+    // Check for existing transactions
+    const [saleCount, quotationCount] = await Promise.all([
+        prisma.sale.count({ where: { customerId: id } }),
+        prisma.quotation.count({ where: { customerId: id } }),
+    ]);
+
+    const totalTx = saleCount + quotationCount;
+    if (totalTx > 0) {
+        const parts: string[] = [];
+        if (saleCount) parts.push(`บิลขาย ${saleCount} รายการ`);
+        if (quotationCount) parts.push(`ใบเสนอราคา ${quotationCount} รายการ`);
+        throw new Error(`ไม่สามารถลบได้ — ลูกค้านี้มี transaction แล้ว: ${parts.join(', ')}`);
+    }
+
     await prisma.customer.update({
         where: { id },
         data: { deletedAt: new Date() },

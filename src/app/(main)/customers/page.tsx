@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import CustomerFilter from './CustomerFilter';
 import PageHeader from '@/components/PageHeader';
+import DeleteButton from '@/components/DeleteButton';
+import { deleteCustomer } from '@/app/actions/customers';
 
 interface Props {
     searchParams: Promise<{ page?: string; search?: string }>;
@@ -83,7 +85,11 @@ export default async function CustomersPage({ searchParams }: Props) {
                                     <td className="px-4 py-3 text-sm font-semibold text-emerald-600">{c.totalPoints.toLocaleString()}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500">{new Date(c.createdAt).toLocaleDateString('th-TH')}</td>
                                     <td className="px-4 py-3">
-                                        <Link href={`/customers/${c.id}`} className="text-xs text-emerald-600 hover:underline">ดูรายละเอียด</Link>
+                                        <div className="flex items-center gap-2">
+                                            <Link href={`/customers/${c.id}`} className="text-xs text-emerald-600 hover:underline">ดูรายละเอียด</Link>
+                                            <span className="text-gray-300">|</span>
+                                            <DeleteButton id={c.id} name={c.name} entityLabel="ลูกค้า" deleteAction={deleteCustomer} />
+                                        </div>
                                     </td>
                                 </tr>
                             ))

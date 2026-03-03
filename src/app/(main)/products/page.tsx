@@ -7,9 +7,12 @@ import ExportProductsButton from './ExportProductsButton';
 import ImportProductsButton from './ImportProductsButton';
 import { isServerAdmin } from '@/lib/server-auth';
 import PageHeader from '@/components/PageHeader';
+import SortableHeader from '@/components/SortableHeader';
+import DeleteButton from '@/components/DeleteButton';
+import { deleteProduct } from '@/app/actions/products';
 
 interface Props {
-    searchParams: Promise<{ page?: string; search?: string; warehouse?: string; group?: string }>;
+    searchParams: Promise<{ page?: string; search?: string; warehouse?: string; group?: string; sort?: string; order?: string }>;
 }
 
 export default async function ProductsPage({ searchParams }: Props) {
@@ -19,6 +22,8 @@ export default async function ProductsPage({ searchParams }: Props) {
     const search = sp.search || '';
     const warehouseFilter = sp.warehouse || '';
     const groupFilter = sp.group || '';
+    const sort = sp.sort || 'createdAt';
+    const order = sp.order || 'desc';
     const perPage = 10;
 
     const [warehouses, productGroups] = await Promise.all([
@@ -45,6 +50,11 @@ export default async function ProductsPage({ searchParams }: Props) {
             : {}),
     };
 
+    // Build orderBy from sort param
+    const allowedSorts: Record<string, string> = { code: 'code', name: 'name', brand: 'brand', packaging: 'packaging', cost: 'cost', price: 'price', unit: 'unit', createdAt: 'createdAt' };
+    const sortField = allowedSorts[sort] || 'createdAt';
+    const orderBy = { [sortField]: order === 'asc' ? 'asc' : 'desc' } as any;
+
     const [products, total] = await Promise.all([
         prisma.product.findMany({
             where,
@@ -57,7 +67,7 @@ export default async function ProductsPage({ searchParams }: Props) {
             },
             skip: (page - 1) * perPage,
             take: perPage,
-            orderBy: { createdAt: 'desc' },
+            orderBy,
         }),
         prisma.product.count({ where }),
     ]);
@@ -66,10 +76,12 @@ export default async function ProductsPage({ searchParams }: Props) {
 
     const buildUrl = (params: Record<string, string>) => {
         const p = new URLSearchParams();
-        const merged = { page: String(page), search, warehouse: warehouseFilter, group: groupFilter, ...params };
+        const merged = { page: String(page), search, warehouse: warehouseFilter, group: groupFilter, sort, order, ...params };
         if (merged.search) p.set('search', merged.search);
         if (merged.warehouse) p.set('warehouse', merged.warehouse);
         if (merged.group) p.set('group', merged.group);
+        if (merged.sort && merged.sort !== 'createdAt') p.set('sort', merged.sort);
+        if (merged.order && merged.order !== 'desc') p.set('order', merged.order);
         if (merged.page !== '1') p.set('page', merged.page);
         return `/products?${p}`;
     };
@@ -101,24 +113,25 @@ export default async function ProductsPage({ searchParams }: Props) {
                     <table className="w-full">
                         <thead>
                             <tr className="bg-gray-50 border-b border-gray-100">
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">รหัส</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ชื่อสินค้า</th>
+                                <SortableHeader label="รหัส" field="code" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
+                                <SortableHeader label="ชื่อสินค้า" field="name" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">หมวดหมู่</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ยี่ห้อ</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">บรรจุภัณฑ์</th>
-                                {adminUser && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ต้นทุน</th>}
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ราคาขาย</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">หน่วย</th>
+                                <SortableHeader label="ยี่ห้อ" field="brand" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
+                                <SortableHeader label="บรรจุภัณฑ์" field="packaging" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
+                                {adminUser && <SortableHeader label="ต้นทุน" field="cost" currentSort={sort} currentOrder={order} buildUrl={buildUrl} align="right" />}
+                                <SortableHeader label="ราคาขาย" field="price" currentSort={sort} currentOrder={order} buildUrl={buildUrl} align="right" />
+                                <SortableHeader label="หน่วย" field="unit" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     {warehouseFilter ? `Stock (${warehouses.find(w => w.id === warehouseFilter)?.name || ''})` : 'Stock รวม'}
                                 </th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">สถานะ</th>
+                                <th className="px-4 py-3"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {products.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} className="px-4 py-12 text-center text-gray-400">ไม่พบสินค้า</td>
+                                    <td colSpan={11} className="px-4 py-12 text-center text-gray-400">ไม่พบสินค้า</td>
                                 </tr>
                             ) : (
                                 products.map((product) => {
@@ -172,6 +185,9 @@ export default async function ProductsPage({ searchParams }: Props) {
                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${product.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
                                                     {product.isActive ? 'ใช้งาน' : 'ไม่ใช้งาน'}
                                                 </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <DeleteButton id={product.id} name={product.name} entityLabel="สินค้า" deleteAction={deleteProduct} />
                                             </td>
                                         </tr>
                                     );

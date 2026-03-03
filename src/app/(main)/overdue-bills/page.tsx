@@ -4,8 +4,9 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { Suspense } from 'react';
 import OverdueDateFilter from './OverdueDateFilter';
 import PageHeader from '@/components/PageHeader';
+import SortableHeader from '@/components/SortableHeader';
 
-interface Props { searchParams: Promise<{ page?: string; from?: string; to?: string; q?: string }> }
+interface Props { searchParams: Promise<{ page?: string; from?: string; to?: string; q?: string; sort?: string; order?: string }> }
 
 export default async function OverdueBillsPage({ searchParams }: Props) {
     const sp = await searchParams;
@@ -13,6 +14,8 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
     const from = sp.from || '';
     const to = sp.to || '';
     const q = sp.q || '';
+    const sort = sp.sort || 'creditDueDate';
+    const order = sp.order || 'asc';
     const perPage = 15;
 
     const where: Record<string, unknown> = {
@@ -36,6 +39,16 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
         ];
     }
 
+    // Build orderBy from sort param
+    const allowedSorts: Record<string, any> = {
+        saleNumber: { saleNumber: order === 'asc' ? 'asc' : 'desc' },
+        customer: { customer: { name: order === 'asc' ? 'asc' : 'desc' } },
+        totalAmount: { totalAmount: order === 'asc' ? 'asc' : 'desc' },
+        creditDueDate: { creditDueDate: order === 'asc' ? 'asc' : 'desc' },
+        createdAt: { createdAt: order === 'asc' ? 'asc' : 'desc' },
+    };
+    const orderBy = allowedSorts[sort] || { creditDueDate: 'asc' };
+
     const [sales, total, totalAmount] = await Promise.all([
         prisma.sale.findMany({
             where,
@@ -50,7 +63,7 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
             },
             skip: (page - 1) * perPage,
             take: perPage,
-            orderBy: { creditDueDate: 'asc' },
+            orderBy,
         }),
         prisma.sale.count({ where }),
         prisma.sale.aggregate({ where, _sum: { totalAmount: true } }),
@@ -95,8 +108,10 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
 
     const buildUrl = (params: Record<string, string>) => {
         const p = new URLSearchParams();
-        const vals = { page: String(page), from, to, q, ...params };
-        Object.entries(vals).forEach(([k, v]) => { if (v) p.set(k, v); });
+        const vals = { page: String(page), from, to, q, sort, order, ...params };
+        Object.entries(vals).forEach(([k, v]) => {
+            if (v && !(k === 'sort' && v === 'creditDueDate') && !(k === 'order' && v === 'asc')) p.set(k, v);
+        });
         return `/overdue-bills?${p.toString()}`;
     };
 
@@ -153,15 +168,15 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
                 <table className="w-full">
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เลขที่บิล</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ลูกค้า</th>
+                            <SortableHeader label="เลขที่บิล" field="saleNumber" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
+                            <SortableHeader label="ลูกค้า" field="customer" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">รายการสินค้า</th>
-                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">มูลค่าบิล</th>
+                            <SortableHeader label="มูลค่าบิล" field="totalAmount" currentSort={sort} currentOrder={order} buildUrl={buildUrl} align="right" />
                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">จ่ายแล้ว</th>
                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">ค้างจ่าย</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">กำหนดชำระ</th>
+                            <SortableHeader label="กำหนดชำระ" field="creditDueDate" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สถานะ</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">วันที่ขาย</th>
+                            <SortableHeader label="วันที่ขาย" field="createdAt" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">

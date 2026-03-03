@@ -155,6 +155,26 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: string) {
+    // Check for existing transactions
+    const [saleCount, grCount, transferCount, returnCount, factoryReturnCount] = await Promise.all([
+        prisma.saleItem.count({ where: { productId: id } }),
+        prisma.goodsReceiveItem.count({ where: { productId: id } }),
+        prisma.stockTransferItem.count({ where: { productId: id } }),
+        prisma.saleReturnItem.count({ where: { productId: id } }),
+        prisma.factoryReturnItem.count({ where: { productId: id } }),
+    ]);
+
+    const totalTx = saleCount + grCount + transferCount + returnCount + factoryReturnCount;
+    if (totalTx > 0) {
+        const parts: string[] = [];
+        if (saleCount) parts.push(`ขายแล้ว ${saleCount} รายการ`);
+        if (grCount) parts.push(`รับเข้า ${grCount} รายการ`);
+        if (transferCount) parts.push(`โอนย้าย ${transferCount} รายการ`);
+        if (returnCount) parts.push(`คืนสินค้า ${returnCount} รายการ`);
+        if (factoryReturnCount) parts.push(`คืนโรงงาน ${factoryReturnCount} รายการ`);
+        throw new Error(`ไม่สามารถลบได้ — สินค้านี้มี transaction แล้ว: ${parts.join(', ')}`);
+    }
+
     await prisma.product.update({
         where: { id },
         data: { deletedAt: new Date() },
