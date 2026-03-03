@@ -64,7 +64,7 @@ interface BankAccountInfo { id: string; accountName: string; accountNumber: stri
 const PAYMENT_METHODS = [
     { value: 'CASH', label: '💵 เงินสด', color: 'emerald' },
     { value: 'TRANSFER', label: '🏦 เงินโอน', color: 'blue' },
-    { value: 'CREDIT', label: '📋 เครดิต', color: 'amber' },
+    { value: 'CREDIT', label: '📋 ค้างชำระ', color: 'amber' },
 ];
 
 function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType }: {
@@ -967,7 +967,7 @@ export default function POSPage() {
                                         </div>
                                     )}
                                 </div>
-                                <div ref={desktopSearchRef} className="relative w-80 shrink-0">
+                                <div ref={desktopSearchRef} className="relative w-[480px] shrink-0">
                                     <input ref={searchInputRef} type="text" value={search}
                                         onChange={e => { setSearch(e.target.value); setShowSearchResults(true); setHighlightedIndex(-1); }}
                                         onFocus={() => { if (search) setShowSearchResults(true); }}
@@ -1234,7 +1234,7 @@ export default function POSPage() {
                                                     <p className="text-xs lg:text-sm font-bold text-emerald-600 shrink-0 min-w-[60px] lg:min-w-[80px] text-right">{formatCurrency(item.quantity * item.unitPrice)}</p>
                                                     <button onClick={() => removeFromCart(idx)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
                                                 </div>
-                                                {/* Item discount row */}
+                                                {/* Item discount row + stock */}
                                                 <div className="hidden lg:flex items-center gap-2 mt-1">
                                                     <span className="text-[10px] text-gray-400">ส่วนลด:</span>
                                                     <input type="number" value={item.itemDiscount || ''}
@@ -1242,6 +1242,8 @@ export default function POSPage() {
                                                         className="w-20 px-1.5 py-0.5 rounded border border-gray-200 text-xs outline-none text-right"
                                                         placeholder="0" step="0.01" min={0} />
                                                     <span className="text-[10px] text-gray-400">บาท</span>
+                                                    <span className="text-[10px] text-gray-400 ml-2">|</span>
+                                                    <span className={`text-[10px] font-medium ${(item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) <= 0 ? 'text-red-500' : (item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) < 10 ? 'text-orange-500' : 'text-gray-500'}`}>📦 คงเหลือ {item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock} {item.unit}</span>
                                                 </div>
                                                 {/* Mobile-only Row 2: controls */}
                                                 <div className="flex lg:hidden items-center gap-2 mt-1.5 flex-wrap text-[10px]">
@@ -1249,7 +1251,7 @@ export default function POSPage() {
                                                         className="px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none">
                                                         {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                                                     </select>
-                                                    <span className="text-gray-400">({item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock})</span>
+                                                    <span className={`${(item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) <= 0 ? 'text-red-500' : (item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) < 10 ? 'text-orange-500' : 'text-gray-400'}`}>คงเหลือ {item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock}</span>
                                                     {item.productUnits && item.productUnits.length > 0 && (
                                                         <select value={item.selectedUnitId || '__default__'} onChange={e => updateCartUnit(idx, e.target.value)}
                                                             className="px-1 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-[10px] outline-none font-medium">

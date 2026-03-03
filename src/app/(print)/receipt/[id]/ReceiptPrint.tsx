@@ -7,6 +7,7 @@ interface SaleItem {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    unitName?: string;
 }
 
 interface Sale {
@@ -52,7 +53,7 @@ function methodLabel(m: string) {
     switch (m) {
         case 'CASH': return 'เงินสด';
         case 'TRANSFER': return 'โอนเงิน';
-        case 'CREDIT': return 'เครดิต';
+        case 'CREDIT': return 'ค้างชำระ';
         default: return m;
     }
 }
@@ -67,6 +68,9 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
     const shopName = template?.shopName || 'Fertilizer POS';
     const totalPaid = (sale.payments || [])
         .filter(p => p.method !== 'CREDIT')
+        .reduce((s, p) => s + p.amount, 0);
+    const cashTotal = (sale.payments || [])
+        .filter(p => p.method === 'CASH')
         .reduce((s, p) => s + p.amount, 0);
     const change = totalPaid - sale.totalAmount;
 
@@ -161,7 +165,7 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                                 <td style={{ paddingTop: '2px' }}>
                                     <div style={{ fontSize: '13px' }}>{item.product.name}</div>
                                 </td>
-                                <td style={{ textAlign: 'right', paddingTop: '2px' }}>{item.quantity}</td>
+                                <td style={{ textAlign: 'right', paddingTop: '2px' }}>{item.quantity} {item.unitName || item.product.unit}</td>
                                 <td style={{ textAlign: 'right', paddingTop: '2px' }}>{formatCurrency(item.unitPrice)}</td>
                                 <td style={{ textAlign: 'right', paddingTop: '2px' }}>{formatCurrency(item.totalPrice)}</td>
                             </tr>
@@ -204,7 +208,7 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '2px' }}>
                                 <span>เงินทอน</span>
-                                <span>{formatCurrency(cashReceived - sale.totalAmount)}</span>
+                                <span>{formatCurrency(cashReceived - cashTotal)}</span>
                             </div>
                         </>
                     ) : change > 0 && (
