@@ -21,7 +21,9 @@ export default function NewCustomerPage() {
     useEffect(() => {
         fetch('/api/customer-groups').then(r => r.json()).then(data => {
             setGroups(data);
-            if (data.length > 0) setForm(f => ({ ...f, customerGroupId: data[0].id }));
+            const defaultGroup = data.find((g: CustomerGroup) => g.name === 'ลูกค้าทั่วไป');
+            if (defaultGroup) setForm(f => ({ ...f, customerGroupId: defaultGroup.id }));
+            else if (data.length > 0) setForm(f => ({ ...f, customerGroupId: data[0].id }));
         });
     }, []);
 
