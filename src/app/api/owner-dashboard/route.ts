@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     });
     const prevTotalSales = prevSales.reduce((s, sale) => s + Number(sale.totalAmount), 0);
 
-    // 2. Total items sold
+    // 2. Total items sold + COGS calculation
     const saleItems = await prisma.saleItem.findMany({
         where: {
             sale: {
@@ -48,9 +48,11 @@ export async function GET(request: Request) {
                 deletedAt: null,
             },
         },
-        select: { quantity: true },
+        select: { quantity: true, product: { select: { cost: true } } },
     });
     const totalItemsSold = saleItems.reduce((s, i) => s + i.quantity, 0);
+    const totalCOGS = saleItems.reduce((s, i) => s + (i.quantity * Number(i.product.cost)), 0);
+
     const prevSaleItems = await prisma.saleItem.findMany({
         where: {
             sale: {
@@ -71,7 +73,8 @@ export async function GET(request: Request) {
         },
         select: { amount: true, category: true },
     });
-    const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
+    const expensesOnly = expenses.reduce((s, e) => s + Number(e.amount), 0);
+    const totalExpenses = totalCOGS + expensesOnly;
     const netProfit = totalSales - totalExpenses;
 
     // Expense by category
@@ -166,6 +169,8 @@ export async function GET(request: Request) {
             prevTotalSales,
             netProfit,
             totalExpenses,
+            totalCOGS,
+            expensesOnly,
             totalItemsSold,
             prevTotalItemsSold,
             totalBills,

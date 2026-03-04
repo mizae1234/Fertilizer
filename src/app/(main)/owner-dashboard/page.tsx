@@ -8,6 +8,8 @@ interface DashboardData {
         prevTotalSales: number;
         netProfit: number;
         totalExpenses: number;
+        totalCOGS: number;
+        expensesOnly: number;
         totalItemsSold: number;
         prevTotalItemsSold: number;
         totalBills: number;
@@ -169,7 +171,7 @@ export default function OwnerDashboardPage() {
                             <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">📊</div>
                             <p className="text-xs text-white/80 font-medium">กำไรสุทธิ</p>
                             <p className="text-2xl font-bold mt-1">{formatCurrency(data.summary.netProfit)}</p>
-                            <p className="text-xs mt-2 text-white/70">↪ หักค่าใช้จ่าย {formatCurrency(data.summary.totalExpenses)}</p>
+                            <p className="text-xs mt-2 text-white/70">↪ หักต้นทุน {formatCurrency(data.summary.totalCOGS)} + ค่าใช้จ่าย {formatCurrency(data.summary.expensesOnly)}</p>
                         </div>
                         {/* Items Sold */}
                         <div className="rounded-2xl p-4 text-white shadow-lg bg-gradient-to-br from-cyan-400 to-blue-500 relative overflow-hidden">
@@ -188,7 +190,7 @@ export default function OwnerDashboardPage() {
                         {/* Total Expenses */}
                         <div className="rounded-2xl p-4 text-white shadow-lg bg-gradient-to-br from-rose-400 to-pink-600 relative overflow-hidden">
                             <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">💸</div>
-                            <p className="text-xs text-white/80 font-medium">ค่าใช้จ่ายรวม</p>
+                            <p className="text-xs text-white/80 font-medium">ค่าใช้จ่ายรวม <span className="opacity-70">(COGS+Expenses)</span></p>
                             <p className="text-2xl font-bold mt-1">{formatCurrency(data.summary.totalExpenses)}</p>
                             <p className="text-xs mt-2 text-white/70">↪ {expensePercent.toFixed(1)}% ของยอดขาย</p>
                         </div>
