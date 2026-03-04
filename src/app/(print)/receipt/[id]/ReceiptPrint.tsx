@@ -231,7 +231,7 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
 
                 {/* Notes */}
                 {sale.notes && (
-                    <div style={{ fontSize: '10px', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '13px', marginBottom: '4px' }}>
                         หมายเหตุ: {sale.notes}
                     </div>
                 )}
