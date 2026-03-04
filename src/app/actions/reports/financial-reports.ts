@@ -146,6 +146,7 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
         where: { sale: saleWhere },
         select: {
             id: true, productId: true, warehouseId: true, quantity: true,
+            conversionRate: true,
             sale: {
                 select: {
                     saleReturns: {
@@ -178,7 +179,8 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
         cogsAmount = saleItems.reduce((sum, si) => {
             const returned = retMap.get(si.id) || 0;
             const remaining = si.quantity - returned;
-            return sum + Math.max(0, remaining) * (costMap.get(`${si.productId}_${si.warehouseId}`) || 0);
+            const rate = Number(si.conversionRate ?? 1);
+            return sum + Math.max(0, remaining) * rate * (costMap.get(`${si.productId}_${si.warehouseId}`) || 0);
         }, 0);
     }
 
@@ -236,6 +238,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
                     quantity: true,
                     unitPrice: true,
                     totalPrice: true,
+                    conversionRate: true,
                     product: { select: { name: true, code: true } },
                 },
             },
@@ -272,7 +275,8 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
             const remaining = item.quantity - returned;
             if (remaining <= 0) continue;
             const unitCost = costMap.get(`${item.productId}_${item.warehouseId}`) || 0;
-            cogs += remaining * unitCost;
+            const rate = Number(item.conversionRate ?? 1);
+            cogs += remaining * rate * unitCost;
         }
         const profit = revenue - cogs;
         return {
@@ -302,8 +306,9 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
                 const remaining = item.quantity - returned;
                 if (remaining <= 0) return null;
                 const unitCost = costMap.get(`${item.productId}_${item.warehouseId}`) || 0;
+                const rate = Number(item.conversionRate ?? 1);
                 const revenue = remaining * Number(item.unitPrice);
-                const cogs = remaining * unitCost;
+                const cogs = remaining * rate * unitCost;
                 const profit = revenue - cogs;
                 return {
                     saleNumber: sale.saleNumber,

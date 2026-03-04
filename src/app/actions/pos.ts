@@ -87,6 +87,7 @@ export async function createSaleFromPOS(data: {
                                 discount: item.itemDiscount || 0,
                                 points: item.points,
                                 unitName: item.unitName || null,
+                                conversionRate: item.conversionRate || 1,
                             })),
                         },
                     },

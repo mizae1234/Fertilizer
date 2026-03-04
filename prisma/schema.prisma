@@ -367,8 +367,9 @@ model SaleItem {
   unitPrice   Decimal @db.Decimal(12, 2)
   totalPrice  Decimal @db.Decimal(12, 2)
   discount    Decimal @default(0) @db.Decimal(12, 2)
-  points      Int     @default(0)
-  unitName    String?
+  points         Int     @default(0)
+  unitName       String?
+  conversionRate Decimal @default(1) @db.Decimal(12, 4)
 
   sale      Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product   Product   @relation(fields: [productId], references: [id])

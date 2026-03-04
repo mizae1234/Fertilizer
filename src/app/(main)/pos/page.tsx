@@ -634,7 +634,7 @@ export default function POSPage() {
         setCart(cart.map((c, i) => {
             if (i !== idx) return c;
             const product = products.find(p => p.id === c.productId);
-            const baseStock = product ? getStock(product, c.warehouseId) : 0;
+            const baseStock = product ? getStock(product, c.warehouseId) : c.availableStock;
 
             // "default" = product's original unit (no productUnit record)
             if (unitId === '__default__') {
