@@ -141,12 +141,13 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
         prisma.factoryReturn.aggregate({ where: factoryReturnWhere, _sum: { totalAmount: true } }),
     ]);
 
-    // COGS — account for returns
+    // COGS — account for returns, use Product.cost (reflects user's cost type setting)
     const saleItems = await prisma.saleItem.findMany({
         where: { sale: saleWhere },
         select: {
             id: true, productId: true, warehouseId: true, quantity: true,
             conversionRate: true,
+            product: { select: { cost: true } },
             sale: {
                 select: {
                     saleReturns: {
@@ -169,18 +170,12 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
 
     let cogsAmount = 0;
     if (saleItems.length > 0) {
-        const productIds = [...new Set(saleItems.map(si => si.productId))];
-        const warehouseIds = [...new Set(saleItems.map(si => si.warehouseId))];
-        const stocks = await prisma.productStock.findMany({
-            where: { productId: { in: productIds }, warehouseId: { in: warehouseIds } },
-            select: { productId: true, warehouseId: true, avgCost: true },
-        });
-        const costMap = new Map(stocks.map(s => [`${s.productId}_${s.warehouseId}`, Number(s.avgCost)]));
         cogsAmount = saleItems.reduce((sum, si) => {
             const returned = retMap.get(si.id) || 0;
             const remaining = si.quantity - returned;
             const rate = Number(si.conversionRate ?? 1);
-            return sum + Math.max(0, remaining) * rate * (costMap.get(`${si.productId}_${si.warehouseId}`) || 0);
+            const unitCost = Number(si.product.cost);
+            return sum + Math.max(0, remaining) * rate * unitCost;
         }, 0);
     }
 
@@ -239,7 +234,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
                     unitPrice: true,
                     totalPrice: true,
                     conversionRate: true,
-                    product: { select: { name: true, code: true } },
+                    product: { select: { name: true, code: true, cost: true } },
                 },
             },
             saleReturns: {
@@ -248,15 +243,6 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
         },
         orderBy: { createdAt: 'desc' },
     });
-
-    // Get avgCost for COGS calculation
-    const allProductIds = [...new Set(sales.flatMap(s => s.items.map(i => i.productId)))];
-    const allWarehouseIds = [...new Set(sales.flatMap(s => s.items.map(i => i.warehouseId)))];
-    const stocks = allProductIds.length > 0 ? await prisma.productStock.findMany({
-        where: { productId: { in: allProductIds }, warehouseId: { in: allWarehouseIds } },
-        select: { productId: true, warehouseId: true, avgCost: true },
-    }) : [];
-    const costMap = new Map(stocks.map(s => [`${s.productId}_${s.warehouseId}`, Number(s.avgCost)]));
 
     // Per-bill aggregation
     const byBill = sales.map(sale => {
@@ -274,7 +260,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
             const returned = retMap.get(item.id) || 0;
             const remaining = item.quantity - returned;
             if (remaining <= 0) continue;
-            const unitCost = costMap.get(`${item.productId}_${item.warehouseId}`) || 0;
+            const unitCost = Number(item.product.cost);
             const rate = Number(item.conversionRate ?? 1);
             cogs += remaining * rate * unitCost;
         }
@@ -305,7 +291,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
                 const returned = retMap.get(item.id) || 0;
                 const remaining = item.quantity - returned;
                 if (remaining <= 0) return null;
-                const unitCost = costMap.get(`${item.productId}_${item.warehouseId}`) || 0;
+                const unitCost = Number(item.product.cost);
                 const rate = Number(item.conversionRate ?? 1);
                 const revenue = remaining * Number(item.unitPrice);
                 const cogs = remaining * rate * unitCost;

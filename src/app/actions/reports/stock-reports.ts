@@ -23,7 +23,7 @@ export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
             quantity: true,
             unitPrice: true,
             totalPrice: true,
-            product: { select: { id: true, name: true, code: true } },
+            product: { select: { id: true, name: true, code: true, cost: true } },
             sale: {
                 select: {
                     saleReturns: {
@@ -100,7 +100,7 @@ export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
         const p = productMap.get(key)!;
         p.qtySold += remaining;
         p.revenue += remaining * Number(si.unitPrice);
-        const unitCost = costMap.get(`${si.productId}_${si.warehouseId}`) || 0;
+        const unitCost = Number(si.product.cost);
         p.cogs += remaining * unitCost;
     }
 
