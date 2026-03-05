@@ -34,6 +34,13 @@ export async function GET(
                     include: { user: { select: { name: true } } },
                     orderBy: { createdAt: 'desc' },
                 },
+                debtPayments: {
+                    select: { id: true, amount: true, method: true, note: true, paidAt: true },
+                    orderBy: { paidAt: 'desc' },
+                },
+                debtInterests: {
+                    select: { id: true, amount: true },
+                },
             },
         });
 

@@ -25,11 +25,18 @@ interface SaleEditLogData {
     user: { name: string };
 }
 
+interface DebtPaymentData {
+    id: string; amount: string; method: string; note: string | null; paidAt: string;
+}
+
 interface SaleDetail {
     id: string; saleNumber: string; status: string;
     totalAmount: string; discount: string; totalPoints: number; createdAt: string;
     customerId: string | null;
     notes: string | null;
+    paymentMethod: string | null;
+    payments: { method: string; amount: number }[] | null;
+    creditDueDate: string | null;
     customer: { name: string; phone: string } | null;
     createdBy: { name: string };
     items: {
@@ -41,6 +48,8 @@ interface SaleDetail {
     }[];
     saleReturns: SaleReturnData[];
     saleEditLogs: SaleEditLogData[];
+    debtPayments: DebtPaymentData[];
+    debtInterests: { id: string; amount: string }[];
 }
 
 interface Product { id: string; code: string; name: string; unit: string; pointsPerUnit: number; productStocks: { warehouseId: string; quantity: number }[]; }
@@ -533,6 +542,135 @@ export default function SaleDetailPage() {
                     <p className="text-sm text-gray-700 whitespace-pre-wrap">{sale.notes}</p>
                 </div>
             )}
+
+            {/* ========== Payment Details ========== */}
+            {!isEditing && sale.paymentMethod && (() => {
+                const paymentMethodLabels: Record<string, string> = {
+                    'CASH': '💵 เงินสด', 'TRANSFER': '🏦 โอน', 'CREDIT': '📋 เครดิต',
+                    'SPLIT': '🔀 จ่ายหลายช่องทาง', 'CREDIT_CARD': '💳 บัตรเครดิต',
+                };
+                const payments = (sale.payments && Array.isArray(sale.payments) ? sale.payments : []) as { method: string; amount: number }[];
+                const hasCredit = sale.paymentMethod === 'CREDIT' || sale.paymentMethod === 'SPLIT';
+                const totalInterest = (sale.debtInterests || []).reduce((s, di) => s + Number(di.amount), 0);
+                const grandTotal = Number(sale.totalAmount) + totalInterest;
+
+                // Initial non-credit paid
+                let initialPaid = 0;
+                for (const p of payments) {
+                    if (p.method !== 'CREDIT') initialPaid += Number(p.amount);
+                }
+                // Subsequent debt payments
+                const debtPaid = (sale.debtPayments || [])
+                    .filter(dp => dp.method !== 'CREDIT')
+                    .reduce((s, dp) => s + Number(dp.amount), 0);
+                const totalPaid = initialPaid + debtPaid;
+                const remaining = Math.max(0, grandTotal - totalPaid);
+                const paidPercent = grandTotal > 0 ? Math.min(100, (totalPaid / grandTotal) * 100) : 0;
+
+                return (
+                    <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
+                        <h2 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            💳 ข้อมูลการชำระเงิน
+                        </h2>
+
+                        {/* Payment Method + Breakdown */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                            <div>
+                                <p className="text-xs text-gray-500">ช่องทางชำระ</p>
+                                <p className="text-sm font-medium text-gray-800 mt-0.5">
+                                    {paymentMethodLabels[sale.paymentMethod] || sale.paymentMethod}
+                                </p>
+                            </div>
+                            {hasCredit && sale.creditDueDate && (
+                                <div>
+                                    <p className="text-xs text-gray-500">กำหนดชำระ</p>
+                                    <p className={`text-sm font-medium mt-0.5 ${new Date(sale.creditDueDate) < new Date() && remaining > 0 ? 'text-red-600' : 'text-gray-800'}`}>
+                                        {new Date(sale.creditDueDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        {new Date(sale.creditDueDate) < new Date() && remaining > 0 && <span className="ml-1">⚠️</span>}
+                                    </p>
+                                </div>
+                            )}
+                            <div>
+                                <p className="text-xs text-gray-500">จ่ายแล้ว</p>
+                                <p className="text-sm font-semibold text-emerald-600 mt-0.5">{formatCurrency(totalPaid)}</p>
+                            </div>
+                            {hasCredit && (
+                                <div>
+                                    <p className="text-xs text-gray-500">ค้างจ่าย</p>
+                                    <p className={`text-sm font-semibold mt-0.5 ${remaining > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                        {remaining > 0 ? formatCurrency(remaining) : '✅ ชำระครบแล้ว'}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Progress bar for credit/split */}
+                        {hasCredit && remaining > 0 && (
+                            <div className="mb-4">
+                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                    <span>ความคืบหน้าการชำระ</span>
+                                    <span>{paidPercent.toFixed(0)}%</span>
+                                </div>
+                                <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all" style={{ width: `${paidPercent}%` }} />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Payment split details */}
+                        {payments.length > 0 && (
+                            <div className="border-t border-gray-100 pt-3 mb-3">
+                                <p className="text-xs font-medium text-gray-500 mb-2">รายละเอียดการชำระ (ตอนขาย)</p>
+                                <div className="space-y-1.5">
+                                    {payments.map((p, i) => (
+                                        <div key={i} className="flex justify-between items-center text-sm">
+                                            <span className="text-gray-600">
+                                                {paymentMethodLabels[p.method] || p.method}
+                                            </span>
+                                            <span className={`font-medium ${p.method === 'CREDIT' ? 'text-orange-600' : 'text-gray-800'}`}>
+                                                {formatCurrency(Number(p.amount))}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Debt payments history */}
+                        {sale.debtPayments && sale.debtPayments.length > 0 && (
+                            <div className="border-t border-gray-100 pt-3">
+                                <p className="text-xs font-medium text-gray-500 mb-2">ประวัติชำระหนี้</p>
+                                <div className="space-y-2">
+                                    {sale.debtPayments.map(dp => (
+                                        <div key={dp.id} className="flex justify-between items-center text-sm bg-emerald-50 rounded-lg px-3 py-2">
+                                            <div>
+                                                <span className="text-gray-700 font-medium">
+                                                    {paymentMethodLabels[dp.method] || dp.method}
+                                                </span>
+                                                <span className="text-xs text-gray-400 ml-2">
+                                                    {new Date(dp.paidAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                </span>
+                                                {dp.note && <span className="text-xs text-gray-400 ml-2">({dp.note})</span>}
+                                            </div>
+                                            <span className="font-semibold text-emerald-600">+{formatCurrency(Number(dp.amount))}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Interest */}
+                        {totalInterest > 0 && (
+                            <div className="border-t border-gray-100 pt-3 mt-3">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-600">ดอกเบี้ยสะสม</span>
+                                    <span className="font-medium text-red-600">{formatCurrency(totalInterest)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
 
             {/* Notes (edit mode) */}
             {isEditing && (

@@ -21,7 +21,7 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
     const where: Record<string, unknown> = {
         deletedAt: null,
         status: 'APPROVED',
-        paymentMethod: 'CREDIT',
+        paymentMethod: { in: ['CREDIT', 'SPLIT'] },
     };
 
     // Filter by due date range
