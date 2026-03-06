@@ -49,27 +49,22 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
     };
     const orderBy = allowedSorts[sort] || { creditDueDate: 'asc' };
 
-    const [sales, total, totalAmount] = await Promise.all([
-        prisma.sale.findMany({
-            where,
-            select: {
-                id: true, saleNumber: true, totalAmount: true, status: true,
-                paymentMethod: true, creditDueDate: true, payments: true, createdAt: true,
-                customer: { select: { name: true } },
-                createdBy: { select: { name: true } },
-                _count: { select: { items: true } },
-                debtPayments: { select: { amount: true, method: true } },
-                debtInterests: { select: { amount: true } },
-            },
-            skip: (page - 1) * perPage,
-            take: perPage,
-            orderBy,
-        }),
-        prisma.sale.count({ where }),
-        prisma.sale.aggregate({ where, _sum: { totalAmount: true } }),
-    ]);
-
-    const totalPages = Math.ceil(total / perPage);
+    // Fetch ALL matching bills first (without pagination), then filter by remaining > 0
+    // This is needed because the outstanding balance calculation involves JSON payments + debtPayments
+    // which can't be expressed in a Prisma WHERE clause
+    const allSales = await prisma.sale.findMany({
+        where,
+        select: {
+            id: true, saleNumber: true, totalAmount: true, status: true,
+            paymentMethod: true, creditDueDate: true, payments: true, createdAt: true,
+            customer: { select: { name: true } },
+            createdBy: { select: { name: true } },
+            _count: { select: { items: true } },
+            debtPayments: { select: { amount: true, method: true } },
+            debtInterests: { select: { amount: true } },
+        },
+        orderBy,
+    });
 
     const now = new Date();
 
@@ -103,8 +98,15 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
         return { paidAmount, remaining: remaining > 0 ? remaining : 0 };
     };
 
+    // Filter out fully-paid bills
+    const unpaidSales = allSales.filter(sale => getPaymentSplit(sale).remaining > 0);
+    const total = unpaidSales.length;
+    const totalPages = Math.ceil(total / perPage);
+    const sales = unpaidSales.slice((page - 1) * perPage, page * perPage);
+
     // Calculate total remaining across all filtered bills
-    const totalRemaining = sales.reduce((sum, sale) => sum + getPaymentSplit(sale).remaining, 0);
+    const totalRemaining = unpaidSales.reduce((sum, sale) => sum + getPaymentSplit(sale).remaining, 0);
+    const totalBillAmount = unpaidSales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0);
 
     const buildUrl = (params: Record<string, string>) => {
         const p = new URLSearchParams();
@@ -140,7 +142,7 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
         <div className="animate-fade-in">
             <PageHeader
                 title="📋 บิลค้างจ่าย"
-                subtitle={`ทั้งหมด ${total} รายการ · มูลค่ารวม ${formatCurrency(Number(totalAmount._sum.totalAmount || 0))} · ยอดค้างรวม ${formatCurrency(totalRemaining)}`}
+                subtitle={`ทั้งหมด ${total} รายการ · มูลค่ารวม ${formatCurrency(totalBillAmount)} · ยอดค้างรวม ${formatCurrency(totalRemaining)}`}
             />
 
             {/* Filters */}

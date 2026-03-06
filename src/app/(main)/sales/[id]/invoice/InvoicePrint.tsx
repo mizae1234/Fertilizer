@@ -19,6 +19,8 @@ interface SaleData {
         quantity: number;
         unitPrice: number;
         totalPrice: number;
+        discount: number;
+        unitName: string | null;
         product: { name: string; code: string; unit: string };
         warehouse: { name: string; id: string };
     }[];
@@ -218,9 +220,9 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                                 <td style={{ padding: '8px 8px', fontSize: 12 }}>{item.product.code}</td>
                                 <td style={{ padding: '8px 8px', fontSize: 12 }}>{item.product.name}</td>
                                 <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'center' }}>{item.quantity}</td>
-                                <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'center' }}>{item.product.unit}</td>
+                                <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'center' }}>{item.unitName || item.product.unit}</td>
                                 <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'right' }}>{formatCurrency(item.unitPrice)}</td>
-                                <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'right' }}>{formatCurrency(0)}</td>
+                                <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'right' }}>{formatCurrency(item.discount || 0)}</td>
                                 <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'right' }}>{formatCurrency(item.totalPrice)}</td>
                             </tr>
                         ))}

@@ -52,7 +52,8 @@ interface SaleDetail {
     debtInterests: { id: string; amount: string }[];
 }
 
-interface Product { id: string; code: string; name: string; unit: string; pointsPerUnit: number; productStocks: { warehouseId: string; quantity: number }[]; }
+interface ProductUnitInfo { id: string; unitName: string; conversionRate: string; sellingPrice: string; isBaseUnit: boolean; }
+interface Product { id: string; code: string; name: string; unit: string; price: string; pointsPerUnit: number; productStocks: { warehouseId: string; quantity: number }[]; productUnits: ProductUnitInfo[]; }
 interface Warehouse { id: string; name: string; }
 interface Customer { id: string; name: string; phone: string; }
 
@@ -63,6 +64,11 @@ interface EditItem {
     unitPrice: number;
     points: number;
     itemDiscount: number;
+    // Unit fields
+    selectedUnitId: string;
+    selectedUnitName: string;
+    conversionRate: number;
+    productUnits: ProductUnitInfo[];
 }
 
 interface ReturnItem {
@@ -138,14 +144,33 @@ export default function SaleDetailPage() {
         const totalDiscount = Number(sale.discount || 0);
         const itemDiscountsSum = sale.items.reduce((s, i) => s + Number(i.discount || 0), 0);
         setEditBillDiscount(Math.max(0, totalDiscount - itemDiscountsSum));
-        setItems(sale.items.map(i => ({
-            productId: i.productId,
-            warehouseId: i.warehouseId,
-            quantity: i.quantity,
-            unitPrice: Number(i.unitPrice),
-            points: i.points,
-            itemDiscount: Number(i.discount || 0),
-        })));
+        setItems(sale.items.map(i => {
+            // Find matching product to get its productUnits
+            const prod = prods.find((p: Product) => p.id === i.productId);
+            const pUnits: ProductUnitInfo[] = prod?.productUnits || [];
+            // Match existing unitName to a productUnit
+            let selectedUnitId = '';
+            let convRate = 1;
+            if (i.unitName && pUnits.length > 0) {
+                const matchedUnit = pUnits.find(u => u.unitName === i.unitName);
+                if (matchedUnit) {
+                    selectedUnitId = matchedUnit.id;
+                    convRate = Number(matchedUnit.conversionRate);
+                }
+            }
+            return {
+                productId: i.productId,
+                warehouseId: i.warehouseId,
+                quantity: i.quantity,
+                unitPrice: Number(i.unitPrice),
+                points: i.points,
+                itemDiscount: Number(i.discount || 0),
+                selectedUnitId,
+                selectedUnitName: i.unitName || prod?.unit || i.product?.unit || '',
+                conversionRate: convRate,
+                productUnits: pUnits,
+            };
+        }));
         setIsEditing(true);
     };
 
@@ -154,11 +179,20 @@ export default function SaleDetailPage() {
             const copy = [...prev];
             if (field === 'productId') {
                 const prod = products.find(p => p.id === value);
-                copy[index] = { ...copy[index], productId: value as string, points: (prod?.pointsPerUnit || 0) * copy[index].quantity };
+                const pUnits = prod?.productUnits || [];
+                copy[index] = {
+                    ...copy[index], productId: value as string,
+                    points: (prod?.pointsPerUnit || 0) * copy[index].quantity,
+                    productUnits: pUnits,
+                    selectedUnitId: '',
+                    selectedUnitName: prod?.unit || '',
+                    conversionRate: 1,
+                };
             } else if (field === 'quantity') {
                 const qty = Number(value) || 0;
                 const prod = products.find(p => p.id === copy[index].productId);
-                copy[index] = { ...copy[index], quantity: qty, points: (prod?.pointsPerUnit || 0) * qty };
+                const convRate = copy[index].conversionRate || 1;
+                copy[index] = { ...copy[index], quantity: qty, points: (prod?.pointsPerUnit || 0) * qty * convRate };
             } else {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (copy[index] as any)[field] = (field === 'unitPrice' || field === 'itemDiscount') ? Number(value) || 0 : value;
@@ -167,9 +201,46 @@ export default function SaleDetailPage() {
         });
     };
 
+    const updateItemUnit = (index: number, unitId: string) => {
+        setItems(prev => {
+            const copy = [...prev];
+            const item = copy[index];
+            const prod = products.find(p => p.id === item.productId);
+
+            if (unitId === '__default__') {
+                // Reset to base unit
+                copy[index] = {
+                    ...item,
+                    selectedUnitId: '',
+                    selectedUnitName: prod?.unit || '',
+                    conversionRate: 1,
+                    unitPrice: Number(prod?.price || item.unitPrice),
+                    points: (prod?.pointsPerUnit || 0) * item.quantity,
+                };
+            } else {
+                const unit = item.productUnits.find(u => u.id === unitId);
+                if (unit) {
+                    const convRate = Number(unit.conversionRate);
+                    copy[index] = {
+                        ...item,
+                        selectedUnitId: unit.id,
+                        selectedUnitName: unit.unitName,
+                        conversionRate: convRate,
+                        unitPrice: Number(unit.sellingPrice),
+                        points: (prod?.pointsPerUnit || 0) * item.quantity * convRate,
+                    };
+                }
+            }
+            return copy;
+        });
+    };
+
     const addItem = () => {
         if (warehouses.length === 0) return;
-        setItems(prev => [...prev, { productId: '', warehouseId: warehouses[0].id, quantity: 1, unitPrice: 0, points: 0, itemDiscount: 0 }]);
+        setItems(prev => [...prev, {
+            productId: '', warehouseId: warehouses[0].id, quantity: 1, unitPrice: 0, points: 0, itemDiscount: 0,
+            selectedUnitId: '', selectedUnitName: '', conversionRate: 1, productUnits: [],
+        }]);
     };
 
     const removeItem = (index: number) => {
@@ -188,7 +259,16 @@ export default function SaleDetailPage() {
             const updated = await updateSale(id, {
                 customerId: selectedCustomerId || null,
                 notes: editNotes || null,
-                items,
+                items: items.map(i => ({
+                    productId: i.productId,
+                    warehouseId: i.warehouseId,
+                    quantity: i.quantity,
+                    unitPrice: i.unitPrice,
+                    points: i.points,
+                    itemDiscount: i.itemDiscount,
+                    unitName: i.selectedUnitName || undefined,
+                    conversionRate: i.conversionRate || 1,
+                })),
                 billDiscount: editBillDiscount,
                 userId: user.userId,
             });
@@ -416,6 +496,22 @@ export default function SaleDetailPage() {
                                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                                         </select>
                                     </div>
+                                    {item.productUnits && item.productUnits.length > 0 && (
+                                        <div>
+                                            <label className="text-xs text-gray-500 mb-1 block">หน่วยขาย</label>
+                                            <select value={item.selectedUnitId || '__default__'} onChange={e => updateItemUnit(idx, e.target.value)}
+                                                className="w-full px-3 py-2 rounded-lg border border-emerald-300 bg-emerald-50 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none">
+                                                <option value="__default__">
+                                                    {products.find(p => p.id === item.productId)?.unit || ''} (ปกติ)
+                                                </option>
+                                                {item.productUnits.map(u => (
+                                                    <option key={u.id} value={u.id}>
+                                                        {u.unitName} (×{Number(u.conversionRate)})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                     <div>
                                         <label className="text-xs text-gray-500 mb-1 block">จำนวน</label>
                                         <input type="number" min={1} value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)}

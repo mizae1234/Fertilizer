@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import InvoicePrint from './InvoicePrint';
 
+export const dynamic = 'force-dynamic';
+
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
 
@@ -39,6 +41,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             ...item,
             unitPrice: Number(item.unitPrice),
             totalPrice: Number(item.totalPrice),
+            discount: Number(item.discount || 0),
         })),
     }));
 

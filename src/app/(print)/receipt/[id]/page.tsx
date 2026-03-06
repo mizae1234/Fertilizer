@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import ReceiptPrint from './ReceiptPrint';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ReceiptPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ cashReceived?: string }> }) {
     const { id } = await params;
     const { cashReceived: cashReceivedStr } = await searchParams;

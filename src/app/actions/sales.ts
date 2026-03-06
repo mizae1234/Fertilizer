@@ -165,6 +165,8 @@ export async function updateSale(id: string, data: {
         unitPrice: number;
         points: number;
         itemDiscount?: number;
+        unitName?: string;
+        conversionRate?: number;
     }[];
 }) {
     const existing = await prisma.sale.findUnique({
@@ -238,6 +240,8 @@ export async function updateSale(id: string, data: {
                         totalPrice: i.quantity * i.unitPrice,
                         discount: i.itemDiscount || 0,
                         points: i.points,
+                        unitName: i.unitName || null,
+                        conversionRate: i.conversionRate || 1,
                     })),
                 },
             },
