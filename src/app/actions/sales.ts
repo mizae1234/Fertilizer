@@ -182,6 +182,37 @@ export async function updateSale(id: string, data: {
     const totalAmount = subtotal - totalDiscount;
     const totalPoints = data.items.reduce((s, i) => s + i.points, 0);
 
+    // Recalculate payments JSON if totalAmount changed and has credit/split payments
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let updatedPayments: any[] | undefined;
+    const existingPayments = existing.payments as { method: string; amount: number }[] | null;
+    if (existingPayments && Array.isArray(existingPayments) && totalAmount !== Number(existing.totalAmount)) {
+        const hasCredit = existingPayments.some(p => p.method === 'CREDIT');
+        if (hasCredit) {
+            // Keep non-credit payments as-is, recalculate credit = newTotal - sumOfNonCredit
+            const nonCreditPaid = existingPayments
+                .filter(p => p.method !== 'CREDIT')
+                .reduce((s, p) => s + Number(p.amount), 0);
+            const newCredit = Math.max(0, totalAmount - nonCreditPaid);
+            updatedPayments = [
+                ...existingPayments.filter(p => p.method !== 'CREDIT'),
+                ...(newCredit > 0 ? [{ method: 'CREDIT', amount: newCredit }] : []),
+            ];
+        } else {
+            // No credit involved — recalculate proportionally or just update
+            // For CASH/TRANSFER-only, set the single payment to match new total
+            if (existingPayments.length === 1) {
+                updatedPayments = [{ method: existingPayments[0].method, amount: totalAmount }];
+            } else {
+                // Multiple non-credit payments: adjust last one to cover the difference
+                const allButLast = existingPayments.slice(0, -1);
+                const sumAllButLast = allButLast.reduce((s, p) => s + Number(p.amount), 0);
+                const lastPayment = { ...existingPayments[existingPayments.length - 1], amount: Math.max(0, totalAmount - sumAllButLast) };
+                updatedPayments = [...allButLast, lastPayment];
+            }
+        }
+    }
+
     // Build audit log snapshot
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const changes: Record<string, any> = {};
@@ -231,6 +262,7 @@ export async function updateSale(id: string, data: {
                 totalAmount,
                 totalPoints,
                 discount: totalDiscount,
+                ...(updatedPayments ? { payments: updatedPayments } : {}),
                 items: {
                     create: data.items.map(i => ({
                         productId: i.productId,
