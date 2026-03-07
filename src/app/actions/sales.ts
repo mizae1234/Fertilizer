@@ -324,10 +324,35 @@ export async function updateSale(id: string, data: {
                     warehouse: { select: { name: true } },
                 },
             },
+            saleReturns: {
+                include: {
+                    createdBy: { select: { name: true } },
+                    items: {
+                        include: {
+                            product: { select: { name: true, code: true, unit: true } },
+                            warehouse: { select: { name: true } },
+                        },
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+            },
+            saleEditLogs: {
+                include: { user: { select: { name: true } } },
+                orderBy: { createdAt: 'desc' },
+            },
+            debtPayments: {
+                select: { id: true, amount: true, method: true, note: true, paidAt: true },
+                orderBy: { paidAt: 'desc' },
+            },
+            debtInterests: {
+                select: { id: true, amount: true },
+            },
         },
     });
 
     revalidatePath('/sales');
+    revalidatePath('/overdue-bills');
+    revalidatePath(`/overdue-bills/${id}`);
 
     return updated;
 }
