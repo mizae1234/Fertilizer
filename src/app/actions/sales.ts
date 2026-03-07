@@ -353,6 +353,7 @@ export async function updateSale(id: string, data: {
     revalidatePath('/sales');
     revalidatePath('/overdue-bills');
     revalidatePath(`/overdue-bills/${id}`);
+    revalidatePath('/products');
 
     return updated;
 }
