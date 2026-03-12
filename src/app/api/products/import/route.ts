@@ -163,6 +163,7 @@ export async function POST(request: Request) {
                                 type: 'GOODS_RECEIVE',
                                 quantity: initialStock,
                                 unitCost: costVal,
+                                balanceAfter: initialStock,
                                 notes: 'สต็อกตั้งต้น (Import Excel)',
                             },
                         });

@@ -48,7 +48,7 @@ export async function createFactoryReturn(data: {
 
         // Deduct stock + create stock transactions
         await Promise.all(data.items.map(async (item) => {
-            await tx.productStock.upsert({
+            const updatedStock = await tx.productStock.upsert({
                 where: {
                     productId_warehouseId: {
                         productId: item.productId,
@@ -72,6 +72,7 @@ export async function createFactoryReturn(data: {
                     unitCost: item.unitCost,
                     reference: returnNumber,
                     userId: data.userId,
+                    balanceAfter: updatedStock.quantity,
                     notes: `เคลมคืนโรงงาน ${returnNumber}`,
                 },
             });
@@ -134,7 +135,7 @@ export async function cancelFactoryReturn(id: string) {
             const qtyToRestore = matchingTx ? Math.abs(matchingTx.quantity) : item.quantity;
 
             // Restore stock
-            await tx.productStock.update({
+            const restoredStock = await tx.productStock.update({
                 where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
                 data: { quantity: { increment: qtyToRestore } },
             });
@@ -149,6 +150,7 @@ export async function cancelFactoryReturn(id: string) {
                     unitCost: item.unitCost,
                     reference: fr.returnNumber,
                     userId: fr.createdById,
+                    balanceAfter: restoredStock.quantity,
                     notes: `ยกเลิกเคลมคืนโรงงาน ${fr.returnNumber}`,
                 },
             });

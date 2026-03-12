@@ -226,6 +226,12 @@ export async function approveGoodsReceive(id: string) {
                 });
             }
 
+            // Get updated stock for balanceAfter
+            const updatedStock = await tx.productStock.findUnique({
+                where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
+                select: { quantity: true },
+            });
+
             await tx.stockTransaction.create({
                 data: {
                     productId: item.productId,
@@ -236,6 +242,7 @@ export async function approveGoodsReceive(id: string) {
                     reference: gr.grNumber,
                     lotNo: item.lotNo || null,
                     userId: gr.createdById,
+                    balanceAfter: updatedStock?.quantity ?? null,
                     notes: `รับสินค้าจาก GR ${gr.grNumber}`,
                 },
             });

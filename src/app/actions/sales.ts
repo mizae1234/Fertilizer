@@ -95,7 +95,7 @@ export async function approveSale(id: string) {
 
         // Deduct stock for each item
         for (const item of sale.items) {
-            await tx.productStock.update({
+            const updatedStock = await tx.productStock.update({
                 where: {
                     productId_warehouseId: {
                         productId: item.productId,
@@ -117,6 +117,7 @@ export async function approveSale(id: string) {
                     unitCost: item.unitPrice,
                     reference: sale.saleNumber,
                     userId: sale.createdById,
+                    balanceAfter: updatedStock.quantity,
                     notes: `ขายสินค้า ${sale.saleNumber}`,
                 },
             });
@@ -282,7 +283,7 @@ export async function updateSale(id: string, data: {
         // If APPROVED, deduct new stock
         if (existing.status === 'APPROVED') {
             for (const item of data.items) {
-                await tx.productStock.update({
+                const editStock = await tx.productStock.update({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
                     data: { quantity: { decrement: item.quantity } },
                 });
@@ -295,6 +296,7 @@ export async function updateSale(id: string, data: {
                         unitCost: item.unitPrice,
                         reference: existing.saleNumber,
                         userId: existing.createdById,
+                        balanceAfter: editStock.quantity,
                         notes: `ขายสินค้า ${existing.saleNumber} (แก้ไข)`,
                     },
                 });
@@ -384,7 +386,7 @@ export async function cancelSale(id: string, userId?: string) {
                 // Fallback to item.quantity if no stock transaction found
                 const baseQtyToRestore = matchingTx ? Math.abs(matchingTx.quantity) : item.quantity;
 
-                await tx.productStock.update({
+                const cancelStock = await tx.productStock.update({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
                     data: { quantity: { increment: baseQtyToRestore } },
                 });
@@ -399,6 +401,7 @@ export async function cancelSale(id: string, userId?: string) {
                         unitCost: item.unitPrice,
                         reference: sale.saleNumber,
                         userId: sale.createdById,
+                        balanceAfter: cancelStock.quantity,
                         notes: `ยกเลิกบิล ${sale.saleNumber}`,
                     },
                 });
