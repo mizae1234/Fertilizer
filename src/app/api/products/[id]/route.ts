@@ -56,8 +56,32 @@ export async function GET(
             return NextResponse.json({ error: 'ไม่พบสินค้า' }, { status: 404 });
         }
 
+        // When date filter is applied, compute sum of transactions AFTER the filter
+        // so the client can calculate accurate starting balance
+        let txSumAfterFilter: number | null = null;
+        if (txFrom || txTo) {
+            const afterWhere: Record<string, unknown> = { productId: id };
+            if (txTo) {
+                const toDate = new Date(txTo);
+                toDate.setHours(23, 59, 59, 999);
+                afterWhere.createdAt = { gt: toDate };
+            }
+            // If only txFrom is set (no txTo), we don't need afterSum since newest tx = current stock
+            if (txTo) {
+                const afterAgg = await prisma.stockTransaction.aggregate({
+                    where: afterWhere,
+                    _sum: { quantity: true },
+                });
+                txSumAfterFilter = afterAgg._sum.quantity ?? 0;
+            }
+        }
+
         // Serialize Decimal objects to plain values
-        return NextResponse.json(JSON.parse(JSON.stringify(product)));
+        const result = JSON.parse(JSON.stringify(product));
+        if (txSumAfterFilter !== null) {
+            result.txSumAfterFilter = txSumAfterFilter;
+        }
+        return NextResponse.json(result);
     } catch (error: any) {
         console.error('Product GET error:', error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });

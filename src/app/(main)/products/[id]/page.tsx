@@ -80,6 +80,7 @@ interface ProductDetail {
     productUnits: ProductUnit[];
     stockTransactions: StockTransaction[];
     productLogs: ProductLog[];
+    txSumAfterFilter?: number;
 }
 
 const txTypeLabels: Record<string, { label: string; color: string; icon: string }> = {
@@ -945,11 +946,10 @@ export default function ProductDetailPage() {
                             <div className="text-xs text-gray-400 mt-2">
                                 แสดง {product.stockTransactions.length} รายการ
                             </div>
-                            <div className="flex items-start gap-1.5 mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                                <span className="text-amber-500 mt-0.5">⚠️</span>
-                                <p className="text-xs text-amber-700">
-                                    คอลัมน์ "คงเหลือ" คำนวณจาก stock ปัจจุบัน ({totalStock.toLocaleString()}) ย้อนกลับ — 
-                                    หากกรองตามช่วงวันที่ ค่าอาจไม่ตรงกับ stock จริงในวันนั้น
+                            <div className="flex items-start gap-1.5 mt-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                <span className="text-blue-500 mt-0.5">ℹ️</span>
+                                <p className="text-xs text-blue-700">
+                                    คอลัมน์ "คงเหลือ" คำนวณจาก stock รวมปัจจุบัน ({totalStock.toLocaleString()}) ย้อนกลับตามรายการ
                                 </p>
                             </div>
                         </div>
@@ -977,8 +977,10 @@ export default function ProductDetailPage() {
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
                                                 {(() => {
-                                                    // Compute running balance: start from current stock, go newest→oldest
-                                                    let balance = totalStock;
+                                                    // Compute accurate starting balance:
+                                                    // If date filter is applied, subtract transactions after filter from current stock
+                                                    const startingBalance = totalStock - (product.txSumAfterFilter ?? 0);
+                                                    let balance = startingBalance;
                                                     const rows = product.stockTransactions.map(tx => {
                                                         const currentBalance = balance;
                                                         // Reverse the effect: newest tx first, so subtract its effect to get previous balance
@@ -1039,16 +1041,6 @@ export default function ProductDetailPage() {
                                                             {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
                                                             {Math.abs(tx.quantity).toLocaleString()} {product.unit}
                                                         </span>
-                                                        <span className="text-xs text-gray-500 ml-1">คงเหลือ: {(() => {
-                                                            // Quick balance calc for mobile
-                                                            let b = totalStock;
-                                                            for (const t of product.stockTransactions) {
-                                                                if (t.id === tx.id) break;
-                                                                const out = t.type === 'SALE' || t.type === 'TRANSFER_OUT';
-                                                                b += out ? Math.abs(t.quantity) : -Math.abs(t.quantity);
-                                                            }
-                                                            return b.toLocaleString();
-                                                        })()}</span>
                                                     </div>
                                                     <div className="flex justify-between text-xs text-gray-500">
                                                         <span>{formatDateTime(tx.createdAt)}</span>
