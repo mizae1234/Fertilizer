@@ -14,14 +14,22 @@ export default function DateRangeFilter() {
 
     const navigate = (f: string, t: string) => {
         const params = new URLSearchParams();
-        // Preserve all other params
         searchParams.forEach((v, k) => { if (k !== 'from' && k !== 'to' && k !== 'page') params.set(k, v); });
         if (f) params.set('from', f);
         if (t) params.set('to', t);
         startTransition(() => router.push(`${pathname}?${params}`));
     };
 
-    const applyFilter = () => navigate(from, to);
+    // Auto-apply when date changes
+    const handleFromChange = (value: string) => {
+        setFrom(value);
+        navigate(value, to);
+    };
+
+    const handleToChange = (value: string) => {
+        setTo(value);
+        navigate(from, value);
+    };
 
     const setQuick = (days: number) => {
         const d = new Date();
@@ -41,18 +49,15 @@ export default function DateRangeFilter() {
         <div className="flex flex-wrap items-end gap-2 ml-auto">
             <div>
                 <label className="text-xs text-gray-500 mb-1 block">จากวันที่</label>
-                <input type="date" value={from} onChange={e => setFrom(e.target.value)}
+                <input type="date" value={from} onChange={e => handleFromChange(e.target.value)}
                     className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
             </div>
             <div>
                 <label className="text-xs text-gray-500 mb-1 block">ถึงวันที่</label>
-                <input type="date" value={to} onChange={e => setTo(e.target.value)}
+                <input type="date" value={to} onChange={e => handleToChange(e.target.value)}
                     className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
             </div>
-            <button onClick={applyFilter} disabled={isPending}
-                className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
-                {isPending ? '🔄' : '🔍 กรอง'}
-            </button>
+            {isPending && <span className="text-xs text-gray-400 self-center">🔄</span>}
             <div className="flex gap-1">
                 {[{ l: '7 วัน', d: 7 }, { l: '30 วัน', d: 30 }, { l: '90 วัน', d: 90 }].map(o => (
                     <button key={o.d} onClick={() => setQuick(o.d)}
@@ -60,9 +65,7 @@ export default function DateRangeFilter() {
                         {o.l}
                     </button>
                 ))}
-                {(from || to) && (
-                    <button onClick={clearFilter} className="px-2.5 py-1.5 rounded-lg text-xs text-red-500 hover:bg-red-50">ล้าง</button>
-                )}
+                <button onClick={clearFilter} className="px-2.5 py-1.5 rounded-lg text-xs text-red-500 hover:bg-red-50">ล้าง</button>
             </div>
         </div>
     );

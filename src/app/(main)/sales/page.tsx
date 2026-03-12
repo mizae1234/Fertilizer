@@ -4,6 +4,7 @@ import { formatCurrency, formatDateTime } from '@/lib/utils';
 import StatusBadge from '@/components/StatusBadge';
 import { Suspense } from 'react';
 import DateRangeFilter from '@/components/DateRangeFilter';
+import SearchBar from '@/components/SearchBar';
 import PageHeader from '@/components/PageHeader';
 
 interface Props { searchParams: Promise<{ page?: string; status?: string; from?: string; to?: string; search?: string }> }
@@ -12,8 +13,7 @@ export default async function SalesPage({ searchParams }: Props) {
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
     const status = sp.status || '';
-    const defaultFrom = () => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); };
-    const from = sp.from || defaultFrom();
+    const from = sp.from || '';
     const to = sp.to || '';
     const searchQuery = sp.search || '';
     const perPage = 15;
@@ -27,8 +27,8 @@ export default async function SalesPage({ searchParams }: Props) {
     }
     if (searchQuery) {
         where.OR = [
-            { saleNumber: { contains: searchQuery } },
-            { customer: { name: { contains: searchQuery } } },
+            { saleNumber: { contains: searchQuery, mode: 'insensitive' as const } },
+            { customer: { name: { contains: searchQuery, mode: 'insensitive' as const } } },
         ];
     }
 
@@ -96,16 +96,9 @@ export default async function SalesPage({ searchParams }: Props) {
             </div>
             {/* Search */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">
-                <form method="get" action="/sales" className="flex gap-2">
-                    <input type="hidden" name="status" value={status} />
-                    <input type="hidden" name="from" value={from} />
-                    <input type="hidden" name="to" value={to} />
-                    <input type="text" name="search" defaultValue={searchQuery}
-                        placeholder="🔍 ค้นหาเลขบิล หรือชื่อลูกค้า..."
-                        className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm" />
-                    <button type="submit" className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600">ค้นหา</button>
-                    {searchQuery && <a href={buildUrl({ search: '', page: '1' })} className="px-3 py-2.5 rounded-xl bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200">ล้าง</a>}
-                </form>
+                <Suspense fallback={<div className="h-11 bg-gray-100 rounded-xl animate-pulse" />}>
+                    <SearchBar placeholder="🔍 ค้นหาเลขบิล หรือชื่อลูกค้า..." />
+                </Suspense>
             </div>
 
             {/* Sales Table */}
