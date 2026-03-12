@@ -163,7 +163,11 @@ export default function ProductDetailPage() {
             const res = await fetch(`/api/products/${id}?${params.toString()}`);
             const data = await res.json();
             if (data.stockTransactions) {
-                setProduct(prev => prev ? { ...prev, stockTransactions: data.stockTransactions } : prev);
+                setProduct(prev => prev ? {
+                    ...prev,
+                    stockTransactions: data.stockTransactions,
+                    txSumAfterFilter: data.txSumAfterFilter ?? undefined,
+                } : prev);
             }
         } catch { /* ignore */ }
         setTxLoading(false);
