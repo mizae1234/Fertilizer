@@ -20,6 +20,7 @@ interface Sale {
     discount: number;
     payments: { method: string; amount: number }[];
     notes: string | null;
+    debtPaid: number;
     items: SaleItem[];
 }
 
@@ -66,9 +67,10 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
     }, []);
 
     const shopName = template?.shopName || 'Fertilizer POS';
-    const totalPaid = (sale.payments || [])
+    const paidAtSale = (sale.payments || [])
         .filter(p => p.method !== 'CREDIT')
         .reduce((s, p) => s + p.amount, 0);
+    const totalPaid = paidAtSale + (sale.debtPaid || 0);
     const cashTotal = (sale.payments || [])
         .filter(p => p.method === 'CASH')
         .reduce((s, p) => s + p.amount, 0);
@@ -193,12 +195,24 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                     </div>
 
                     {/* Payment breakdown */}
-                    {(sale.payments || []).map((p, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                            <span>{methodLabel(p.method)}</span>
-                            <span>{formatCurrency(p.amount)}</span>
-                        </div>
-                    ))}
+                    {(sale.payments || []).map((p, i) => {
+                        // For CREDIT line, show remaining debt (original credit minus debt payments)
+                        if (p.method === 'CREDIT') {
+                            const remaining = Math.max(0, p.amount - (sale.debtPaid || 0));
+                            return (
+                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                                    <span>{remaining > 0 ? 'ค้างชำระ' : 'ชำระแล้ว (เครดิต)'}</span>
+                                    <span>{formatCurrency(remaining)}</span>
+                                </div>
+                            );
+                        }
+                        return (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                                <span>{methodLabel(p.method)}</span>
+                                <span>{formatCurrency(p.amount)}</span>
+                            </div>
+                        );
+                    })}
 
                     {cashReceived && cashReceived > 0 ? (
                         <>
