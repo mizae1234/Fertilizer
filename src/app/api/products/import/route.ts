@@ -122,6 +122,14 @@ export async function POST(request: Request) {
                 }
             }
 
+            // Helper: strip commas/spaces before parsing numbers (e.g. "1,000" → 1000)
+            const parseNum = (val: string | null, fallback = 0) => {
+                if (!val) return fallback;
+                const cleaned = val.replace(/[,\s]/g, '');
+                const n = parseFloat(cleaned);
+                return isNaN(n) ? fallback : n;
+            };
+
             try {
                 await prisma.product.create({
                     data: {
@@ -129,11 +137,11 @@ export async function POST(request: Request) {
                         name,
                         description: getValue('description') || null,
                         unit: getValue('unit') || 'ชิ้น',
-                        pointsPerUnit: parseInt(getValue('pointsPerUnit') || '0') || 0,
-                        minStock: parseInt(getValue('minStock') || '10') || 10,
+                        pointsPerUnit: Math.floor(parseNum(getValue('pointsPerUnit'), 0)),
+                        minStock: Math.floor(parseNum(getValue('minStock'), 10)),
                         brand: getValue('brand') || null,
-                        cost: parseFloat(getValue('cost') || '0') || 0,
-                        price: parseFloat(getValue('price') || '0') || 0,
+                        cost: parseNum(getValue('cost'), 0),
+                        price: parseNum(getValue('price'), 0),
                         packaging: getValue('packaging') || null,
                         productGroupId,
                     },
@@ -142,9 +150,9 @@ export async function POST(request: Request) {
                 results.created++;
 
                 // Create initial stock if specified
-                const initialStock = parseInt(getValue('initialStock') || '0') || 0;
+                const initialStock = Math.floor(parseNum(getValue('initialStock'), 0));
                 if (initialStock > 0) {
-                    const costVal = parseFloat(getValue('cost') || '0') || 0;
+                    const costVal = parseNum(getValue('cost'), 0);
                     const createdProduct = await prisma.product.findFirst({ where: { code }, select: { id: true } });
                     if (createdProduct) {
                         await prisma.productStock.create({
