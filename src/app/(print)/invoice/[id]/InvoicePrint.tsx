@@ -12,6 +12,7 @@ interface SaleData {
     creditDueDate: string | null;
     payments: { method: string; amount: number; dueDate?: string }[] | null;
     notes: string | null;
+    debtPaid: number;
     createdAt: string;
     customer: { name: string; phone: string } | null;
     createdBy: { name: string };
@@ -106,8 +107,9 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
 
     // Payment info
     const payments = sale.payments as { method: string; amount: number; dueDate?: string }[] | null;
-    const totalPaid = payments?.filter(p => p.method !== 'CREDIT').reduce((s, p) => s + p.amount, 0) ?? (sale.paymentMethod !== 'CREDIT' ? sale.totalAmount : 0);
-    const totalCredit = sale.totalAmount - totalPaid;
+    const paidAtSale = payments?.filter(p => p.method !== 'CREDIT').reduce((s, p) => s + p.amount, 0) ?? (sale.paymentMethod !== 'CREDIT' ? sale.totalAmount : 0);
+    const totalPaid = paidAtSale + (sale.debtPaid || 0);
+    const totalCredit = Math.max(0, sale.totalAmount - totalPaid);
 
     return (
         <>

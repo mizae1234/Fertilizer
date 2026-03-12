@@ -21,6 +21,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             saleReturns: {
                 include: { items: true },
             },
+            debtPayments: {
+                select: { amount: true },
+            },
         },
     });
 
@@ -58,6 +61,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         ...sale,
         totalAmount: Number(sale.totalAmount),
         discount: Number(sale.discount || 0),
+        debtPaid: sale.debtPayments.reduce((s, p) => s + Number(p.amount), 0),
         items: adjustedItems.map(item => ({
             ...item,
             unitPrice: Number(item.unitPrice),
