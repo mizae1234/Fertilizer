@@ -12,8 +12,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
     const status = sp.status || '';
-    const defaultFrom = () => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); };
-    const from = sp.from || defaultFrom();
+    const from = sp.from || '';
     const to = sp.to || '';
     const perPage = 10;
 
@@ -86,26 +85,28 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เลขที่ GR</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เลข PO</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้ขาย</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">รายการ</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">มูลค่า</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สถานะ</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">บันทึกโดย</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">หมายเหตุ</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">วันที่</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {records.length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
+                            <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
                         ) : (
                             records.map(gr => (
                                 <tr key={gr.id} className="hover:bg-gray-50">
                                     <td className="px-4 py-3"><Link href={`/goods-receive/${gr.id}`} className="text-sm font-medium text-emerald-600 hover:underline">{gr.grNumber}</Link></td>
+                                    <td className="px-4 py-3 text-sm text-gray-600">{gr.poNumber || '-'}</td>
                                     <td className="px-4 py-3 text-sm text-gray-800">{gr.vendor.name}</td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{gr._count.items} รายการ</td>
                                     <td className="px-4 py-3 text-sm font-semibold text-gray-800">{formatCurrency(Number(gr.totalAmount))}</td>
                                     <td className="px-4 py-3"><StatusBadge status={gr.status} /></td>
-                                    <td className="px-4 py-3 text-sm text-gray-600">{gr.createdBy.name}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500 max-w-[200px] truncate" title={gr.notes || ''}>{gr.notes || '-'}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(gr.createdAt)}</td>
                                 </tr>
                             ))
@@ -137,10 +138,12 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                                 <StatusBadge status={gr.status} />
                             </div>
                             <p className="text-sm font-medium text-gray-800 mb-1">{gr.vendor.name}</p>
+                            {gr.poNumber && <p className="text-xs text-gray-500 mb-1">PO: {gr.poNumber}</p>}
                             <div className="flex items-center justify-between text-xs text-gray-500">
                                 <span>{gr._count.items} รายการ · {gr.createdBy.name}</span>
                                 <span className="font-semibold text-gray-800 text-sm">{formatCurrency(Number(gr.totalAmount))}</span>
                             </div>
+                            {gr.notes && <p className="text-xs text-gray-400 mt-1">📝 {gr.notes}</p>}
                             <p className="text-xs text-gray-400 mt-1">{formatDateTime(gr.createdAt)}</p>
                         </Link>
                     ))
