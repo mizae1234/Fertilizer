@@ -961,6 +961,7 @@ export default function ProductDetailPage() {
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ประเภท</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
                                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">คงเหลือ</th>
                                                     {user?.role === 'ADMIN' && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>}
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">อ้างอิง</th>
@@ -968,37 +969,51 @@ export default function ProductDetailPage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
-                                                {product.stockTransactions.map(tx => {
-                                                    const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
-                                                    return (
-                                                        <tr key={tx.id} className="hover:bg-gray-50">
-                                                            <td className="px-4 py-3 text-sm text-gray-600">{formatDateTime(tx.createdAt)}</td>
-                                                            <td className="px-4 py-3">
-                                                                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
-                                                                    {info.icon} {info.label}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-4 py-3 text-sm text-gray-600">{tx.warehouse.name}</td>
-                                                            <td className="px-4 py-3 text-sm text-right">
-                                                                <span className={tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}>
-                                                                    {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
-                                                                    {Math.abs(tx.quantity).toLocaleString()} {product.unit}
-                                                                </span>
-                                                            </td>
-                                                            {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(tx.unitCost))}</td>}
-                                                            <td className="px-4 py-3 text-xs text-gray-500">
-                                                                {tx.lotNo ? <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">{tx.lotNo}</span> : <span className="text-gray-300">-</span>}
-                                                            </td>
-                                                            <td className="px-4 py-3 text-xs text-gray-500">
-                                                                {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
-                                                                {tx.notes && <p className="text-gray-400 mt-0.5">{tx.notes}</p>}
-                                                            </td>
-                                                            <td className="px-4 py-3 text-xs text-gray-600">
-                                                                {tx.user?.name || <span className="text-gray-300">-</span>}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
+                                                {(() => {
+                                                    // Compute running balance: start from current stock, go newest→oldest
+                                                    let balance = totalStock;
+                                                    const rows = product.stockTransactions.map(tx => {
+                                                        const currentBalance = balance;
+                                                        // Reverse the effect: newest tx first, so subtract its effect to get previous balance
+                                                        const isOut = tx.type === 'SALE' || tx.type === 'TRANSFER_OUT';
+                                                        balance = balance + (isOut ? Math.abs(tx.quantity) : -Math.abs(tx.quantity));
+                                                        return { tx, balance: currentBalance };
+                                                    });
+                                                    return rows.map(({ tx, balance: bal }) => {
+                                                        const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
+                                                        return (
+                                                            <tr key={tx.id} className="hover:bg-gray-50">
+                                                                <td className="px-4 py-3 text-sm text-gray-600">{formatDateTime(tx.createdAt)}</td>
+                                                                <td className="px-4 py-3">
+                                                                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
+                                                                        {info.icon} {info.label}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm text-gray-600">{tx.warehouse.name}</td>
+                                                                <td className="px-4 py-3 text-sm text-right">
+                                                                    <span className={tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}>
+                                                                        {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
+                                                                        {Math.abs(tx.quantity).toLocaleString()} {product.unit}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm text-right font-medium text-gray-700">
+                                                                    {bal.toLocaleString()}
+                                                                </td>
+                                                                {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(tx.unitCost))}</td>}
+                                                                <td className="px-4 py-3 text-xs text-gray-500">
+                                                                    {tx.lotNo ? <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">{tx.lotNo}</span> : <span className="text-gray-300">-</span>}
+                                                                </td>
+                                                                <td className="px-4 py-3 text-xs text-gray-500">
+                                                                    {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
+                                                                    {tx.notes && <p className="text-gray-400 mt-0.5">{tx.notes}</p>}
+                                                                </td>
+                                                                <td className="px-4 py-3 text-xs text-gray-600">
+                                                                    {tx.user?.name || <span className="text-gray-300">-</span>}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    });
+                                                })()}
                                             </tbody>
                                         </table>
                                     </div>
@@ -1017,6 +1032,16 @@ export default function ProductDetailPage() {
                                                             {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
                                                             {Math.abs(tx.quantity).toLocaleString()} {product.unit}
                                                         </span>
+                                                        <span className="text-xs text-gray-500 ml-1">คงเหลือ: {(() => {
+                                                            // Quick balance calc for mobile
+                                                            let b = totalStock;
+                                                            for (const t of product.stockTransactions) {
+                                                                if (t.id === tx.id) break;
+                                                                const out = t.type === 'SALE' || t.type === 'TRANSFER_OUT';
+                                                                b += out ? Math.abs(t.quantity) : -Math.abs(t.quantity);
+                                                            }
+                                                            return b.toLocaleString();
+                                                        })()}</span>
                                                     </div>
                                                     <div className="flex justify-between text-xs text-gray-500">
                                                         <span>{formatDateTime(tx.createdAt)}</span>
