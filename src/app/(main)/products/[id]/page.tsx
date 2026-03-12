@@ -970,11 +970,11 @@ export default function ProductDetailPage() {
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
                                                 {(() => {
-                                                    // Compute running balance for old records without balanceAfter
+                                                    // Compute running balance: start from current stock, go newest→oldest
                                                     let balance = totalStock;
-                                                    const rows = product.stockTransactions.map((tx: any) => {
-                                                        const currentBalance = tx.balanceAfter != null ? tx.balanceAfter : balance;
-                                                        // Always track computed balance for fallback
+                                                    const rows = product.stockTransactions.map(tx => {
+                                                        const currentBalance = balance;
+                                                        // Reverse the effect: newest tx first, so subtract its effect to get previous balance
                                                         const isOut = tx.type === 'SALE' || tx.type === 'TRANSFER_OUT';
                                                         balance = balance + (isOut ? Math.abs(tx.quantity) : -Math.abs(tx.quantity));
                                                         return { tx, balance: currentBalance };
@@ -1032,7 +1032,16 @@ export default function ProductDetailPage() {
                                                             {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
                                                             {Math.abs(tx.quantity).toLocaleString()} {product.unit}
                                                         </span>
-                                                        {(tx as any).balanceAfter != null && <span className="text-xs text-gray-500 ml-1">คงเหลือ: {(tx as any).balanceAfter.toLocaleString()}</span>}
+                                                        <span className="text-xs text-gray-500 ml-1">คงเหลือ: {(() => {
+                                                            // Quick balance calc for mobile
+                                                            let b = totalStock;
+                                                            for (const t of product.stockTransactions) {
+                                                                if (t.id === tx.id) break;
+                                                                const out = t.type === 'SALE' || t.type === 'TRANSFER_OUT';
+                                                                b += out ? Math.abs(t.quantity) : -Math.abs(t.quantity);
+                                                            }
+                                                            return b.toLocaleString();
+                                                        })()}</span>
                                                     </div>
                                                     <div className="flex justify-between text-xs text-gray-500">
                                                         <span>{formatDateTime(tx.createdAt)}</span>

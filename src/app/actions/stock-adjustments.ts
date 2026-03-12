@@ -86,8 +86,6 @@ export async function createStockAdjustment(data: {
                     data: { quantity: { decrement: item.quantity } },
                 });
 
-                const newBalance = stock.quantity - item.quantity;
-
                 await tx.stockTransaction.create({
                     data: {
                         productId: item.productId,
@@ -97,7 +95,6 @@ export async function createStockAdjustment(data: {
                         unitCost: Number(stock.avgCost),
                         reference: adjNumber,
                         userId: data.userId,
-                        balanceAfter: newBalance,
                         notes: noteText,
                     },
                 });
@@ -118,8 +115,6 @@ export async function createStockAdjustment(data: {
                     });
                 }
 
-                const newBalance = (stock?.quantity || 0) + item.quantity;
-
                 await tx.stockTransaction.create({
                     data: {
                         productId: item.productId,
@@ -129,7 +124,6 @@ export async function createStockAdjustment(data: {
                         unitCost: stock ? Number(stock.avgCost) : 0,
                         reference: adjNumber,
                         userId: data.userId,
-                        balanceAfter: newBalance,
                         notes: noteText,
                     },
                 });

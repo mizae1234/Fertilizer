@@ -81,7 +81,7 @@ export async function createSaleReturn(data: {
 
                 // Restore stock + create StockTransaction for each item
                 await Promise.all(data.items.map(async (item) => {
-                    const updatedStock = await tx.productStock.upsert({
+                    await tx.productStock.upsert({
                         where: {
                             productId_warehouseId: {
                                 productId: item.productId,
@@ -105,7 +105,6 @@ export async function createSaleReturn(data: {
                             unitCost: item.unitPrice,
                             reference: returnNumber,
                             userId: data.userId,
-                            balanceAfter: updatedStock.quantity,
                             notes: `คืนสินค้า ${returnNumber} (จากบิล ${sale.saleNumber})`,
                         },
                     });

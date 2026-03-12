@@ -105,7 +105,7 @@ export async function approveTransfer(id: string) {
 
         for (const item of transfer.items) {
             // Deduct from source warehouse
-            const fromStock = await tx.productStock.upsert({
+            await tx.productStock.upsert({
                 where: {
                     productId_warehouseId: {
                         productId: item.productId,
@@ -121,7 +121,7 @@ export async function approveTransfer(id: string) {
             });
 
             // Add to destination warehouse
-            const toStock = await tx.productStock.upsert({
+            await tx.productStock.upsert({
                 where: {
                     productId_warehouseId: {
                         productId: item.productId,
@@ -145,7 +145,6 @@ export async function approveTransfer(id: string) {
                     quantity: -item.quantity,
                     reference: transfer.transferNumber,
                     userId: transfer.createdById,
-                    balanceAfter: fromStock.quantity,
                     notes: `โอนออกไปยัง ${transfer.toWarehouseId}`,
                 },
             });
@@ -159,7 +158,6 @@ export async function approveTransfer(id: string) {
                     quantity: item.quantity,
                     reference: transfer.transferNumber,
                     userId: transfer.createdById,
-                    balanceAfter: toStock.quantity,
                     notes: `รับโอนจาก ${transfer.fromWarehouseId}`,
                 },
             });
