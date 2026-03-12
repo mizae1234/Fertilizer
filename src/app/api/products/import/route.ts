@@ -149,9 +149,9 @@ export async function POST(request: Request) {
                 existingCodes.add(code.toLowerCase());
                 results.created++;
 
-                // Create initial stock if specified
+                // Create initial stock if specified (allow negative values too)
                 const initialStock = Math.floor(parseNum(getValue('initialStock'), 0));
-                if (initialStock > 0) {
+                if (initialStock !== 0) {
                     const costVal = parseNum(getValue('cost'), 0);
                     const createdProduct = await prisma.product.findFirst({ where: { code }, select: { id: true } });
                     if (createdProduct) {
@@ -168,10 +168,10 @@ export async function POST(request: Request) {
                             data: {
                                 productId: createdProduct.id,
                                 warehouseId: defaultWarehouse.id,
-                                type: 'GOODS_RECEIVE',
+                                type: initialStock > 0 ? 'GOODS_RECEIVE' : 'ADJUSTMENT',
                                 quantity: initialStock,
                                 unitCost: costVal,
-                                notes: 'สต็อกตั้งต้น (Import Excel)',
+                                notes: `สต็อกตั้งต้น (Import Excel)${initialStock < 0 ? ' — ติดลบ' : ''}`,
                             },
                         });
                     }
