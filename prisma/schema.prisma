@@ -121,6 +121,7 @@ model Product {
   description    String?
   unit           String    @default("bag")
   cost           Decimal   @default(0) @db.Decimal(12, 2)
+  costMethod     String    @default("MANUAL") // AVG, LAST, MANUAL
   price          Decimal   @default(0) @db.Decimal(12, 2)
   brand          String?
   packaging      String?

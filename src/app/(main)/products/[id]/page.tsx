@@ -65,6 +65,7 @@ interface ProductDetail {
     description: string | null;
     unit: string;
     cost: number | string;
+    costMethod: string;
     price: number | string;
     brand: string | null;
     packaging: string | null;
@@ -216,18 +217,11 @@ export default function ProductDetailPage() {
             setUnitValue(product.unit);
             setCustomCost(String(Number(product.cost)));
 
-            // Auto-detect which cost type matches the saved cost
-            const savedCost = Number(product.cost);
-            const avgCost = product.computedAvgCost ?? 0;
-            const lastCost = product.computedLastCost ?? 0;
-
-            if (savedCost === lastCost && lastCost > 0) {
-                setCostType('last');
-            } else if (savedCost === avgCost && avgCost > 0) {
-                setCostType('avg');
-            } else {
-                setCostType('custom');
-            }
+            // Load cost method from DB
+            const method = product.costMethod || 'MANUAL';
+            if (method === 'AVG') setCostType('avg');
+            else if (method === 'LAST') setCostType('last');
+            else setCostType('custom');
         }
     }, [product]);
 
@@ -597,6 +591,7 @@ export default function ProductDetailPage() {
                             brand: infoForm.brand || null,
                             packaging: infoForm.packaging || null,
                             cost: costVal,
+                            costMethod: costType === 'avg' ? 'AVG' : costType === 'last' ? 'LAST' : 'MANUAL',
                             price: parseFloat(sellingPriceValue) || 0,
                             unit: unitValue || product.unit,
                             pointsPerUnit: parseInt(pointsValue) || 0,

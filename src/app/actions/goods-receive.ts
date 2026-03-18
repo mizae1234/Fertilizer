@@ -181,6 +181,14 @@ export async function approveGoodsReceive(id: string) {
             data: { status: 'APPROVED' },
         });
 
+        // Fetch products for costMethod check
+        const productIds = [...new Set(gr.items.map(i => i.productId))];
+        const products = await tx.product.findMany({
+            where: { id: { in: productIds } },
+            select: { id: true, cost: true, costMethod: true, name: true },
+        });
+        const productMap = Object.fromEntries(products.map(p => [p.id, p]));
+
         // Update stock for each item — fetch all existing stocks in one query
         const existingStocks = await tx.productStock.findMany({
             where: {
@@ -240,6 +248,69 @@ export async function approveGoodsReceive(id: string) {
                 },
             });
         }));
+
+        // Update product.cost based on costMethod for each product
+        for (const productId of productIds) {
+            const prod = productMap[productId];
+            if (!prod) continue;
+
+            const method = prod.costMethod || 'MANUAL';
+            if (method === 'MANUAL') continue; // Don't touch manual cost
+
+            const oldCost = Number(prod.cost);
+
+            if (method === 'AVG') {
+                // Calculate weighted average across ALL warehouses for this product
+                const allStocks = await tx.productStock.findMany({
+                    where: { productId },
+                    select: { quantity: true, avgCost: true },
+                });
+                const totalStockQty = allStocks.reduce((s, ps) => s + ps.quantity, 0);
+                const weightedTotal = allStocks.reduce((s, ps) => s + (ps.quantity * Number(ps.avgCost)), 0);
+                const newAvgCost = totalStockQty > 0 ? weightedTotal / totalStockQty : oldCost;
+
+                await tx.product.update({
+                    where: { id: productId },
+                    data: { cost: parseFloat(newAvgCost.toFixed(2)) },
+                });
+
+                // Log cost change
+                await tx.productLog.create({
+                    data: {
+                        productId,
+                        userId: gr.createdById,
+                        action: 'COST_UPDATE',
+                        field: 'cost',
+                        oldValue: String(oldCost),
+                        newValue: String(parseFloat(newAvgCost.toFixed(2))),
+                        details: `อัพเดตต้นทุนเฉลี่ย จาก ฿${oldCost} → ฿${parseFloat(newAvgCost.toFixed(2))} (GR ${gr.grNumber})`,
+                    },
+                });
+            } else if (method === 'LAST') {
+                // Use latest cost from GR items for this product
+                const grItem = gr.items.find(i => i.productId === productId);
+                if (!grItem) continue;
+                const newCost = Number(grItem.unitCost);
+
+                await tx.product.update({
+                    where: { id: productId },
+                    data: { cost: newCost },
+                });
+
+                // Log cost change
+                await tx.productLog.create({
+                    data: {
+                        productId,
+                        userId: gr.createdById,
+                        action: 'COST_UPDATE',
+                        field: 'cost',
+                        oldValue: String(oldCost),
+                        newValue: String(newCost),
+                        details: `อัพเดตต้นทุนล่าสุด จาก ฿${oldCost} → ฿${newCost} (GR ${gr.grNumber})`,
+                    },
+                });
+            }
+        }
     });
 
     revalidatePath('/goods-receive');
