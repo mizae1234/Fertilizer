@@ -37,7 +37,7 @@ export default function Pagination({ page, totalPages, onPageChange, basePath, p
     // Generate page numbers to display
     const getPageNumbers = (): (number | '...')[] => {
         const pages: (number | '...')[] = [];
-        const delta = 2;
+        const delta = 5;
 
         pages.push(1);
 
