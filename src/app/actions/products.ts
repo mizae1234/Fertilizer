@@ -187,20 +187,28 @@ export async function updateProductCost(
     costType: 'avg' | 'last' | 'custom',
     customCost?: number
 ) {
-    const stocks = await prisma.productStock.findMany({ where: { productId } });
-
     let newCost: number;
     if (costType === 'avg') {
-        // Weighted average cost across all warehouses
-        const totalQty = stocks.reduce((s, st) => s + st.quantity, 0);
-        newCost = totalQty > 0
-            ? stocks.reduce((s, st) => s + Number(st.avgCost) * st.quantity, 0) / totalQty
-            : stocks.length > 0 ? Number(stocks[0].avgCost) : 0;
+        // Weighted average cost from ALL GOODS_RECEIVE transactions
+        const receives = await prisma.stockTransaction.findMany({
+            where: { productId, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
+            select: { quantity: true, unitCost: true },
+        });
+        if (receives.length > 0) {
+            const totalQty = receives.reduce((s, tx) => s + tx.quantity, 0);
+            const totalCost = receives.reduce((s, tx) => s + tx.quantity * Number(tx.unitCost), 0);
+            newCost = totalQty > 0 ? totalCost / totalQty : 0;
+        } else {
+            newCost = 0;
+        }
     } else if (costType === 'last') {
-        // Max last cost across warehouses (most recent receive cost)
-        newCost = stocks.length > 0
-            ? Math.max(...stocks.map(st => Number(st.lastCost)))
-            : 0;
+        // Most recent GOODS_RECEIVE unitCost
+        const lastReceive = await prisma.stockTransaction.findFirst({
+            where: { productId, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
+            orderBy: { createdAt: 'desc' },
+            select: { unitCost: true },
+        });
+        newCost = lastReceive ? Number(lastReceive.unitCost) : 0;
     } else {
         if (customCost === undefined || customCost < 0) throw new Error('กรุณาระบุต้นทุนที่ถูกต้อง');
         newCost = customCost;

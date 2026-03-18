@@ -76,11 +76,33 @@ export async function GET(
             }
         }
 
+        // Compute true avg cost from ALL GOODS_RECEIVE transactions (not date-filtered)
+        const allReceives = await prisma.stockTransaction.findMany({
+            where: { productId: id, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
+            select: { quantity: true, unitCost: true },
+        });
+        let computedAvgCost = 0;
+        let computedLastCost = 0;
+        if (allReceives.length > 0) {
+            const totalQty = allReceives.reduce((s, tx) => s + tx.quantity, 0);
+            const totalCost = allReceives.reduce((s, tx) => s + tx.quantity * Number(tx.unitCost), 0);
+            computedAvgCost = totalQty > 0 ? Math.round(totalCost / totalQty * 100) / 100 : 0;
+        }
+        // Last cost = most recent GOODS_RECEIVE unitCost
+        const lastReceive = await prisma.stockTransaction.findFirst({
+            where: { productId: id, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
+            orderBy: { createdAt: 'desc' },
+            select: { unitCost: true },
+        });
+        if (lastReceive) computedLastCost = Number(lastReceive.unitCost);
+
         // Serialize Decimal objects to plain values
         const result = JSON.parse(JSON.stringify(product));
         if (txSumAfterFilter !== null) {
             result.txSumAfterFilter = txSumAfterFilter;
         }
+        result.computedAvgCost = computedAvgCost;
+        result.computedLastCost = computedLastCost;
         return NextResponse.json(result);
     } catch (error: any) {
         console.error('Product GET error:', error.message);
