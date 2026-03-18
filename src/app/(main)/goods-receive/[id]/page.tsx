@@ -488,7 +488,22 @@ export default function GoodsReceiveDetailPage() {
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-sm font-semibold text-gray-700">💰 สถานะการจ่ายเงิน</h2>
-                    {paymentSaving && <span className="text-xs text-emerald-500 animate-pulse">กำลังบันทึก...</span>}
+                    <button
+                        onClick={async () => {
+                            setPaymentSaving(true);
+                            try {
+                                await updateGoodsReceivePayment(id, { goodsPaid, shippingPaid, shippingCost });
+                                showAlert('บันทึกสถานะการจ่ายเงินเรียบร้อย', 'success', 'สำเร็จ');
+                            } catch (error) {
+                                showAlert((error as Error).message || 'ไม่สามารถบันทึกได้', 'error', 'เกิดข้อผิดพลาด');
+                            }
+                            setPaymentSaving(false);
+                        }}
+                        disabled={paymentSaving}
+                        className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                    >
+                        {paymentSaving ? 'กำลังบันทึก...' : '💾 บันทึก'}
+                    </button>
                 </div>
                 <div className="space-y-4">
                     {/* ค่าสินค้า */}
@@ -496,15 +511,7 @@ export default function GoodsReceiveDetailPage() {
                         <input
                             type="checkbox"
                             checked={goodsPaid}
-                            onChange={async (e) => {
-                                const val = e.target.checked;
-                                setGoodsPaid(val);
-                                setPaymentSaving(true);
-                                try {
-                                    await updateGoodsReceivePayment(id, { goodsPaid: val, shippingPaid, shippingCost });
-                                } catch { /* silent */ }
-                                setPaymentSaving(false);
-                            }}
+                            onChange={(e) => setGoodsPaid(e.target.checked)}
                             className="w-5 h-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
                         />
                         <div className="flex-1">
@@ -520,15 +527,7 @@ export default function GoodsReceiveDetailPage() {
                             <input
                                 type="checkbox"
                                 checked={shippingPaid}
-                                onChange={async (e) => {
-                                    const val = e.target.checked;
-                                    setShippingPaid(val);
-                                    setPaymentSaving(true);
-                                    try {
-                                        await updateGoodsReceivePayment(id, { goodsPaid, shippingPaid: val, shippingCost });
-                                    } catch { /* silent */ }
-                                    setPaymentSaving(false);
-                                }}
+                                onChange={(e) => setShippingPaid(e.target.checked)}
                                 className="w-5 h-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
                             />
                             <span className="text-sm font-medium text-gray-700 group-hover:text-emerald-600 transition-colors">จ่ายค่ารถบรรทุกสินค้าแล้ว</span>
@@ -536,29 +535,15 @@ export default function GoodsReceiveDetailPage() {
                         </label>
                         <div className="mt-3 ml-8">
                             <label className="text-xs text-gray-500 mb-1 block">ยอดค่ารถบรรทุก (บาท)</label>
-                            <div className="flex gap-2 items-center">
-                                <input
-                                    type="number"
-                                    min={0}
-                                    step="0.01"
-                                    value={shippingCost}
-                                    onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
-                                    className="w-48 px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
-                                    placeholder="0.00"
-                                />
-                                <button
-                                    onClick={async () => {
-                                        setPaymentSaving(true);
-                                        try {
-                                            await updateGoodsReceivePayment(id, { goodsPaid, shippingPaid, shippingCost });
-                                        } catch { /* silent */ }
-                                        setPaymentSaving(false);
-                                    }}
-                                    className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium transition-colors"
-                                >
-                                    บันทึก
-                                </button>
-                            </div>
+                            <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={shippingCost}
+                                onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
+                                className="w-48 px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                                placeholder="0.00"
+                            />
                         </div>
                     </div>
                 </div>
