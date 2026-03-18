@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { updateGoodsReceive, approveGoodsReceive, rejectGoodsReceive, deleteGoodsReceive } from '@/app/actions/goods-receive';
+import { updateGoodsReceive, approveGoodsReceive, rejectGoodsReceive, deleteGoodsReceive, updateGoodsReceivePayment } from '@/app/actions/goods-receive';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
@@ -35,6 +35,9 @@ interface GRDetail {
     notes: string | null;
     receivedDate: string;
     createdAt: string;
+    goodsPaid: boolean;
+    shippingPaid: boolean;
+    shippingCost: number | string;
     vendor: Vendor;
     createdBy: { name: string };
     items: {
@@ -66,6 +69,12 @@ export default function GoodsReceiveDetailPage() {
     const [receivedDate, setReceivedDate] = useState('');
     const [notes, setNotes] = useState('');
     const [items, setItems] = useState<GRItem[]>([]);
+
+    // Payment tracking
+    const [goodsPaid, setGoodsPaid] = useState(false);
+    const [shippingPaid, setShippingPaid] = useState(false);
+    const [shippingCost, setShippingCost] = useState(0);
+    const [paymentSaving, setPaymentSaving] = useState(false);
 
     // Lookup data
     const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -106,6 +115,9 @@ export default function GoodsReceiveDetailPage() {
                     unitCost: Number(item.unitCost),
                     lotNo: item.lotNo || '',
                 })));
+                setGoodsPaid(data.goodsPaid || false);
+                setShippingPaid(data.shippingPaid || false);
+                setShippingCost(Number(data.shippingCost) || 0);
                 setLoading(false);
             });
     }, [id]);
@@ -469,6 +481,86 @@ export default function GoodsReceiveDetailPage() {
                 <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-3 flex justify-between items-center">
                     <span className="text-sm font-semibold text-gray-600">มูลค่ารวม</span>
                     <span className="text-lg font-bold text-emerald-600">{formatCurrency(isPending ? total : Number(gr.totalAmount))}</span>
+                </div>
+            </div>
+
+            {/* Payment Tracking */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold text-gray-700">💰 สถานะการจ่ายเงิน</h2>
+                    {paymentSaving && <span className="text-xs text-emerald-500 animate-pulse">กำลังบันทึก...</span>}
+                </div>
+                <div className="space-y-4">
+                    {/* ค่าสินค้า */}
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                        <input
+                            type="checkbox"
+                            checked={goodsPaid}
+                            onChange={async (e) => {
+                                const val = e.target.checked;
+                                setGoodsPaid(val);
+                                setPaymentSaving(true);
+                                try {
+                                    await updateGoodsReceivePayment(id, { goodsPaid: val, shippingPaid, shippingCost });
+                                } catch { /* silent */ }
+                                setPaymentSaving(false);
+                            }}
+                            className="w-5 h-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-emerald-600 transition-colors">จ่ายค่าสินค้าแล้ว</span>
+                            <p className="text-xs text-gray-400">มูลค่า {formatCurrency(isPending ? total : Number(gr.totalAmount))}</p>
+                        </div>
+                        {goodsPaid && <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">✓ จ่ายแล้ว</span>}
+                    </label>
+
+                    {/* ค่ารถบรรทุก */}
+                    <div className="border-t border-gray-100 pt-4">
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                            <input
+                                type="checkbox"
+                                checked={shippingPaid}
+                                onChange={async (e) => {
+                                    const val = e.target.checked;
+                                    setShippingPaid(val);
+                                    setPaymentSaving(true);
+                                    try {
+                                        await updateGoodsReceivePayment(id, { goodsPaid, shippingPaid: val, shippingCost });
+                                    } catch { /* silent */ }
+                                    setPaymentSaving(false);
+                                }}
+                                className="w-5 h-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                            />
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-emerald-600 transition-colors">จ่ายค่ารถบรรทุกสินค้าแล้ว</span>
+                            {shippingPaid && <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">✓ จ่ายแล้ว</span>}
+                        </label>
+                        <div className="mt-3 ml-8">
+                            <label className="text-xs text-gray-500 mb-1 block">ยอดค่ารถบรรทุก (บาท)</label>
+                            <div className="flex gap-2 items-center">
+                                <input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={shippingCost}
+                                    onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
+                                    className="w-48 px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                                    placeholder="0.00"
+                                />
+                                <button
+                                    onClick={async () => {
+                                        setPaymentSaving(true);
+                                        try {
+                                            await updateGoodsReceivePayment(id, { goodsPaid, shippingPaid, shippingCost });
+                                        } catch { /* silent */ }
+                                        setPaymentSaving(false);
+                                    }}
+                                    className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium transition-colors"
+                                >
+                                    บันทึก
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

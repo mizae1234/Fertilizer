@@ -265,3 +265,24 @@ export async function deleteGoodsReceive(id: string) {
 
     revalidatePath('/goods-receive');
 }
+
+export async function updateGoodsReceivePayment(id: string, data: {
+    goodsPaid: boolean;
+    shippingPaid: boolean;
+    shippingCost: number;
+}) {
+    const gr = await prisma.goodsReceive.findUnique({ where: { id } });
+    if (!gr) throw new Error('ไม่พบรายการ');
+
+    await prisma.goodsReceive.update({
+        where: { id },
+        data: {
+            goodsPaid: data.goodsPaid,
+            shippingPaid: data.shippingPaid,
+            shippingCost: data.shippingCost,
+        },
+    });
+
+    revalidatePath('/goods-receive');
+    revalidatePath(`/goods-receive/${id}`);
+}

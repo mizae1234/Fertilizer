@@ -285,6 +285,11 @@ model GoodsReceive {
   updatedAt    DateTime    @updatedAt
   deletedAt    DateTime?
 
+  // Payment tracking
+  goodsPaid    Boolean     @default(false)
+  shippingPaid Boolean     @default(false)
+  shippingCost Decimal     @default(0) @db.Decimal(12, 2)
+
   vendor    Vendor             @relation(fields: [vendorId], references: [id])
   createdBy User               @relation(fields: [createdById], references: [id])
   items     GoodsReceiveItem[]
