@@ -34,25 +34,37 @@ export default function Pagination({ page, totalPages, onPageChange, basePath, p
         return qs ? `${basePath}?${qs}` : basePath;
     };
 
-    // Generate page numbers to display
+    // Generate page numbers to display (~10 visible)
     const getPageNumbers = (): (number | '...')[] => {
         const pages: (number | '...')[] = [];
-        const delta = 5;
+        const maxVisible = 10;
 
-        pages.push(1);
-
-        const rangeStart = Math.max(2, page - delta);
-        const rangeEnd = Math.min(totalPages - 1, page + delta);
-
-        if (rangeStart > 2) pages.push('...');
-
-        for (let i = rangeStart; i <= rangeEnd; i++) {
-            pages.push(i);
+        if (totalPages <= maxVisible + 2) {
+            // Show all pages if total is small enough
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+            return pages;
         }
 
-        if (rangeEnd < totalPages - 1) pages.push('...');
+        // Calculate range ensuring ~maxVisible pages shown
+        let rangeStart = page - Math.floor(maxVisible / 2);
+        let rangeEnd = page + Math.floor(maxVisible / 2) - 1;
 
-        if (totalPages > 1) pages.push(totalPages);
+        // Compensate at edges
+        if (rangeStart < 2) {
+            rangeEnd += (2 - rangeStart);
+            rangeStart = 2;
+        }
+        if (rangeEnd > totalPages - 1) {
+            rangeStart -= (rangeEnd - (totalPages - 1));
+            rangeEnd = totalPages - 1;
+        }
+        rangeStart = Math.max(2, rangeStart);
+
+        pages.push(1);
+        if (rangeStart > 2) pages.push('...');
+        for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i);
+        if (rangeEnd < totalPages - 1) pages.push('...');
+        pages.push(totalPages);
 
         return pages;
     };
