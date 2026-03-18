@@ -78,6 +78,12 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
     const now = new Date();
     const aging = { current: 0, days30: 0, days60: 0, days90Plus: 0 };
 
+    // Credit breakdown tracking
+    let creditGrandTotal = 0;     // ยอดเครดิตรวม
+    let creditPaidCash = 0;       // ชำระเงินสดแล้ว
+    let creditPaidTransfer = 0;   // ชำระโอนแล้ว
+    let creditOutstanding = 0;    // ค้างจ่าย
+
     // Group AR by customer — with paid/remaining calculation
     // Uses same logic as overdue-bills page (getPaymentSplit)
     const customerMap = new Map<string, {
@@ -94,17 +100,32 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
         const totalInterest = s.debtInterests.reduce((sum, di) => sum + Number(di.amount), 0);
         const grandTotal = totalAmount + totalInterest;
 
+        creditGrandTotal += grandTotal;
+
         // Initial paid from POS (non-credit payments in the payments JSON)
         let initialPaid = 0;
         if (s.payments && typeof s.payments === 'object' && Array.isArray(s.payments)) {
             for (const p of s.payments as { method: string; amount: number }[]) {
-                if (p.method !== 'CREDIT') {
+                if (p.method === 'CASH') {
                     initialPaid += Number(p.amount);
+                    creditPaidCash += Number(p.amount);
+                } else if (p.method === 'TRANSFER') {
+                    initialPaid += Number(p.amount);
+                    creditPaidTransfer += Number(p.amount);
                 }
             }
         }
 
-        // Subsequent debt payments (only non-credit method — actual cash/transfer payments)
+        // Subsequent debt payments
+        for (const dp of s.debtPayments) {
+            const dpAmount = Number(dp.amount);
+            if (dp.method === 'CASH') {
+                creditPaidCash += dpAmount;
+            } else if (dp.method === 'TRANSFER') {
+                creditPaidTransfer += dpAmount;
+            }
+        }
+
         const debtPaid = s.debtPayments
             .filter(dp => dp.method !== 'CREDIT')
             .reduce((sum, dp) => sum + Number(dp.amount), 0);
@@ -112,7 +133,9 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
         const paidAmount = initialPaid + debtPaid;
         const remaining = grandTotal - paidAmount;
 
-        // Skip fully paid bills
+        if (remaining > 0) creditOutstanding += remaining;
+
+        // Skip fully paid bills for AR section
         if (remaining <= 0) continue;
 
         // Aging based on remaining amount
@@ -149,7 +172,17 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
     const arCount = byCustomer.reduce((sum, c) => sum + c.count, 0);
 
     return {
-        cashFlow: { cash: cashTotal, transfer: transferTotal, credit: creditTotal, total: cashTotal + transferTotal + creditTotal },
+        cashFlow: {
+            cash: cashTotal,
+            transfer: transferTotal,
+            credit: creditTotal,
+            total: cashTotal + transferTotal + creditTotal,
+            // Credit breakdown
+            creditTotal: creditGrandTotal,
+            creditPaidCash,
+            creditPaidTransfer,
+            creditOutstanding,
+        },
         ar: {
             total: arTotal,
             count: arCount,
