@@ -253,26 +253,15 @@ export async function updateSale(id: string, data: {
         // Delete old items
         await tx.saleItem.deleteMany({ where: { saleId: id } });
 
-        // Fetch avgCost for each product to record cost at time of sale
+        // Fetch product.cost for each item — product.cost already reflects the user's
+        // configured cost type (avg / last / custom) via updateProductCost
         const productCosts = await Promise.all(
             data.items.map(async (i) => {
-                const stocks = await tx.productStock.findMany({
-                    where: { productId: i.productId },
-                    select: { avgCost: true, quantity: true },
+                const product = await tx.product.findUnique({
+                    where: { id: i.productId },
+                    select: { cost: true },
                 });
-                let cost = 0;
-                if (stocks.length > 0) {
-                    const totalQty = stocks.reduce((s, st) => s + st.quantity, 0);
-                    cost = totalQty > 0
-                        ? stocks.reduce((s, st) => s + Number(st.avgCost) * st.quantity, 0) / totalQty
-                        : Number(stocks[0].avgCost);
-                }
-                // Fallback to product.cost if avgCost is 0 or no stocks
-                if (cost === 0) {
-                    const product = await tx.product.findUnique({ where: { id: i.productId }, select: { cost: true } });
-                    if (product && Number(product.cost) > 0) cost = Number(product.cost);
-                }
-                return cost;
+                return product ? Number(product.cost) : 0;
             })
         );
 
