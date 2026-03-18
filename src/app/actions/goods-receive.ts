@@ -266,7 +266,6 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
 
             const method = prod.costMethod || 'MANUAL';
             console.log(`[GR APPROVE] Product "${prod.name}" (${productId}): costMethod=${prod.costMethod}, resolved=${method}, cost=${Number(prod.cost)}`);
-            if (method === 'MANUAL') continue; // Don't touch manual cost
 
             const oldCost = Number(prod.cost);
 
@@ -285,7 +284,6 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     data: { cost: parseFloat(newAvgCost.toFixed(2)) },
                 });
 
-                // Log cost change
                 await tx.productLog.create({
                     data: {
                         productId,
@@ -308,7 +306,6 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     data: { cost: newCost },
                 });
 
-                // Log cost change
                 await tx.productLog.create({
                     data: {
                         productId,
@@ -320,6 +317,30 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                         details: `อัพเดตต้นทุนล่าสุด จาก ฿${oldCost} → ฿${newCost} (GR ${gr.grNumber})`,
                     },
                 });
+            } else if (method === 'MANUAL') {
+                // Use the unitCost from GR item as the manually specified cost
+                const grItem = gr.items.find(i => i.productId === productId);
+                if (!grItem) continue;
+                const newCost = Number(grItem.unitCost);
+
+                if (newCost !== oldCost) {
+                    await tx.product.update({
+                        where: { id: productId },
+                        data: { cost: newCost },
+                    });
+
+                    await tx.productLog.create({
+                        data: {
+                            productId,
+                            userId: gr.createdById,
+                            action: 'COST_UPDATE',
+                            field: 'cost',
+                            oldValue: String(oldCost),
+                            newValue: String(newCost),
+                            details: `อัพเดตต้นทุนกำหนดเอง จาก ฿${oldCost} → ฿${newCost} (GR ${gr.grNumber})`,
+                        },
+                    });
+                }
             }
         }
     });
