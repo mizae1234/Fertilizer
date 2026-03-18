@@ -48,10 +48,10 @@ export async function GET(request: Request) {
                 deletedAt: null,
             },
         },
-        select: { quantity: true, product: { select: { cost: true } } },
+        select: { quantity: true, unitCost: true },
     });
     const totalItemsSold = saleItems.reduce((s, i) => s + i.quantity, 0);
-    const totalCOGS = saleItems.reduce((s, i) => s + (i.quantity * Number(i.product.cost)), 0);
+    const totalCOGS = saleItems.reduce((s, i) => s + (i.quantity * Number(i.unitCost)), 0);
 
     const prevSaleItems = await prisma.saleItem.findMany({
         where: {
