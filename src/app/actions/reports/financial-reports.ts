@@ -173,15 +173,13 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
 
     return {
         cashFlow: {
-            cash: cashTotal,
-            transfer: transferTotal,
-            credit: creditTotal,
-            total: cashTotal + transferTotal + creditTotal,
-            // Credit breakdown
-            creditTotal: creditGrandTotal,
-            creditPaidCash,
-            creditPaidTransfer,
-            creditOutstanding,
+            // Actual cash received = direct cash sales + credit repaid in cash
+            cash: cashTotal + creditPaidCash,
+            // Actual transfer received = direct transfer sales + credit repaid in transfer
+            transfer: transferTotal + creditPaidTransfer,
+            // Outstanding credit = not yet paid
+            credit: creditOutstanding,
+            total: cashTotal + creditPaidCash + transferTotal + creditPaidTransfer + creditOutstanding,
         },
         ar: {
             total: arTotal,

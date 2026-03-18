@@ -894,7 +894,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
         const rows = [
             { 'ประเภท': 'เงินสด', 'จำนวน': cashData.cashFlow.cash },
             { 'ประเภท': 'โอน', 'จำนวน': cashData.cashFlow.transfer },
-            { 'ประเภท': 'เครดิต', 'จำนวน': cashData.cashFlow.credit },
+            { 'ประเภท': 'เครดิตค้างจ่าย', 'จำนวน': cashData.cashFlow.credit },
             { 'ประเภท': 'รวม', 'จำนวน': cashData.cashFlow.total },
         ];
         exportToExcel(rows, `CashFlow_${dateFrom || 'all'}_${dateTo || 'all'}`);
@@ -1140,23 +1140,9 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                         <p className="text-xs text-gray-500">โอน</p>
                                         <p className="text-sm font-bold text-blue-600">{formatCurrency(cashData.cashFlow.transfer)}</p>
                                     </div>
-                                    <div className="bg-orange-50 rounded-lg p-3 text-center">
-                                        <p className="text-xs text-gray-500">เครดิตรวม</p>
-                                        <p className="text-sm font-bold text-orange-600">{formatCurrency(cashData.cashFlow.creditTotal ?? cashData.cashFlow.credit)}</p>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-3 gap-3 mb-3">
-                                    <div className="bg-green-50 rounded-lg p-3 text-center">
-                                        <p className="text-xs text-gray-500">ชำระเงินสด</p>
-                                        <p className="text-sm font-bold text-green-600">{formatCurrency(cashData.cashFlow.creditPaidCash ?? 0)}</p>
-                                    </div>
-                                    <div className="bg-sky-50 rounded-lg p-3 text-center">
-                                        <p className="text-xs text-gray-500">ชำระโอน</p>
-                                        <p className="text-sm font-bold text-sky-600">{formatCurrency(cashData.cashFlow.creditPaidTransfer ?? 0)}</p>
-                                    </div>
                                     <div className="bg-red-50 rounded-lg p-3 text-center">
-                                        <p className="text-xs text-gray-500">ยอดหนี้ค้างจ่าย</p>
-                                        <p className="text-sm font-bold text-red-600">{formatCurrency(cashData.cashFlow.creditOutstanding ?? 0)}</p>
+                                        <p className="text-xs text-gray-500">เครดิตค้างจ่าย</p>
+                                        <p className="text-sm font-bold text-red-600">{formatCurrency(cashData.cashFlow.credit)}</p>
                                     </div>
                                 </div>
                                 <div className="flex justify-between items-center pt-2 border-t border-gray-100">
