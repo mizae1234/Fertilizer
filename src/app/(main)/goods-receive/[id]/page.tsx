@@ -354,7 +354,8 @@ export default function GoodsReceiveDetailPage() {
                     /* Editable Items */
                     <div className="divide-y divide-gray-50">
                         {items.map((item, idx) => {
-                            const currentMethod = costMethodOverrides[item.productId] || (gr?.items.find(i => i.productId === item.productId)?.product as { costMethod?: string })?.costMethod || 'LAST';
+                            const productCostMethod = gr?.items.find(i => i.productId === item.productId)?.product?.costMethod;
+                            const currentMethod = costMethodOverrides[item.productId] ?? productCostMethod ?? 'LAST';
                             return (
                             <div key={idx} className="p-4 sm:px-6">
                                 <div className="flex flex-wrap lg:flex-nowrap gap-3 items-end">
