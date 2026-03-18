@@ -504,7 +504,8 @@ export default function GoodsReceiveDetailPage() {
                 </div>
             )}
 
-            {/* Delete button - always visible */}
+            {/* Delete button - only visible if not approved */}
+            {gr.status !== 'APPROVED' && (
             <div className="mt-4">
                 <button
                     onClick={() => setShowDelete(true)}
@@ -514,6 +515,7 @@ export default function GoodsReceiveDetailPage() {
                     {actionLoading === 'delete' ? 'กำลังลบ...' : '🗑️ ลบรายการ'}
                 </button>
             </div>
+            )}
 
             {/* Modals */}
             <ConfirmModal

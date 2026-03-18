@@ -256,6 +256,7 @@ export async function rejectGoodsReceive(id: string) {
 export async function deleteGoodsReceive(id: string) {
     const gr = await prisma.goodsReceive.findUnique({ where: { id } });
     if (!gr) throw new Error('ไม่พบรายการ');
+    if (gr.status === 'APPROVED') throw new Error('ไม่สามารถลบรายการที่อนุมัติแล้วได้');
 
     await prisma.goodsReceive.update({
         where: { id },
