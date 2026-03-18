@@ -114,7 +114,7 @@ export async function PATCH(
 
     // Only allow known Product scalar fields
     const allowedFields = [
-        'name', 'description', 'unit', 'cost', 'price', 'brand',
+        'name', 'description', 'unit', 'cost', 'costMethod', 'price', 'brand',
         'packaging', 'productGroupId', 'pointsPerUnit', 'minStock', 'isActive', 'code', 'imageUrl'
     ];
     const data: Record<string, any> = {};
@@ -165,7 +165,7 @@ export async function PATCH(
         // Create audit log entries for each changed field
         const fieldLabels: Record<string, string> = {
             name: 'ชื่อสินค้า', code: 'รหัสสินค้า', unit: 'หน่วยนับ',
-            cost: 'ราคาทุน', price: 'ราคาขาย', brand: 'แบรนด์',
+            cost: 'ราคาทุน', costMethod: 'วิธีคิดต้นทุน', price: 'ราคาขาย', brand: 'แบรนด์',
             packaging: 'บรรจุภัณฑ์', productGroupId: 'กลุ่มสินค้า',
             pointsPerUnit: 'แต้มต่อหน่วย', minStock: 'สต็อกขั้นต่ำ',
             isActive: 'สถานะ', description: 'คำอธิบาย', imageUrl: 'รูปภาพ',
