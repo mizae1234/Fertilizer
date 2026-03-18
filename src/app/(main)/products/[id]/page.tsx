@@ -81,6 +81,8 @@ interface ProductDetail {
     stockTransactions: StockTransaction[];
     productLogs: ProductLog[];
     txSumAfterFilter?: number;
+    computedAvgCost?: number;
+    computedLastCost?: number;
 }
 
 const txTypeLabels: Record<string, { label: string; color: string; icon: string }> = {
@@ -216,12 +218,8 @@ export default function ProductDetailPage() {
 
             // Auto-detect which cost type matches the saved cost
             const savedCost = Number(product.cost);
-            const stocks = product.productStocks;
-            const totalQty = stocks.reduce((s, st) => s + st.quantity, 0);
-            const avgCost = totalQty > 0
-                ? Math.round(stocks.reduce((s, st) => s + Number(st.avgCost) * st.quantity, 0) / totalQty * 100) / 100
-                : stocks.length > 0 ? Number(stocks[0].avgCost) : 0;
-            const lastCost = stocks.length > 0 ? Math.max(...stocks.map(st => Number(st.lastCost))) : 0;
+            const avgCost = product.computedAvgCost ?? 0;
+            const lastCost = product.computedLastCost ?? 0;
 
             if (savedCost === lastCost && lastCost > 0) {
                 setCostType('last');
@@ -233,17 +231,9 @@ export default function ProductDetailPage() {
         }
     }, [product]);
 
-    // Compute global avg / last costs from all warehouses
-    const globalAvgCost = product ? (() => {
-        const stocks = product.productStocks;
-        const totalQty = stocks.reduce((s, st) => s + st.quantity, 0);
-        return totalQty > 0
-            ? Math.round(stocks.reduce((s, st) => s + Number(st.avgCost) * st.quantity, 0) / totalQty * 100) / 100
-            : stocks.length > 0 ? Number(stocks[0].avgCost) : 0;
-    })() : 0;
-    const globalLastCost = product
-        ? (product.productStocks.length > 0 ? Math.max(...product.productStocks.map(st => Number(st.lastCost))) : 0)
-        : 0;
+    // Use server-computed costs from ALL GOODS_RECEIVE StockTransactions
+    const globalAvgCost = product?.computedAvgCost ?? 0;
+    const globalLastCost = product?.computedLastCost ?? 0;
 
     const refreshProduct = async () => {
         const data = await fetch(`/api/products/${id}`).then(r => r.json());

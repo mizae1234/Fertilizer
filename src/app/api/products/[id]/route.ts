@@ -76,11 +76,28 @@ export async function GET(
             }
         }
 
+        // Compute avg/last cost from ALL GOODS_RECEIVE StockTransactions
+        const allReceives = await prisma.stockTransaction.findMany({
+            where: { productId: id, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
+            select: { quantity: true, unitCost: true },
+            orderBy: { createdAt: 'desc' },
+        });
+        let computedAvgCost = 0;
+        let computedLastCost = 0;
+        if (allReceives.length > 0) {
+            const totalQty = allReceives.reduce((s, r) => s + r.quantity, 0);
+            const totalCost = allReceives.reduce((s, r) => s + r.quantity * Number(r.unitCost), 0);
+            computedAvgCost = totalQty > 0 ? Math.round(totalCost / totalQty * 100) / 100 : 0;
+            computedLastCost = Number(allReceives[0].unitCost); // first = most recent (desc order)
+        }
+
         // Serialize Decimal objects to plain values
         const result = JSON.parse(JSON.stringify(product));
         if (txSumAfterFilter !== null) {
             result.txSumAfterFilter = txSumAfterFilter;
         }
+        result.computedAvgCost = computedAvgCost;
+        result.computedLastCost = computedLastCost;
         return NextResponse.json(result);
     } catch (error: any) {
         console.error('Product GET error:', error.message);
