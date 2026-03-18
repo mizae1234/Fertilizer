@@ -73,7 +73,7 @@ export default function GoodsReceiveDetailPage() {
     // Payment tracking
     const [goodsPaid, setGoodsPaid] = useState(false);
     const [shippingPaid, setShippingPaid] = useState(false);
-    const [shippingCost, setShippingCost] = useState(0);
+    const [shippingCost, setShippingCost] = useState('');
     const [paymentSaving, setPaymentSaving] = useState(false);
 
     // Lookup data
@@ -117,7 +117,7 @@ export default function GoodsReceiveDetailPage() {
                 })));
                 setGoodsPaid(data.goodsPaid || false);
                 setShippingPaid(data.shippingPaid || false);
-                setShippingCost(Number(data.shippingCost) || 0);
+                setShippingCost(Number(data.shippingCost) ? String(Number(data.shippingCost)) : '');
                 setLoading(false);
             });
     }, [id]);
@@ -492,7 +492,7 @@ export default function GoodsReceiveDetailPage() {
                         onClick={async () => {
                             setPaymentSaving(true);
                             try {
-                                await updateGoodsReceivePayment(id, { goodsPaid, shippingPaid, shippingCost });
+                                await updateGoodsReceivePayment(id, { goodsPaid, shippingPaid, shippingCost: parseFloat(shippingCost) || 0 });
                                 showAlert('บันทึกสถานะการจ่ายเงินเรียบร้อย', 'success', 'สำเร็จ');
                             } catch (error) {
                                 showAlert((error as Error).message || 'ไม่สามารถบันทึกได้', 'error', 'เกิดข้อผิดพลาด');
@@ -540,7 +540,8 @@ export default function GoodsReceiveDetailPage() {
                                 min={0}
                                 step="0.01"
                                 value={shippingCost}
-                                onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
+                                onChange={(e) => setShippingCost(e.target.value)}
+                                onFocus={(e) => e.target.select()}
                                 className="w-48 px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                                 placeholder="0.00"
                             />
