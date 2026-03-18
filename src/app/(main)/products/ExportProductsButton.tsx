@@ -26,6 +26,7 @@ export default function ExportProductsButton() {
                     'ราคาขาย': Number(p.price),
                     'Stock รวม': totalStock,
                     'Stock แยกคลัง': stockDetail,
+                    'ประเภทต้นทุน': p.costMethod === 'AVG' ? 'เฉลี่ย' : p.costMethod === 'LAST' ? 'ล่าสุด' : 'กำหนดเอง',
                 };
             });
 
@@ -33,7 +34,7 @@ export default function ExportProductsButton() {
             ws['!cols'] = [
                 { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 15 },
                 { wch: 15 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
-                { wch: 12 }, { wch: 30 },
+                { wch: 12 }, { wch: 30 }, { wch: 15 },
             ];
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Products');
