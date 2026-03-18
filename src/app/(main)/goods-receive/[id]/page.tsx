@@ -250,7 +250,7 @@ export default function GoodsReceiveDetailPage() {
     const selectedVendor = vendors.find(v => v.id === vendorId) || gr.vendor;
 
     return (
-        <div className="animate-fade-in max-w-4xl mx-auto">
+        <div className="animate-fade-in max-w-7xl mx-auto">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
@@ -353,11 +353,13 @@ export default function GoodsReceiveDetailPage() {
                 {isPending ? (
                     /* Editable Items */
                     <div className="divide-y divide-gray-50">
-                        {items.map((item, idx) => (
+                        {items.map((item, idx) => {
+                            const currentMethod = costMethodOverrides[item.productId] || (gr?.items.find(i => i.productId === item.productId)?.product as { costMethod?: string })?.costMethod || 'LAST';
+                            return (
                             <div key={idx} className="p-4 sm:px-6">
-                                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                                <div className="flex flex-wrap lg:flex-nowrap gap-3 items-end">
                                     {/* Product */}
-                                    <div className="sm:col-span-4">
+                                    <div className="w-full lg:w-auto lg:flex-[3]">
                                         <label className="text-xs text-gray-400 mb-1 block">สินค้า</label>
                                         <select
                                             value={item.productId}
@@ -369,7 +371,7 @@ export default function GoodsReceiveDetailPage() {
                                         </select>
                                     </div>
                                     {/* Warehouse */}
-                                    <div className="sm:col-span-3">
+                                    <div className="w-1/2 lg:w-auto lg:flex-[2]">
                                         <label className="text-xs text-gray-400 mb-1 block">คลัง</label>
                                         <select
                                             value={item.warehouseId}
@@ -380,7 +382,7 @@ export default function GoodsReceiveDetailPage() {
                                         </select>
                                     </div>
                                     {/* Qty */}
-                                    <div className="sm:col-span-2">
+                                    <div className="w-20 lg:w-auto lg:flex-[1]">
                                         <label className="text-xs text-gray-400 mb-1 block">จำนวน</label>
                                         <input
                                             type="number" min={1} value={item.quantity}
@@ -389,7 +391,7 @@ export default function GoodsReceiveDetailPage() {
                                         />
                                     </div>
                                     {/* Unit Cost */}
-                                    <div className="sm:col-span-2">
+                                    <div className="w-24 lg:w-auto lg:flex-[1]">
                                         <label className="text-xs text-gray-400 mb-1 block">ต้นทุน/หน่วย</label>
                                         <input
                                             type="number" min={0} step="0.01" value={item.unitCost}
@@ -397,31 +399,21 @@ export default function GoodsReceiveDetailPage() {
                                             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 outline-none"
                                         />
                                     </div>
-                                    {/* Remove */}
-                                    <div className="sm:col-span-1 flex items-end justify-end sm:justify-center">
-                                        {items.length > 1 && (
-                                            <button onClick={() => removeItem(idx)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบรายการ">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
-                                        )}
-                                    </div>
                                     {/* Lot No */}
-                                    <div className="sm:col-span-3">
+                                    <div className="w-28 lg:w-auto lg:flex-[1.5]">
                                         <label className="text-xs text-gray-400 mb-1 block">Lot No.</label>
                                         <input
                                             type="text" value={item.lotNo}
                                             onChange={e => updateItem(idx, 'lotNo', e.target.value)}
-                                            placeholder="เลข Lot (ถ้ามี)"
+                                            placeholder="ถ้ามี"
                                             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                         />
                                     </div>
                                     {/* Cost Method */}
-                                    <div className="sm:col-span-3">
+                                    <div className="w-32 lg:w-auto lg:flex-[1.5]">
                                         <label className="text-xs text-gray-400 mb-1 block">ประเภทต้นทุน</label>
                                         <select
-                                            value={costMethodOverrides[item.productId] || (gr?.items.find(i => i.productId === item.productId)?.product as { costMethod?: string })?.costMethod || 'LAST'}
+                                            value={currentMethod}
                                             onChange={e => setCostMethodOverrides(prev => ({ ...prev, [item.productId]: e.target.value }))}
                                             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                         >
@@ -430,10 +422,10 @@ export default function GoodsReceiveDetailPage() {
                                             <option value="MANUAL">✏️ กำหนดเอง</option>
                                         </select>
                                     </div>
-                                    {/* Manual cost input - shown when MANUAL selected */}
-                                    {(costMethodOverrides[item.productId] || (gr?.items.find(i => i.productId === item.productId)?.product as { costMethod?: string })?.costMethod || 'LAST') === 'MANUAL' && (
-                                        <div className="sm:col-span-2">
-                                            <label className="text-xs text-gray-400 mb-1 block">ต้นทุนกำหนดเอง</label>
+                                    {/* Manual cost input */}
+                                    {currentMethod === 'MANUAL' && (
+                                        <div className="w-28 lg:w-auto lg:flex-[1]">
+                                            <label className="text-xs text-gray-400 mb-1 block">ต้นทุนเอง</label>
                                             <input
                                                 type="number" min={0} step="0.01" value={item.unitCost}
                                                 onChange={e => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
@@ -442,14 +434,24 @@ export default function GoodsReceiveDetailPage() {
                                             />
                                         </div>
                                     )}
+                                    {/* Remove + Total */}
+                                    <div className="flex items-end gap-2">
+                                        {items.length > 1 && (
+                                            <button onClick={() => removeItem(idx)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบรายการ">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                                {/* Line total */}
-                                <div className="text-right mt-2">
+                                <div className="text-right mt-1">
                                     <span className="text-xs text-gray-400">รวม: </span>
                                     <span className="text-sm font-semibold text-gray-700">{formatCurrency(item.quantity * item.unitCost)}</span>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 ) : (
                     /* Read-only Items Table */
