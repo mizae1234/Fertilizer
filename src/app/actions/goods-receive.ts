@@ -255,6 +255,7 @@ export async function approveGoodsReceive(id: string) {
             if (!prod) continue;
 
             const method = prod.costMethod || 'MANUAL';
+            console.log(`[GR APPROVE] Product "${prod.name}" (${productId}): costMethod=${prod.costMethod}, resolved=${method}, cost=${Number(prod.cost)}`);
             if (method === 'MANUAL') continue; // Don't touch manual cost
 
             const oldCost = Number(prod.cost);
