@@ -202,9 +202,23 @@ export async function approveGoodsReceive(id: string) {
                 const newQty = item.quantity;
                 const newCost = Number(item.unitCost);
                 const totalQty = oldQty + newQty;
-                const avgCost = totalQty > 0
-                    ? ((oldQty * oldCost) + (newQty * newCost)) / totalQty
-                    : newCost;
+
+                let avgCost: number;
+                if (totalQty > 0 && oldQty > 0) {
+                    // Normal case: running weighted average
+                    avgCost = ((oldQty * oldCost) + (newQty * newCost)) / totalQty;
+                } else {
+                    // Stock was negative/zero — running avg breaks.
+                    // Query ALL GOODS_RECEIVE transactions + include current receive
+                    const allReceives = await tx.stockTransaction.findMany({
+                        where: { productId: item.productId, warehouseId: item.warehouseId, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
+                        select: { quantity: true, unitCost: true },
+                    });
+                    // Include current receive (not yet in DB)
+                    const totalRcvQty = allReceives.reduce((s, r) => s + r.quantity, 0) + newQty;
+                    const totalRcvCost = allReceives.reduce((s, r) => s + r.quantity * Number(r.unitCost), 0) + (newQty * newCost);
+                    avgCost = totalRcvQty > 0 ? totalRcvCost / totalRcvQty : newCost;
+                }
 
                 await tx.productStock.update({
                     where: { id: existing.id },
