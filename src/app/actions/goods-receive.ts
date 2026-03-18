@@ -260,14 +260,14 @@ export async function approveGoodsReceive(id: string) {
             const oldCost = Number(prod.cost);
 
             if (method === 'AVG') {
-                // Calculate weighted average across ALL warehouses for this product
-                const allStocks = await tx.productStock.findMany({
-                    where: { productId },
-                    select: { quantity: true, avgCost: true },
+                // Calculate weighted average from ALL GOODS_RECEIVE StockTransactions (same as product API)
+                const allReceives = await tx.stockTransaction.findMany({
+                    where: { productId, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
+                    select: { quantity: true, unitCost: true },
                 });
-                const totalStockQty = allStocks.reduce((s, ps) => s + ps.quantity, 0);
-                const weightedTotal = allStocks.reduce((s, ps) => s + (ps.quantity * Number(ps.avgCost)), 0);
-                const newAvgCost = totalStockQty > 0 ? weightedTotal / totalStockQty : oldCost;
+                const totalQty = allReceives.reduce((s, r) => s + r.quantity, 0);
+                const totalCost = allReceives.reduce((s, r) => s + r.quantity * Number(r.unitCost), 0);
+                const newAvgCost = totalQty > 0 ? Math.round(totalCost / totalQty * 100) / 100 : oldCost;
 
                 await tx.product.update({
                     where: { id: productId },
