@@ -63,6 +63,24 @@ export async function createSaleFromPOS(data: {
         const saleNumber = await generateNumber('SL');
         try {
             const sale = await prisma.$transaction(async (tx) => {
+                // Fetch avgCost for each product to record cost at time of sale
+                const productCosts = await Promise.all(
+                    data.items.map(async (item) => {
+                        const stocks = await tx.productStock.findMany({
+                            where: { productId: item.productId },
+                            select: { avgCost: true, quantity: true },
+                        });
+                        if (stocks.length > 0) {
+                            const totalQty = stocks.reduce((s, st) => s + st.quantity, 0);
+                            return totalQty > 0
+                                ? stocks.reduce((s, st) => s + Number(st.avgCost) * st.quantity, 0) / totalQty
+                                : Number(stocks[0].avgCost);
+                        }
+                        const product = await tx.product.findUnique({ where: { id: item.productId }, select: { cost: true } });
+                        return product ? Number(product.cost) : 0;
+                    })
+                );
+
                 const newSale = await tx.sale.create({
                     data: {
                         saleNumber,
@@ -78,11 +96,12 @@ export async function createSaleFromPOS(data: {
                         cashReceived: data.cashReceived || null,
                         createdById: data.userId,
                         items: {
-                            create: data.items.map((item) => ({
+                            create: data.items.map((item, idx) => ({
                                 productId: item.productId,
                                 warehouseId: item.warehouseId,
                                 quantity: item.quantity,
                                 unitPrice: item.unitPrice,
+                                unitCost: parseFloat(productCosts[idx].toFixed(2)),
                                 totalPrice: item.quantity * item.unitPrice,
                                 discount: item.itemDiscount || 0,
                                 points: item.points,

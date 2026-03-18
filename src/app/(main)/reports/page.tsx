@@ -886,7 +886,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
         const rows: Record<string, unknown>[] = [];
         for (const cust of cashData.ar.byCustomer) {
             for (const item of cust.items) {
-                rows.push({ 'ลูกค้า': cust.customer, 'เลขที่': item.saleNumber, 'จำนวน': item.amount, 'กำหนดชำระ': item.dueDate ? new Date(item.dueDate).toLocaleDateString('th-TH') : '-' });
+                rows.push({ 'ลูกค้า': cust.customer, 'เลขที่': item.saleNumber, 'ยอดเครดิต': item.amount, 'ชำระแล้ว': item.paidAmount, 'คงเหลือ': item.remainingAmount, 'กำหนดชำระ': item.dueDate ? new Date(item.dueDate).toLocaleDateString('th-TH') : '-' });
             }
         }
         exportToExcel(rows, `ลูกหนี้_AR_${dateFrom || 'all'}_${dateTo || 'all'}`);
@@ -1192,7 +1192,9 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                                         <thead><tr className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
                                                             <th className="text-left py-2 px-3 font-medium">ลูกค้า</th>
                                                             <th className="text-left py-2 px-3 font-medium">เลขที่บิล</th>
-                                                            <th className="text-right py-2 px-3 font-medium">ยอด</th>
+                                                            <th className="text-right py-2 px-3 font-medium">ยอดเครดิต</th>
+                                                            <th className="text-right py-2 px-3 font-medium">ชำระแล้ว</th>
+                                                            <th className="text-right py-2 px-3 font-medium">คงเหลือ</th>
                                                             <th className="text-left py-2 px-3 font-medium">กำหนดชำระ</th>
                                                             <th className="text-left py-2 px-3 font-medium">วันที่ขาย</th>
                                                         </tr></thead>
@@ -1203,7 +1205,9 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                                                     <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                                                                         <td className="py-2 px-3 font-medium text-gray-800">{item.customer}</td>
                                                                         <td className="py-2 px-3 text-gray-600">{item.saleNumber}</td>
-                                                                        <td className="py-2 px-3 text-right font-medium text-gray-700">{formatCurrency(item.amount)}</td>
+                                                                        <td className="py-2 px-3 text-right text-gray-500">{formatCurrency(item.amount)}</td>
+                                                                        <td className="py-2 px-3 text-right text-emerald-600 font-medium">{formatCurrency(item.paidAmount)}</td>
+                                                                        <td className="py-2 px-3 text-right font-bold text-orange-600">{formatCurrency(item.remainingAmount)}</td>
                                                                         <td className={`py-2 px-3 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                                                                             {item.dueDate ? formatDate(item.dueDate) : '-'}
                                                                             {isOverdue && <span className="ml-1 text-xs">⚠️</span>}
@@ -1223,13 +1227,16 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                                         <thead><tr className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
                                                             <th className="text-left py-2 px-3 font-medium">ลูกค้า</th>
                                                             <th className="text-left py-2 px-3 font-medium">เลขที่บิล</th>
-                                                            <th className="text-right py-2 px-3 font-medium">ยอด</th>
+                                                            <th className="text-right py-2 px-3 font-medium">ยอดเครดิต</th>
+                                                            <th className="text-right py-2 px-3 font-medium">ชำระแล้ว</th>
+                                                            <th className="text-right py-2 px-3 font-medium">คงเหลือ</th>
                                                             <th className="text-left py-2 px-3 font-medium">กำหนดชำระ</th>
                                                             <th className="text-left py-2 px-3 font-medium">วันที่ขาย</th>
                                                         </tr></thead>
                                                         <tbody>
                                                             {filteredByCustomer.map(cust => {
-                                                                const custTotal = cust.items.reduce((s, i) => s + i.amount, 0);
+                                                                const custRemaining = cust.items.reduce((s, i) => s + i.remainingAmount, 0);
+                                                                const custPaid = cust.items.reduce((s, i) => s + i.paidAmount, 0);
                                                                 return (
                                                                     <React.Fragment key={cust.customer}>
                                                                         {cust.items.map((item, j) => {
@@ -1238,7 +1245,9 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                                                                 <tr key={j} className="border-b border-gray-50 hover:bg-gray-50">
                                                                                     {j === 0 && <td className="py-2 px-3 font-semibold text-gray-800 align-top" rowSpan={cust.items.length}>{cust.customer}</td>}
                                                                                     <td className="py-2 px-3 text-gray-600">{item.saleNumber}</td>
-                                                                                    <td className="py-2 px-3 text-right font-medium text-gray-700">{formatCurrency(item.amount)}</td>
+                                                                                    <td className="py-2 px-3 text-right text-gray-500">{formatCurrency(item.amount)}</td>
+                                                                                    <td className="py-2 px-3 text-right text-emerald-600 font-medium">{formatCurrency(item.paidAmount)}</td>
+                                                                                    <td className="py-2 px-3 text-right font-bold text-orange-600">{formatCurrency(item.remainingAmount)}</td>
                                                                                     <td className={`py-2 px-3 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                                                                                         {item.dueDate ? formatDate(item.dueDate) : '-'}
                                                                                         {isOverdue && <span className="ml-1 text-xs">⚠️</span>}
@@ -1249,7 +1258,9 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                                                         })}
                                                                         <tr className="bg-gray-50 border-b-2 border-gray-200">
                                                                             <td colSpan={2} className="py-1.5 px-3 text-xs text-gray-500 font-medium">รวม {cust.customer} ({cust.items.length} บิล)</td>
-                                                                            <td className="py-1.5 px-3 text-right text-sm font-bold text-gray-800">{formatCurrency(custTotal)}</td>
+                                                                            <td className="py-1.5 px-3 text-right text-sm text-gray-500"></td>
+                                                                            <td className="py-1.5 px-3 text-right text-sm font-bold text-emerald-600">{formatCurrency(custPaid)}</td>
+                                                                            <td className="py-1.5 px-3 text-right text-sm font-bold text-orange-600">{formatCurrency(custRemaining)}</td>
                                                                             <td colSpan={2}></td>
                                                                         </tr>
                                                                     </React.Fragment>

@@ -49,12 +49,13 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
         }
     }
 
-    // AR
+    // AR — include debtPayments to calculate paid & remaining
+    // Match overdue-bills logic: include CREDIT + SPLIT payment methods
     const arSales = await prisma.sale.findMany({
         where: {
             status: 'APPROVED',
             deletedAt: null,
-            paymentMethod: 'CREDIT',
+            paymentMethod: { in: ['CREDIT', 'SPLIT'] },
         },
         select: {
             id: true,
@@ -63,54 +64,95 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
             creditDueDate: true,
             createdAt: true,
             customer: { select: { name: true } },
+            payments: true,
+            debtPayments: {
+                select: { amount: true, method: true },
+            },
+            debtInterests: {
+                select: { amount: true },
+            },
         },
         orderBy: { creditDueDate: 'asc' },
     });
 
     const now = new Date();
     const aging = { current: 0, days30: 0, days60: 0, days90Plus: 0 };
-    for (const s of arSales) {
-        const amt = Number(s.totalAmount);
-        if (!s.creditDueDate || new Date(s.creditDueDate) > now) {
-            aging.current += amt;
-        } else {
-            const diff = Math.floor((now.getTime() - new Date(s.creditDueDate).getTime()) / 86400000);
-            if (diff <= 30) aging.days30 += amt;
-            else if (diff <= 60) aging.days60 += amt;
-            else aging.days90Plus += amt;
-        }
-    }
 
-    // Group AR by customer
+    // Group AR by customer — with paid/remaining calculation
+    // Uses same logic as overdue-bills page (getPaymentSplit)
     const customerMap = new Map<string, {
         customer: string;
         totalAmount: number;
+        totalPaid: number;
+        totalRemaining: number;
         count: number;
-        items: { saleId: string; saleNumber: string; amount: number; dueDate: string | null; createdAt: string }[];
+        items: { saleId: string; saleNumber: string; amount: number; paidAmount: number; remainingAmount: number; dueDate: string | null; createdAt: string }[];
     }>();
+
     for (const s of arSales) {
+        const totalAmount = Number(s.totalAmount);
+        const totalInterest = s.debtInterests.reduce((sum, di) => sum + Number(di.amount), 0);
+        const grandTotal = totalAmount + totalInterest;
+
+        // Initial paid from POS (non-credit payments in the payments JSON)
+        let initialPaid = 0;
+        if (s.payments && typeof s.payments === 'object' && Array.isArray(s.payments)) {
+            for (const p of s.payments as { method: string; amount: number }[]) {
+                if (p.method !== 'CREDIT') {
+                    initialPaid += Number(p.amount);
+                }
+            }
+        }
+
+        // Subsequent debt payments (only non-credit method — actual cash/transfer payments)
+        const debtPaid = s.debtPayments
+            .filter(dp => dp.method !== 'CREDIT')
+            .reduce((sum, dp) => sum + Number(dp.amount), 0);
+
+        const paidAmount = initialPaid + debtPaid;
+        const remaining = grandTotal - paidAmount;
+
+        // Skip fully paid bills
+        if (remaining <= 0) continue;
+
+        // Aging based on remaining amount
+        if (!s.creditDueDate || new Date(s.creditDueDate) > now) {
+            aging.current += remaining;
+        } else {
+            const diff = Math.floor((now.getTime() - new Date(s.creditDueDate).getTime()) / 86400000);
+            if (diff <= 30) aging.days30 += remaining;
+            else if (diff <= 60) aging.days60 += remaining;
+            else aging.days90Plus += remaining;
+        }
+
         const customerName = s.customer?.name || 'ลูกค้าทั่วไป';
         if (!customerMap.has(customerName)) {
-            customerMap.set(customerName, { customer: customerName, totalAmount: 0, count: 0, items: [] });
+            customerMap.set(customerName, { customer: customerName, totalAmount: 0, totalPaid: 0, totalRemaining: 0, count: 0, items: [] });
         }
         const group = customerMap.get(customerName)!;
-        group.totalAmount += Number(s.totalAmount);
+        group.totalAmount += totalAmount;
+        group.totalPaid += paidAmount;
+        group.totalRemaining += remaining;
         group.count++;
         group.items.push({
             saleId: s.id,
             saleNumber: s.saleNumber,
-            amount: Number(s.totalAmount),
+            amount: totalAmount,
+            paidAmount,
+            remainingAmount: remaining,
             dueDate: s.creditDueDate?.toISOString() || null,
             createdAt: s.createdAt.toISOString(),
         });
     }
-    const byCustomer = Array.from(customerMap.values()).sort((a, b) => b.totalAmount - a.totalAmount);
+    const byCustomer = Array.from(customerMap.values()).sort((a, b) => b.totalRemaining - a.totalRemaining);
+    const arTotal = byCustomer.reduce((sum, c) => sum + c.totalRemaining, 0);
+    const arCount = byCustomer.reduce((sum, c) => sum + c.count, 0);
 
     return {
         cashFlow: { cash: cashTotal, transfer: transferTotal, credit: creditTotal, total: cashTotal + transferTotal + creditTotal },
         ar: {
-            total: arSales.reduce((sum, s) => sum + Number(s.totalAmount), 0),
-            count: arSales.length,
+            total: arTotal,
+            count: arCount,
             aging,
             byCustomer,
         },
@@ -141,13 +183,13 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
         prisma.factoryReturn.aggregate({ where: factoryReturnWhere, _sum: { totalAmount: true } }),
     ]);
 
-    // COGS — account for returns, use Product.cost (reflects user's cost type setting)
+    // COGS — use SaleItem.unitCost (cost at time of sale), account for returns
     const saleItems = await prisma.saleItem.findMany({
         where: { sale: saleWhere },
         select: {
             id: true, productId: true, warehouseId: true, quantity: true,
             conversionRate: true,
-            product: { select: { cost: true } },
+            unitCost: true,
             sale: {
                 select: {
                     saleReturns: {
@@ -174,7 +216,7 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
             const returned = retMap.get(si.id) || 0;
             const remaining = si.quantity - returned;
             const rate = Number(si.conversionRate ?? 1);
-            const unitCost = Number(si.product.cost);
+            const unitCost = Number(si.unitCost);
             return sum + Math.max(0, remaining) * rate * unitCost;
         }, 0);
     }
@@ -232,9 +274,10 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
                     warehouseId: true,
                     quantity: true,
                     unitPrice: true,
+                    unitCost: true,
                     totalPrice: true,
                     conversionRate: true,
-                    product: { select: { name: true, code: true, cost: true } },
+                    product: { select: { name: true, code: true } },
                 },
             },
             saleReturns: {
@@ -260,7 +303,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
             const returned = retMap.get(item.id) || 0;
             const remaining = item.quantity - returned;
             if (remaining <= 0) continue;
-            const unitCost = Number(item.product.cost);
+            const unitCost = Number(item.unitCost);
             const rate = Number(item.conversionRate ?? 1);
             cogs += remaining * rate * unitCost;
         }
@@ -291,7 +334,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
                 const returned = retMap.get(item.id) || 0;
                 const remaining = item.quantity - returned;
                 if (remaining <= 0) return null;
-                const unitCost = Number(item.product.cost);
+                const unitCost = Number(item.unitCost);
                 const rate = Number(item.conversionRate ?? 1);
                 const revenue = remaining * Number(item.unitPrice);
                 const cogs = remaining * rate * unitCost;

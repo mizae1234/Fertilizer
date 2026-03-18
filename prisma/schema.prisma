@@ -365,6 +365,7 @@ model SaleItem {
   warehouseId String
   quantity    Int
   unitPrice   Decimal @db.Decimal(12, 2)
+  unitCost    Decimal @default(0) @db.Decimal(12, 2) // ต้นทุน ณ ตอนขาย
   totalPrice  Decimal @db.Decimal(12, 2)
   discount    Decimal @default(0) @db.Decimal(12, 2)
   points         Int     @default(0)

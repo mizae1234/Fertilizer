@@ -253,6 +253,24 @@ export async function updateSale(id: string, data: {
         // Delete old items
         await tx.saleItem.deleteMany({ where: { saleId: id } });
 
+        // Fetch avgCost for each product to record cost at time of sale
+        const productCosts = await Promise.all(
+            data.items.map(async (i) => {
+                const stocks = await tx.productStock.findMany({
+                    where: { productId: i.productId },
+                    select: { avgCost: true, quantity: true },
+                });
+                if (stocks.length > 0) {
+                    const totalQty = stocks.reduce((s, st) => s + st.quantity, 0);
+                    return totalQty > 0
+                        ? stocks.reduce((s, st) => s + Number(st.avgCost) * st.quantity, 0) / totalQty
+                        : Number(stocks[0].avgCost);
+                }
+                const product = await tx.product.findUnique({ where: { id: i.productId }, select: { cost: true } });
+                return product ? Number(product.cost) : 0;
+            })
+        );
+
         // Update sale header + create new items
         await tx.sale.update({
             where: { id },
@@ -264,11 +282,12 @@ export async function updateSale(id: string, data: {
                 discount: totalDiscount,
                 ...(updatedPayments ? { payments: updatedPayments } : {}),
                 items: {
-                    create: data.items.map(i => ({
+                    create: data.items.map((i, idx) => ({
                         productId: i.productId,
                         warehouseId: i.warehouseId,
                         quantity: i.quantity,
                         unitPrice: i.unitPrice,
+                        unitCost: parseFloat(productCosts[idx].toFixed(2)),
                         totalPrice: i.quantity * i.unitPrice,
                         discount: i.itemDiscount || 0,
                         points: i.points,

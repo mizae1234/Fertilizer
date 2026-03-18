@@ -39,6 +39,7 @@ interface CartItem {
     selectedUnitId: string;
     selectedUnitName: string;
     conversionRate: number;
+    baseUnitPrice: number; // original base-unit price, never overwritten
     productUnits: ProductUnitInfo[];
     // Bundle fields
     isBundle?: boolean;
@@ -351,6 +352,10 @@ export default function POSPage() {
     const mobileSearchRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const searchInputMobileRef = useRef<HTMLInputElement>(null);
+    const qtyInputRef = useRef<HTMLInputElement>(null);
+
+    // Default quantity preset — value used when adding items to cart
+    const [defaultQty, setDefaultQty] = useState(1);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
     // Bill-level discount
@@ -502,11 +507,12 @@ export default function POSPage() {
         const convRate = 1;
         const unitName = product.unit;
 
+        const qtyToAdd = defaultQty || 1;
         const existing = cart.find(c => c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === '');
         if (existing) {
             setCart(cart.map(c =>
                 c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === ''
-                    ? { ...c, quantity: c.quantity + 1, points: (c.quantity + 1) * c.conversionRate * c.pointsPerUnit }
+                    ? { ...c, quantity: c.quantity + qtyToAdd, points: (c.quantity + qtyToAdd) * c.conversionRate * c.pointsPerUnit }
                     : c
             ));
             triggerPulse(product.id);
@@ -523,14 +529,15 @@ export default function POSPage() {
             }
             setCart([...cart, {
                 productId: product.id, productName: product.name, productCode: product.code,
-                unit: unitName, warehouseId, quantity: 1, unitPrice: price,
-                points: product.pointsPerUnit, availableStock: stock,
+                unit: unitName, warehouseId, quantity: qtyToAdd, unitPrice: price,
+                points: product.pointsPerUnit * qtyToAdd, availableStock: stock,
                 pointsPerUnit: product.pointsPerUnit,
                 priceTier,
                 productPrices: product.productPrices.map(pp => ({ customerGroupId: pp.customerGroup.id, productUnitId: pp.productUnitId, price: Number(pp.price) })),
                 selectedUnitId: '',
                 selectedUnitName: unitName,
                 conversionRate: convRate,
+                baseUnitPrice: price,
                 productUnits: product.productUnits || [],
                 itemDiscount: 0,
             }]);
@@ -595,6 +602,7 @@ export default function POSPage() {
                 selectedUnitId: '',
                 selectedUnitName: 'ชุด',
                 conversionRate: 1,
+                baseUnitPrice: bundlePrice,
                 productUnits: [],
                 isBundle: true,
                 bundleId: bundle.id,
@@ -638,21 +646,31 @@ export default function POSPage() {
 
             // "default" = product's original unit (no productUnit record)
             if (unitId === '__default__') {
-                let price = product ? getPrice(product) : c.unitPrice;
-                // Auto-lookup group price for base unit
+                // Determine the base unit price:
+                // 1. Try customer group price for base unit (productUnitId === null)
+                // 2. Try product.price from products array
+                // 3. Fallback: find base unit in productUnits and use its sellingPrice
+                let price: number | undefined;
                 if (selectedCustomer) {
                     const gp = c.productPrices.find(pp =>
                         pp.customerGroupId === selectedCustomer.customerGroup.id && pp.productUnitId === null
                     );
                     if (gp) price = gp.price;
                 }
+                if (price === undefined) {
+                    if (product) {
+                        price = getPrice(product);
+                    } else {
+                        // products array cleared after search — use stored baseUnitPrice
+                        price = c.baseUnitPrice;
+                    }
+                }
                 return {
                     ...c,
                     selectedUnitId: '',
-                    selectedUnitName: product?.unit || c.unit,
+                    selectedUnitName: c.unit,
                     conversionRate: 1,
                     unitPrice: price,
-                    unit: product?.unit || c.unit,
                     availableStock: baseStock,
                     priceTier: 'custom',
                     points: c.quantity * 1 * c.pointsPerUnit,
@@ -676,7 +694,6 @@ export default function POSPage() {
                 selectedUnitName: unit.unitName,
                 conversionRate: convRate,
                 unitPrice,
-                unit: unit.unitName,
                 availableStock: baseStock,
                 priceTier: 'custom',
                 points: c.quantity * convRate * c.pointsPerUnit,
@@ -907,6 +924,7 @@ export default function POSPage() {
             if (!isSearchInput && isInput) return;
             if (e.key === '+' && !isInput && cart.length > 0) { e.preventDefault(); openPaymentModal(); }
             if (e.key === '-' && !isInput) { e.preventDefault(); setShowBillDiscount(true); }
+            if (e.key === '*') { e.preventDefault(); qtyInputRef.current?.focus(); qtyInputRef.current?.select(); }
         };
         document.addEventListener('keydown', handler);
         return () => document.removeEventListener('keydown', handler);
@@ -936,6 +954,30 @@ export default function POSPage() {
                             <div className="flex-1" />
                             {/* Desktop: Customer + Search inline */}
                             <div className="hidden lg:flex items-center gap-3">
+                                {/* Quantity Preset Input */}
+                                <div className="flex items-center gap-1.5 shrink-0" title="จำนวนเริ่มต้น (กด * เพื่อเลือก)">
+                                    <label className="text-[10px] text-gray-500">จำนวน:</label>
+                                    <input
+                                        ref={qtyInputRef}
+                                        type="number"
+                                        value={defaultQty}
+                                        onChange={e => setDefaultQty(Math.max(1, parseInt(e.target.value) || 1))}
+                                        onFocus={e => e.target.select()}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') { e.preventDefault(); searchInputRef.current?.focus(); }
+                                            if (e.key === '*') { e.preventDefault(); }
+                                        }}
+                                        min={1}
+                                        className={`w-14 px-2 py-1.5 rounded-lg border text-sm font-bold text-center outline-none transition-all ${
+                                            defaultQty > 1
+                                                ? 'border-amber-400 bg-amber-50 text-amber-700 ring-2 ring-amber-200'
+                                                : 'border-gray-200 text-gray-700 focus:ring-2 focus:ring-emerald-500'
+                                        }`}
+                                    />
+                                    {defaultQty > 1 && (
+                                        <button onClick={() => setDefaultQty(1)} className="text-amber-400 hover:text-amber-600 text-xs" title="รีเซ็ตเป็น 1">✕</button>
+                                    )}
+                                </div>
                                 <div className="relative shrink-0">
                                     {selectedCustomer ? (
                                         <div className="flex items-center gap-2 bg-emerald-50 rounded-xl px-3 py-1.5">
@@ -1184,7 +1226,7 @@ export default function POSPage() {
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-xs lg:text-sm font-semibold text-gray-800 truncate">{item.productName}</p>
-                                                        <p className="text-[10px] lg:hidden text-gray-400">{item.productCode} · {formatCurrency(item.unitPrice)}/{item.unit}</p>
+                                                        <p className="text-[10px] lg:hidden text-gray-400">{item.productCode} · {formatCurrency(item.unitPrice)}/{item.selectedUnitName}</p>
                                                         <p className="text-xs text-gray-400 hidden lg:block">{item.productCode}</p>
                                                     </div>
                                                     {/* Desktop inline controls */}
@@ -1214,7 +1256,7 @@ export default function POSPage() {
                                                                 className="w-20 px-1 py-0.5 rounded border border-gray-200 text-[11px] outline-none text-right font-semibold"
                                                                 step="0.01" min={0}
                                                             />
-                                                            <span className="text-gray-400">/{item.unit}</span>
+                                                            <span className="text-gray-400">/{item.selectedUnitName}</span>
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-1 shrink-0">
@@ -1243,7 +1285,7 @@ export default function POSPage() {
                                                         placeholder="0" step="0.01" min={0} />
                                                     <span className="text-[10px] text-gray-400">บาท</span>
                                                     <span className="text-[10px] text-gray-400 ml-2">|</span>
-                                                    <span className={`text-[10px] font-medium ${(item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) <= 0 ? 'text-red-500' : (item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) < 10 ? 'text-orange-500' : 'text-gray-500'}`}>📦 คงเหลือ {item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock} {item.unit}</span>
+                                                    <span className={`text-[10px] font-medium ${(item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) <= 0 ? 'text-red-500' : (item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) < 10 ? 'text-orange-500' : 'text-gray-500'}`}>📦 คงเหลือ {item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock} {item.selectedUnitName}</span>
                                                 </div>
                                                 {/* Mobile-only Row 2: controls */}
                                                 <div className="flex lg:hidden items-center gap-2 mt-1.5 flex-wrap text-[10px]">
@@ -1274,7 +1316,7 @@ export default function POSPage() {
                                                             className="w-16 px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none text-right font-semibold"
                                                             step="0.01" min={0}
                                                         />
-                                                        <span className="text-gray-400">/{item.unit}</span>
+                                                        <span className="text-gray-400">/{item.selectedUnitName}</span>
                                                     </div>
                                                     {/* Mobile item discount */}
                                                     <div className="flex items-center gap-0.5">
