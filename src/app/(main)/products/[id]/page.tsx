@@ -510,14 +510,14 @@ export default function ProductDetailPage() {
                             <input type="radio" name="cost-type" checked={costType === 'avg'} onChange={() => setCostType('avg')} className="accent-emerald-500" />
                             <div className="flex-1 flex justify-between items-center">
                                 <span className="text-sm text-gray-700">ต้นทุนเฉลี่ย</span>
-                                <span className="text-sm font-bold text-blue-700">{formatCurrency(globalAvgCost)}</span>
+                                <span className="text-sm font-bold text-blue-700">฿{globalAvgCost.toFixed(2)}</span>
                             </div>
                         </label>
                         <label className="flex items-center gap-3 p-3 rounded-xl bg-purple-50 border border-purple-200 cursor-pointer hover:border-purple-300">
                             <input type="radio" name="cost-type" checked={costType === 'last'} onChange={() => setCostType('last')} className="accent-emerald-500" />
                             <div className="flex-1 flex justify-between items-center">
                                 <span className="text-sm text-gray-700">ต้นทุนล่าสุด</span>
-                                <span className="text-sm font-bold text-purple-700">{formatCurrency(globalLastCost)}</span>
+                                <span className="text-sm font-bold text-purple-700">฿{globalLastCost.toFixed(2)}</span>
                             </div>
                         </label>
                         <label className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200 cursor-pointer hover:border-amber-300">
