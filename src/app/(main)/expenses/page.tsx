@@ -10,6 +10,7 @@ import AlertModal from '@/components/AlertModal';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
+import Pagination from '@/components/Pagination';
 
 
 
@@ -240,25 +241,7 @@ export default function ExpensesPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-                <div className="flex justify-center gap-2 mt-4">
-                    <button
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page === 1}
-                        className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm disabled:opacity-40 hover:bg-gray-50"
-                    >
-                        ← ก่อนหน้า
-                    </button>
-                    <span className="px-3 py-1.5 text-sm text-gray-600">
-                        {page} / {totalPages}
-                    </span>
-                    <button
-                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        disabled={page === totalPages}
-                        className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm disabled:opacity-40 hover:bg-gray-50"
-                    >
-                        ถัดไป →
-                    </button>
-                </div>
+                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
             )}
 
             {/* Modals */}

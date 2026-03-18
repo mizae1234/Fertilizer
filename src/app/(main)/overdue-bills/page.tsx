@@ -4,6 +4,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { Suspense } from 'react';
 import OverdueDateFilter from './OverdueDateFilter';
 import PageHeader from '@/components/PageHeader';
+import Pagination from '@/components/Pagination';
 import SortableHeader from '@/components/SortableHeader';
 
 interface Props { searchParams: Promise<{ page?: string; from?: string; to?: string; q?: string; sort?: string; order?: string }> }
@@ -222,13 +223,7 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
                 </table>
 
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                        <p className="text-sm text-gray-500">หน้า {page} จาก {totalPages}</p>
-                        <div className="flex gap-1">
-                            {page > 1 && <Link href={buildUrl({ page: String(page - 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ก่อนหน้า</Link>}
-                            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ถัดไป</Link>}
-                        </div>
-                    </div>
+                    <Pagination page={page} totalPages={totalPages} basePath="/overdue-bills" params={{ status, from, to }} />
                 )}
             </div>
         </div>

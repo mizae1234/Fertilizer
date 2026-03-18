@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import CustomerFilter from './CustomerFilter';
 import PageHeader from '@/components/PageHeader';
+import Pagination from '@/components/Pagination';
 import DeleteButton from '@/components/DeleteButton';
 import { deleteCustomer } from '@/app/actions/customers';
 
@@ -98,13 +99,7 @@ export default async function CustomersPage({ searchParams }: Props) {
                 </table>
 
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                        <p className="text-sm text-gray-500">หน้า {page} จาก {totalPages}</p>
-                        <div className="flex gap-1">
-                            {page > 1 && <Link href={`/customers?page=${page - 1}&search=${search}`} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ก่อนหน้า</Link>}
-                            {page < totalPages && <Link href={`/customers?page=${page + 1}&search=${search}`} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ถัดไป</Link>}
-                        </div>
-                    </div>
+                    <Pagination page={page} totalPages={totalPages} basePath="/customers" params={{ search }} />
                 )}
             </div>
         </div>

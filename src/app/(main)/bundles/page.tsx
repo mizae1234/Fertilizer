@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
 import PageHeader from '@/components/PageHeader';
+import Pagination from '@/components/Pagination';
 
 interface Props {
     searchParams: Promise<{ page?: string; search?: string }>;
@@ -133,21 +134,7 @@ export default async function BundlesPage({ searchParams }: Props) {
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                        <p className="text-sm text-gray-500">หน้า {page} จาก {totalPages}</p>
-                        <div className="flex gap-1">
-                            {page > 1 && (
-                                <Link href={buildUrl({ page: String(page - 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
-                                    ก่อนหน้า
-                                </Link>
-                            )}
-                            {page < totalPages && (
-                                <Link href={buildUrl({ page: String(page + 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
-                                    ถัดไป
-                                </Link>
-                            )}
-                        </div>
-                    </div>
+                    <Pagination page={page} totalPages={totalPages} basePath="/bundles" params={{ search }} />
                 )}
             </div>
         </div>

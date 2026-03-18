@@ -3,6 +3,7 @@ import Link from 'next/link';
 import VendorCard from './VendorCard';
 import PageHeader from '@/components/PageHeader';
 import EmptyState from '@/components/EmptyState';
+import Pagination from '@/components/Pagination';
 
 interface Props {
     searchParams: Promise<{ page?: string; search?: string }>;
@@ -72,21 +73,7 @@ export default async function VendorsPage({ searchParams }: Props) {
 
             {/* Pagination */}
             {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-6">
-                    <p className="text-sm text-gray-500">หน้า {page} จาก {totalPages}</p>
-                    <div className="flex gap-1">
-                        {page > 1 && (
-                            <Link href={`/vendors?page=${page - 1}${searchQuery ? `&search=${searchQuery}` : ''}`} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
-                                ก่อนหน้า
-                            </Link>
-                        )}
-                        {page < totalPages && (
-                            <Link href={`/vendors?page=${page + 1}${searchQuery ? `&search=${searchQuery}` : ''}`} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
-                                ถัดไป
-                            </Link>
-                        )}
-                    </div>
-                </div>
+                <Pagination page={page} totalPages={totalPages} basePath="/vendors" params={{ search: searchQuery }} />
             )}
         </div>
     );

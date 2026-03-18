@@ -7,6 +7,7 @@ import AlertModal from '@/components/AlertModal';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
+import Pagination from '@/components/Pagination';
 
 interface Group {
     id: string;
@@ -149,17 +150,7 @@ export default function CustomerGroupsPage() {
 
                 {/* Pagination */}
                 {groups.length > perPage && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                        <p className="text-sm text-gray-500">หน้า {page} จาก {Math.ceil(groups.length / perPage)}</p>
-                        <div className="flex gap-1">
-                            {page > 1 && (
-                                <button onClick={() => setPage(page - 1)} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ก่อนหน้า</button>
-                            )}
-                            {page < Math.ceil(groups.length / perPage) && (
-                                <button onClick={() => setPage(page + 1)} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ถัดไป</button>
-                            )}
-                        </div>
-                    </div>
+                    <Pagination page={page} totalPages={Math.ceil(groups.length / perPage)} onPageChange={setPage} />
                 )}
             </div>
 

@@ -5,6 +5,7 @@ import StatusBadge from '@/components/StatusBadge';
 import { Suspense } from 'react';
 import DateRangeFilter from '@/components/DateRangeFilter';
 import PageHeader from '@/components/PageHeader';
+import Pagination from '@/components/Pagination';
 
 interface Props { searchParams: Promise<{ page?: string; status?: string; from?: string; to?: string }> }
 
@@ -115,13 +116,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                 </table>
 
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                        <p className="text-sm text-gray-500">หน้า {page} จาก {totalPages}</p>
-                        <div className="flex gap-1">
-                            {page > 1 && <Link href={buildUrl({ page: String(page - 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ก่อนหน้า</Link>}
-                            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ถัดไป</Link>}
-                        </div>
-                    </div>
+                    <Pagination page={page} totalPages={totalPages} basePath="/goods-receive" params={{ status, from, to }} />
                 )}
             </div>
 
@@ -149,13 +144,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                     ))
                 )}
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between pt-2">
-                        <p className="text-sm text-gray-500">หน้า {page}/{totalPages}</p>
-                        <div className="flex gap-1">
-                            {page > 1 && <Link href={buildUrl({ page: String(page - 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ก่อนหน้า</Link>}
-                            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) })} className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">ถัดไป</Link>}
-                        </div>
-                    </div>
+                    <Pagination page={page} totalPages={totalPages} basePath="/goods-receive" params={{ status, from, to }} />
                 )}
             </div>
         </div>
