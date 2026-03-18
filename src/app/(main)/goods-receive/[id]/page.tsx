@@ -48,7 +48,7 @@ interface GRDetail {
         unitCost: number | string;
         totalCost: number | string;
         lotNo: string | null;
-        product: { name: string; code: string; unit: string };
+        product: { name: string; code: string; unit: string; costMethod?: string | null };
         warehouse: { name: string };
     }[];
 }
@@ -83,6 +83,7 @@ export default function GoodsReceiveDetailPage() {
 
     // Modals
     const [showApprove, setShowApprove] = useState(false);
+    const [costMethodOverrides, setCostMethodOverrides] = useState<Record<string, string>>({});
     const [showReject, setShowReject] = useState(false);
     const [showDelete, setShowDelete] = useState(false);
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; type: 'success' | 'error' | 'warning'; title?: string }>({ open: false, message: '', type: 'error' });
@@ -198,7 +199,7 @@ export default function GoodsReceiveDetailPage() {
     const handleApprove = async () => {
         setActionLoading('approve');
         try {
-            await approveGoodsReceive(id);
+            await approveGoodsReceive(id, Object.keys(costMethodOverrides).length > 0 ? costMethodOverrides : undefined);
             router.push('/goods-receive');
         } catch (error) {
             showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
@@ -415,6 +416,25 @@ export default function GoodsReceiveDetailPage() {
                                             placeholder="เลข Lot (ถ้ามี)"
                                             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                         />
+                                    </div>
+                                </div>
+                                {/* Cost Method Selector */}
+                                <div className="sm:col-span-8 mt-1">
+                                    <label className="text-xs text-gray-400 mb-1 block">ประเภทต้นทุน</label>
+                                    <div className="flex gap-2">
+                                        {[
+                                            { value: 'AVG', label: '📊 เฉลี่ย', bg: 'bg-blue-50 border-blue-200 text-blue-700', active: 'bg-blue-500 text-white border-blue-500' },
+                                            { value: 'LAST', label: '🕐 ล่าสุด', bg: 'bg-purple-50 border-purple-200 text-purple-700', active: 'bg-purple-500 text-white border-purple-500' },
+                                            { value: 'MANUAL', label: '✏️ กำหนดเอง', bg: 'bg-amber-50 border-amber-200 text-amber-700', active: 'bg-amber-500 text-white border-amber-500' },
+                                        ].map(opt => {
+                                            const currentMethod = costMethodOverrides[item.productId] || (gr?.items.find(i => i.productId === item.productId)?.product as { costMethod?: string })?.costMethod || 'LAST';
+                                            return (
+                                                <button key={opt.value} type="button"
+                                                    onClick={() => setCostMethodOverrides(prev => ({ ...prev, [item.productId]: opt.value }))}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${currentMethod === opt.value ? opt.active : opt.bg + ' hover:opacity-80'}`}
+                                                >{opt.label}</button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                                 {/* Line total */}

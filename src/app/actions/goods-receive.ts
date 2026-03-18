@@ -37,7 +37,7 @@ export async function getGoodsReceiveDetail(id: string) {
             createdBy: { select: { name: true } },
             items: {
                 include: {
-                    product: { select: { name: true, code: true, unit: true } },
+                    product: { select: { name: true, code: true, unit: true, costMethod: true } },
                     warehouse: { select: { name: true } },
                 },
             },
@@ -164,7 +164,7 @@ export async function updateGoodsReceive(id: string, data: {
     });
 }
 
-export async function approveGoodsReceive(id: string) {
+export async function approveGoodsReceive(id: string, costMethodOverrides?: Record<string, string>) {
     const gr = await prisma.goodsReceive.findUnique({
         where: { id },
         include: { items: true },
@@ -181,7 +181,17 @@ export async function approveGoodsReceive(id: string) {
             data: { status: 'APPROVED' },
         });
 
-        // Fetch products for costMethod check
+        // If costMethod overrides provided, apply them to Product records first
+        if (costMethodOverrides && Object.keys(costMethodOverrides).length > 0) {
+            for (const [productId, method] of Object.entries(costMethodOverrides)) {
+                await tx.product.update({
+                    where: { id: productId },
+                    data: { costMethod: method },
+                });
+            }
+        }
+
+        // Fetch products for costMethod check (AFTER overrides applied)
         const productIds = [...new Set(gr.items.map(i => i.productId))];
         const products = await tx.product.findMany({
             where: { id: { in: productIds } },
