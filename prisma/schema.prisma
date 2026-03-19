@@ -337,6 +337,10 @@ model Sale {
   debtInterests DebtInterest[]
   saleReturns   SaleReturn[]
   saleEditLogs  SaleEditLog[]
+
+  @@index([createdAt, status, deletedAt])
+  @@index([paymentMethod, status, creditDueDate])
+  @@index([customerId])
 }
 
 // ============ Debt Management ============
@@ -381,6 +385,9 @@ model SaleItem {
   sale      Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product   Product   @relation(fields: [productId], references: [id])
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@index([saleId])
+  @@index([productId])
 }
 
 // ============ Stock Transfers ============
@@ -431,6 +438,9 @@ model StockTransaction {
   product   Product   @relation(fields: [productId], references: [id])
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
   user      User?     @relation(fields: [userId], references: [id])
+
+  @@index([productId, warehouseId, createdAt])
+  @@index([type, createdAt])
 }
 
 // ============ Expenses ============
@@ -448,6 +458,8 @@ model Expense {
   deletedAt     DateTime?
 
   createdBy User @relation(fields: [createdById], references: [id])
+
+  @@index([expenseDate, deletedAt])
 }
 
 // ============ Bank Accounts ============

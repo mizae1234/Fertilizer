@@ -143,7 +143,6 @@ export async function updateQuotation(id: string, data: {
         updateData.totalAmount = subtotal - discount;
         updateData.discount = discount;
 
-        await prisma.quotationItem.deleteMany({ where: { quotationId: id } });
         updateData.items = {
             create: data.items.map(i => ({
                 productId: i.productId,
@@ -158,7 +157,12 @@ export async function updateQuotation(id: string, data: {
         updateData.totalAmount = Number(existing.totalAmount) + Number(existing.discount) - data.discount;
     }
 
-    await prisma.quotation.update({ where: { id }, data: updateData });
+    await prisma.$transaction(async (tx) => {
+        if (data.items) {
+            await tx.quotationItem.deleteMany({ where: { quotationId: id } });
+        }
+        await tx.quotation.update({ where: { id }, data: updateData });
+    });
     revalidatePath('/quotations');
 }
 

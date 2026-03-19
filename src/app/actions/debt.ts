@@ -115,44 +115,59 @@ export async function payDebt(
     saleId: string,
     payments: { method: string; amount: number; dueDate?: string }[]
 ) {
-    const detail = await getDebtSummary(saleId);
-    if (!detail) throw new Error('ไม่พบบิล');
-    if (detail.isPaidOff) throw new Error('บิลนี้ชำระครบแล้ว');
+    const isPaidOff = await prisma.$transaction(async (tx) => {
+        // Validate inside transaction to prevent race conditions
+        const [sale, debtPayments, debtInterests] = await Promise.all([
+            tx.sale.findUnique({
+                where: { id: saleId },
+                select: { id: true, totalAmount: true, payments: true, paymentMethod: true, creditDueDate: true },
+            }),
+            tx.debtPayment.findMany({ where: { saleId } }),
+            tx.debtInterest.findMany({ where: { saleId } }),
+        ]);
+        if (!sale) throw new Error('ไม่พบบิล');
 
-    // Create all payment records in parallel
-    await Promise.all(payments.map(p =>
-        prisma.debtPayment.create({
-            data: {
-                saleId,
-                amount: p.amount,
-                method: p.method,
-                dueDate: p.dueDate ? new Date(p.dueDate) : null,
-                note: p.method === 'CREDIT' && p.dueDate
-                    ? `เลื่อนกำหนดชำระไปวันที่ ${p.dueDate}`
-                    : null,
-            },
-        })
-    ));
+        const detail = computeDebtTotals({ ...sale, debtPayments, debtInterests });
+        if (detail.isPaidOff) throw new Error('บิลนี้ชำระครบแล้ว');
 
-    // If CREDIT payment exists, update sale due date
-    const creditPayment = payments.find(p => p.method === 'CREDIT' && p.dueDate);
-    if (creditPayment?.dueDate) {
-        await prisma.sale.update({
-            where: { id: saleId },
-            data: { creditDueDate: new Date(creditPayment.dueDate) },
-        });
-    }
+        // Create all payment records
+        await Promise.all(payments.map(p =>
+            tx.debtPayment.create({
+                data: {
+                    saleId,
+                    amount: p.amount,
+                    method: p.method,
+                    dueDate: p.dueDate ? new Date(p.dueDate) : null,
+                    note: p.method === 'CREDIT' && p.dueDate
+                        ? `เลื่อนกำหนดชำระไปวันที่ ${p.dueDate}`
+                        : null,
+                },
+            })
+        ));
 
-    // Check if fully paid now — use lightweight summary
-    const updated = await getDebtSummary(saleId);
-    if (updated && updated.isPaidOff) {
-        await prisma.sale.update({
-            where: { id: saleId },
-            data: { paymentMethod: 'PAID' },
-        });
-    }
+        // If CREDIT payment exists, update sale due date
+        const creditPayment = payments.find(p => p.method === 'CREDIT' && p.dueDate);
+        if (creditPayment?.dueDate) {
+            await tx.sale.update({
+                where: { id: saleId },
+                data: { creditDueDate: new Date(creditPayment.dueDate) },
+            });
+        }
+
+        // Check if fully paid now
+        const updatedPayments = await tx.debtPayment.findMany({ where: { saleId } });
+        const updatedInterests = await tx.debtInterest.findMany({ where: { saleId } });
+        const updated = computeDebtTotals({ ...sale, debtPayments: updatedPayments, debtInterests: updatedInterests });
+        if (updated.isPaidOff) {
+            await tx.sale.update({
+                where: { id: saleId },
+                data: { paymentMethod: 'PAID' },
+            });
+        }
+        return updated.isPaidOff;
+    });
 
     revalidatePath(`/overdue-bills/${saleId}`);
     revalidatePath('/overdue-bills');
-    return { success: true, isPaidOff: updated?.isPaidOff || false };
+    return { success: true, isPaidOff };
 }

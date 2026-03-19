@@ -60,7 +60,7 @@ export async function createStockAdjustment(data: {
     const adjNumber = await generateNumber('ADJ');
 
     await prisma.$transaction(async (tx) => {
-        for (const item of data.items) {
+        await Promise.all(data.items.map(async (item) => {
             if (item.quantity <= 0) throw new Error('จำนวนต้องมากกว่า 0');
 
             const stock = await tx.productStock.findUnique({
@@ -133,7 +133,7 @@ export async function createStockAdjustment(data: {
                     },
                 });
             }
-        }
+        }));
     });
 
     revalidatePath('/stock-adjustments');

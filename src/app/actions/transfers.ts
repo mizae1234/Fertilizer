@@ -103,7 +103,8 @@ export async function approveTransfer(id: string) {
             data: { status: 'APPROVED' },
         });
 
-        for (const item of transfer.items) {
+        // Process all items in parallel
+        await Promise.all(transfer.items.map(async (item) => {
             // Deduct from source warehouse
             await tx.productStock.upsert({
                 where: {
@@ -161,7 +162,7 @@ export async function approveTransfer(id: string) {
                     notes: `รับโอนจาก ${transfer.fromWarehouseId}`,
                 },
             });
-        }
+        }));
     });
 
     revalidatePath('/transfers');

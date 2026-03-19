@@ -70,17 +70,19 @@ export async function approveSale(id: string) {
         throw new Error('ไม่สามารถอนุมัติได้');
     }
 
-    // Validate stock
-    for (const item of sale.items) {
-        const stock = await prisma.productStock.findUnique({
-            where: {
-                productId_warehouseId: {
-                    productId: item.productId,
-                    warehouseId: item.warehouseId,
-                },
-            },
-        });
+    // Validate stock — batch query instead of N+1
+    const stocks = await prisma.productStock.findMany({
+        where: {
+            OR: sale.items.map(i => ({
+                productId: i.productId,
+                warehouseId: i.warehouseId,
+            })),
+        },
+    });
+    const stockMap = new Map(stocks.map(s => [`${s.productId}_${s.warehouseId}`, s]));
 
+    for (const item of sale.items) {
+        const stock = stockMap.get(`${item.productId}_${item.warehouseId}`);
         if (!stock || stock.quantity < item.quantity) {
             throw new Error('สินค้ามี stock ไม่เพียงพอ');
         }
@@ -93,8 +95,8 @@ export async function approveSale(id: string) {
             data: { status: 'APPROVED' },
         });
 
-        // Deduct stock for each item
-        for (const item of sale.items) {
+        // Deduct stock + create stock transactions in parallel
+        await Promise.all(sale.items.map(async (item) => {
             await tx.productStock.update({
                 where: {
                     productId_warehouseId: {
@@ -114,13 +116,13 @@ export async function approveSale(id: string) {
                     warehouseId: item.warehouseId,
                     type: 'SALE',
                     quantity: -item.quantity,
-                    unitCost: item.unitPrice,
+                    unitCost: item.unitCost,
                     reference: sale.saleNumber,
                     userId: sale.createdById,
                     notes: `ขายสินค้า ${sale.saleNumber}`,
                 },
             });
-        }
+        }));
 
         // Update customer points
         if (sale.customerId && sale.totalPoints > 0) {
