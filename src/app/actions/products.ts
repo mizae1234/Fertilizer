@@ -59,15 +59,24 @@ export async function createProduct(data: {
     // Auto-generate code: 5-digit running number (00001, 00002, ...)
     let code = data.code?.trim();
     if (!code) {
-        // Find max numeric code and increment
-        const maxProduct = await prisma.product.findFirst({
-            where: { code: { not: { contains: '-' } }, deletedAt: null },
-            orderBy: { code: 'desc' },
+        // Find max numeric code from ALL products (including soft-deleted) to avoid unique constraint violation
+        const allNumericProducts = await prisma.product.findMany({
+            where: { code: { not: { contains: '-' } } },
             select: { code: true },
+            orderBy: { code: 'desc' },
+            take: 1,
         });
-        const maxNum = maxProduct?.code ? parseInt(maxProduct.code, 10) : 0;
-        const nextNum = (isNaN(maxNum) ? await prisma.product.count() : maxNum) + 1;
+        const maxNum = allNumericProducts.length > 0 ? parseInt(allNumericProducts[0].code, 10) : 0;
+        let nextNum = (isNaN(maxNum) ? await prisma.product.count() : maxNum) + 1;
         code = String(nextNum).padStart(5, '0');
+
+        // Safety: ensure code doesn't already exist (retry up to 10 times)
+        for (let i = 0; i < 10; i++) {
+            const exists = await prisma.product.findUnique({ where: { code } });
+            if (!exists) break;
+            nextNum++;
+            code = String(nextNum).padStart(5, '0');
+        }
     }
 
     const product = await prisma.product.create({
