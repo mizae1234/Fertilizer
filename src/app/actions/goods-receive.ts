@@ -156,7 +156,7 @@ export async function updateGoodsReceive(id: string, data: {
             createdBy: { select: { name: true } },
             items: {
                 include: {
-                    product: { select: { name: true, code: true, unit: true } },
+                    product: { select: { name: true, code: true, unit: true, costMethod: true } },
                     warehouse: { select: { name: true } },
                 },
             },
