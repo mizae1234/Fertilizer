@@ -75,16 +75,21 @@ export async function createStockAdjustment(data: {
             const noteText = [item.reason, data.note].filter(Boolean).join(' — ');
 
             if (data.adjustmentType === 'decrease') {
-                // Decrease mode — deduct stock
-                if (!stock || stock.quantity < item.quantity) {
-                    const product = await tx.product.findUnique({ where: { id: item.productId }, select: { name: true } });
-                    throw new Error(`สินค้า "${product?.name || item.productId}" มี stock ไม่พอ (คงเหลือ ${stock?.quantity || 0}, ต้องการตัด ${item.quantity})`);
+                // Decrease mode — deduct stock (allow negative)
+                if (stock) {
+                    await tx.productStock.update({
+                        where: { id: stock.id },
+                        data: { quantity: { decrement: item.quantity } },
+                    });
+                } else {
+                    await tx.productStock.create({
+                        data: {
+                            productId: item.productId,
+                            warehouseId: item.warehouseId,
+                            quantity: -item.quantity,
+                        },
+                    });
                 }
-
-                await tx.productStock.update({
-                    where: { id: stock.id },
-                    data: { quantity: { decrement: item.quantity } },
-                });
 
                 await tx.stockTransaction.create({
                     data: {
@@ -92,7 +97,7 @@ export async function createStockAdjustment(data: {
                         warehouseId: item.warehouseId,
                         type: 'ADJUSTMENT',
                         quantity: -item.quantity,
-                        unitCost: Number(stock.avgCost),
+                        unitCost: stock ? Number(stock.avgCost) : 0,
                         reference: adjNumber,
                         userId: data.userId,
                         notes: noteText,
