@@ -76,20 +76,16 @@ export async function GET(
             }
         }
 
-        // Compute avg/last cost from ALL GOODS_RECEIVE StockTransactions
-        const allReceives = await prisma.stockTransaction.findMany({
+        // Compute avg/last cost
+        // AVG cost is now maintained as moving weighted average in product.cost
+        // so we use it directly. Last cost comes from the most recent GR.
+        const lastReceive = await prisma.stockTransaction.findFirst({
             where: { productId: id, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
-            select: { quantity: true, unitCost: true },
+            select: { unitCost: true },
             orderBy: { createdAt: 'desc' },
         });
-        let computedAvgCost = 0;
-        let computedLastCost = 0;
-        if (allReceives.length > 0) {
-            const totalQty = allReceives.reduce((s, r) => s + r.quantity, 0);
-            const totalCost = allReceives.reduce((s, r) => s + r.quantity * Number(r.unitCost), 0);
-            computedAvgCost = totalQty > 0 ? Math.round(totalCost / totalQty * 100) / 100 : 0;
-            computedLastCost = Number(allReceives[0].unitCost); // first = most recent (desc order)
-        }
+        const computedAvgCost = Number(product.cost) || 0;
+        const computedLastCost = lastReceive ? Number(lastReceive.unitCost) : 0;
 
         // Serialize Decimal objects to plain values
         const result = JSON.parse(JSON.stringify(product));

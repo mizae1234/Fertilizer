@@ -270,14 +270,29 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
             const oldCost = Number(prod.cost);
 
             if (method === 'AVG') {
-                // Calculate weighted average from ALL GOODS_RECEIVE StockTransactions (same as product API)
-                const allReceives = await tx.stockTransaction.findMany({
-                    where: { productId, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
-                    select: { quantity: true, unitCost: true },
+                // Moving Weighted Average: use current product.cost + current stock balance
+                const grItem = gr.items.find(i => i.productId === productId);
+                if (!grItem) continue;
+
+                // Get total current stock across all warehouses for this product
+                const stockAgg = await tx.productStock.aggregate({
+                    where: { productId },
+                    _sum: { quantity: true },
                 });
-                const totalQty = allReceives.reduce((s, r) => s + r.quantity, 0);
-                const totalCost = allReceives.reduce((s, r) => s + r.quantity * Number(r.unitCost), 0);
-                const newAvgCost = totalQty > 0 ? Math.round(totalCost / totalQty * 100) / 100 : oldCost;
+                // Stock BEFORE this GR was added (subtract the GR qty we just added above)
+                const currentStock = (stockAgg._sum.quantity ?? 0) - grItem.quantity;
+                const newQty = grItem.quantity;
+                const newCost = Number(grItem.unitCost);
+
+                let newAvgCost: number;
+                if (currentStock <= 0) {
+                    // Stock was zero or negative — use the new incoming cost directly
+                    newAvgCost = newCost;
+                } else {
+                    // Moving weighted average
+                    newAvgCost = ((currentStock * oldCost) + (newQty * newCost)) / (currentStock + newQty);
+                }
+                newAvgCost = Math.round(newAvgCost * 100) / 100;
 
                 await tx.product.update({
                     where: { id: productId },
@@ -292,7 +307,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                         field: 'cost',
                         oldValue: String(oldCost),
                         newValue: String(parseFloat(newAvgCost.toFixed(2))),
-                        details: `อัพเดตต้นทุนเฉลี่ย จาก ฿${oldCost} → ฿${parseFloat(newAvgCost.toFixed(2))} (GR ${gr.grNumber})`,
+                        details: `อัพเดตต้นทุนเฉลี่ย จาก ฿${oldCost} → ฿${parseFloat(newAvgCost.toFixed(2))} (คงเหลือ ${currentStock} + รับใหม่ ${newQty} @ ฿${newCost}) (GR ${gr.grNumber})`,
                     },
                 });
             } else if (method === 'LAST') {
