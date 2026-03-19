@@ -954,30 +954,6 @@ export default function POSPage() {
                             <div className="flex-1" />
                             {/* Desktop: Customer + Search inline */}
                             <div className="hidden lg:flex items-center gap-3">
-                                {/* Quantity Preset Input */}
-                                <div className="flex items-center gap-1.5 shrink-0" title="จำนวนเริ่มต้น (กด * เพื่อเลือก)">
-                                    <label className="text-[10px] text-gray-500">จำนวน:</label>
-                                    <input
-                                        ref={qtyInputRef}
-                                        type="number"
-                                        value={defaultQty}
-                                        onChange={e => setDefaultQty(Math.max(1, parseInt(e.target.value) || 1))}
-                                        onFocus={e => e.target.select()}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') { e.preventDefault(); searchInputRef.current?.focus(); }
-                                            if (e.key === '*') { e.preventDefault(); }
-                                        }}
-                                        min={1}
-                                        className={`w-14 px-2 py-1.5 rounded-lg border text-sm font-bold text-center outline-none transition-all ${
-                                            defaultQty > 1
-                                                ? 'border-amber-400 bg-amber-50 text-amber-700 ring-2 ring-amber-200'
-                                                : 'border-gray-200 text-gray-700 focus:ring-2 focus:ring-emerald-500'
-                                        }`}
-                                    />
-                                    {defaultQty > 1 && (
-                                        <button onClick={() => setDefaultQty(1)} className="text-amber-400 hover:text-amber-600 text-xs" title="รีเซ็ตเป็น 1">✕</button>
-                                    )}
-                                </div>
                                 <div className="relative shrink-0">
                                     {selectedCustomer ? (
                                         <div className="flex items-center gap-2 bg-emerald-50 rounded-xl px-3 py-1.5">
@@ -1007,6 +983,30 @@ export default function POSPage() {
                                                 ))}
                                             </div>
                                         </div>
+                                    )}
+                                </div>
+                                {/* Quantity Preset Input */}
+                                <div className="flex items-center gap-1.5 shrink-0" title="จำนวนเริ่มต้น (กด * เพื่อเลือก)">
+                                    <label className="text-[10px] text-gray-500">จำนวน:</label>
+                                    <input
+                                        ref={qtyInputRef}
+                                        type="number"
+                                        value={defaultQty}
+                                        onChange={e => setDefaultQty(Math.max(1, parseInt(e.target.value) || 1))}
+                                        onFocus={e => e.target.select()}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') { e.preventDefault(); searchInputRef.current?.focus(); }
+                                            if (e.key === '*') { e.preventDefault(); }
+                                        }}
+                                        min={1}
+                                        className={`w-14 px-2 py-1.5 rounded-lg border text-sm font-bold text-center outline-none transition-all ${
+                                            defaultQty > 1
+                                                ? 'border-amber-400 bg-amber-50 text-amber-700 ring-2 ring-amber-200'
+                                                : 'border-gray-200 text-gray-700 focus:ring-2 focus:ring-emerald-500'
+                                        }`}
+                                    />
+                                    {defaultQty > 1 && (
+                                        <button onClick={() => setDefaultQty(1)} className="text-amber-400 hover:text-amber-600 text-xs" title="รีเซ็ตเป็น 1">✕</button>
                                     )}
                                 </div>
                                 <div ref={desktopSearchRef} className="relative w-[480px] shrink-0">
