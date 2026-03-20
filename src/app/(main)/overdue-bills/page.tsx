@@ -223,7 +223,7 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
                 </table>
 
                 {totalPages > 1 && (
-                    <Pagination page={page} totalPages={totalPages} basePath="/overdue-bills" params={{ status, from, to }} />
+                    <Pagination page={page} totalPages={totalPages} basePath="/overdue-bills" params={{ from, to, q, sort, order }} />
                 )}
             </div>
         </div>
