@@ -516,6 +516,7 @@ export default function POSPage() {
                     : c
             ));
             triggerPulse(product.id);
+            setDefaultQty(1);
         } else {
             // Auto-determine price based on customer group + unit
             let price = getPrice(product);
@@ -544,6 +545,7 @@ export default function POSPage() {
             setLastAddedId(product.id);
             setTimeout(() => setLastAddedId(null), 400);
             setTimeout(() => cartEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+            setDefaultQty(1);
         }
     };
 
@@ -614,6 +616,7 @@ export default function POSPage() {
         setLastAddedId(bundle.id);
         setTimeout(() => setLastAddedId(null), 400);
         setTimeout(() => cartEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        setDefaultQty(1);
     };
 
     const updateCartQty = (idx: number, qty: number) => {

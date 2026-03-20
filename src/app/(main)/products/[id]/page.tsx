@@ -22,6 +22,8 @@ interface StockTransaction {
     type: string;
     quantity: number;
     unitCost: number | string;
+    actualCost?: number;
+    sellingPrice?: number;
     reference: string | null;
     lotNo: string | null;
     notes: string | null;
@@ -959,6 +961,7 @@ export default function ProductDetailPage() {
                                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
                                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">คงเหลือ</th>
                                                     {user?.role === 'ADMIN' && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>}
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ราคาขาย</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">อ้างอิง</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ผู้ทำรายการ</th>
@@ -997,7 +1000,16 @@ export default function ProductDetailPage() {
                                                                 <td className="px-4 py-3 text-sm text-right font-medium text-gray-700">
                                                                     {bal.toLocaleString()}
                                                                 </td>
-                                                                {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(tx.unitCost))}</td>}
+                                                                {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm text-gray-800 text-right">
+                                                                    {(tx.type === 'SALE' || tx.type === 'SALE_CANCEL' || tx.type === 'SALE_RETURN')
+                                                                        ? (tx.actualCost != null ? formatCurrency(tx.actualCost) : <span className="text-gray-300">-</span>)
+                                                                        : formatCurrency(Number(tx.unitCost))}
+                                                                </td>}
+                                                                <td className="px-4 py-3 text-sm text-right">
+                                                                    {tx.type === 'SALE' || tx.type === 'SALE_CANCEL' || tx.type === 'SALE_RETURN'
+                                                                        ? <span className="text-blue-600 font-medium">{formatCurrency(tx.sellingPrice ?? Number(tx.unitCost))}</span>
+                                                                        : <span className="text-gray-300">-</span>}
+                                                                </td>
                                                                 <td className="px-4 py-3 text-xs text-gray-500">
                                                                     {tx.lotNo ? <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">{tx.lotNo}</span> : <span className="text-gray-300">-</span>}
                                                                 </td>
@@ -1036,7 +1048,11 @@ export default function ProductDetailPage() {
                                                         <span>{tx.warehouse.name}</span>
                                                     </div>
                                                     <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                                        <span>@ {formatCurrency(Number(tx.unitCost))}</span>
+                                                        <span>
+                                                            {(tx.type === 'SALE' || tx.type === 'SALE_CANCEL' || tx.type === 'SALE_RETURN')
+                                                                ? <span className="text-blue-600 font-medium">ราคาขาย {formatCurrency(tx.sellingPrice ?? Number(tx.unitCost))}</span>
+                                                                : <>@ {formatCurrency(Number(tx.unitCost))}</>}
+                                                        </span>
                                                         {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
                                                     </div>
                                                     {tx.lotNo && <p className="text-xs text-purple-600 mt-1">📋 Lot: {tx.lotNo}</p>}

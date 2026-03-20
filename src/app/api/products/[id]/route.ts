@@ -94,6 +94,38 @@ export async function GET(
         }
         result.computedAvgCost = computedAvgCost;
         result.computedLastCost = computedLastCost;
+
+        // Enrich SALE-type transactions with actual cost from SaleItem
+        const saleTxs = result.stockTransactions.filter(
+            (tx: any) => ['SALE', 'SALE_CANCEL', 'SALE_RETURN'].includes(tx.type) && tx.reference
+        );
+        if (saleTxs.length > 0) {
+            const saleNumbers = [...new Set(saleTxs.map((tx: any) => tx.reference))] as string[];
+            const saleItems = await prisma.saleItem.findMany({
+                where: {
+                    productId: id,
+                    sale: { saleNumber: { in: saleNumbers } },
+                },
+                select: {
+                    unitCost: true,
+                    unitPrice: true,
+                    sale: { select: { saleNumber: true } },
+                },
+            });
+            const costMap = new Map(
+                saleItems.map(si => [si.sale.saleNumber, { actualCost: Number(si.unitCost), sellingPrice: Number(si.unitPrice) }])
+            );
+            for (const tx of result.stockTransactions) {
+                if (['SALE', 'SALE_CANCEL', 'SALE_RETURN'].includes(tx.type) && tx.reference) {
+                    const info = costMap.get(tx.reference);
+                    if (info) {
+                        tx.actualCost = info.actualCost;
+                        tx.sellingPrice = info.sellingPrice;
+                    }
+                }
+            }
+        }
+
         return NextResponse.json(result);
     } catch (error: any) {
         console.error('Product GET error:', error.message);

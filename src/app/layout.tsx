@@ -21,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th">
-      <body className={inter.className}>{children}</body>
+    <html lang="th" suppressHydrationWarning>
+      <body className={inter.className} suppressHydrationWarning>{children}</body>
     </html>
   );
 }

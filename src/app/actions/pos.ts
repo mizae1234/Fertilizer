@@ -107,7 +107,7 @@ export async function createSaleFromPOS(data: {
                 });
 
                 // Deduct stock + create stock transactions in parallel per item
-                await Promise.all(data.items.map(async (item) => {
+                await Promise.all(data.items.map(async (item, idx) => {
                     const stockToDeduct = item.quantity * (item.conversionRate || 1);
                     await tx.productStock.upsert({
                         where: {
@@ -132,7 +132,7 @@ export async function createSaleFromPOS(data: {
                             warehouseId: item.warehouseId,
                             type: 'SALE',
                             quantity: -stockToDeduct,
-                            unitCost: item.unitPrice,
+                            unitCost: parseFloat(productCosts[idx].toFixed(2)),
                             reference: saleNumber,
                             userId: data.userId,
                             notes: `ขายสินค้า ${saleNumber}${(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
