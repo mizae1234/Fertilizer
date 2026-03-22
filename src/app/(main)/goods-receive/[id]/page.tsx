@@ -197,8 +197,27 @@ export default function GoodsReceiveDetailPage() {
 
     // Approve
     const handleApprove = async () => {
+        if (!vendorId) { showAlert('กรุณาเลือกผู้ขาย', 'warning', 'ข้อมูลไม่ครบ'); setShowApprove(false); return; }
+        const validItems = items.filter(i => i.productId && i.warehouseId && i.quantity > 0);
+        if (validItems.length === 0) { showAlert('กรุณาเพิ่มรายการสินค้า', 'warning', 'ข้อมูลไม่ครบ'); setShowApprove(false); return; }
+
         setActionLoading('approve');
         try {
+            // บันทึกการแก้ไขก่อนอนุมัติ
+            await updateGoodsReceive(id, {
+                vendorId,
+                poNumber: poNumber || undefined,
+                receivedDate,
+                notes: notes || undefined,
+                items: validItems.map(i => ({
+                    productId: i.productId,
+                    warehouseId: i.warehouseId,
+                    quantity: i.quantity,
+                    unitCost: i.unitCost,
+                    lotNo: i.lotNo || undefined,
+                })),
+            });
+
             await approveGoodsReceive(id, Object.keys(costMethodOverrides).length > 0 ? costMethodOverrides : undefined);
             router.push('/goods-receive');
         } catch (error) {
