@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 import * as XLSX from 'xlsx';
 
 export async function GET() {
+    const warehouses = await prisma.warehouse.findMany({ where: { isActive: true }, orderBy: { createdAt: 'asc' } });
+
     // Create template workbook
-    const headers = [
+    const baseHeaders = [
         'code',
         'name',
         'description',
@@ -15,10 +18,9 @@ export async function GET() {
         'price',
         'packaging',
         'productGroup',
-        'initialStock',
     ];
 
-    const thaiHeaders = [
+    const baseThaiHeaders = [
         'รหัสสินค้า',
         'ชื่อสินค้า *',
         'คำอธิบาย',
@@ -30,11 +32,16 @@ export async function GET() {
         'ราคาขาย',
         'บรรจุภัณฑ์',
         'หมวดหมู่สินค้า',
-        'สต็อกตั้งต้น',
     ];
 
+    const warehouseHeaders = warehouses.map(w => `stock_${w.id}`);
+    const warehouseThaiHeaders = warehouses.map(w => `สต็อกตั้งต้น: ${w.name}`);
+
+    const headers = [...baseHeaders, ...warehouseHeaders];
+    const thaiHeaders = [...baseThaiHeaders, ...warehouseThaiHeaders];
+
     // Example row
-    const example = [
+    const baseExample = [
         '00001',
         'ปุ๋ยยูเรีย 46-0-0',
         'ปุ๋ยเคมี สูตร 46-0-0',
@@ -46,13 +53,16 @@ export async function GET() {
         550,
         'ถุง 50 กก.',
         'ปุ๋ยเคมี',
-        100,
     ];
+    
+    // Add 100 stock for the first warehouse, and 0 for the rest
+    const warehouseExample = warehouses.map((_, i) => i === 0 ? 100 : 0);
+    const example = [...baseExample, ...warehouseExample];
 
     const ws = XLSX.utils.aoa_to_sheet([thaiHeaders, headers, example]);
 
     // Set col widths
-    ws['!cols'] = [
+    const baseCols = [
         { wch: 12 },
         { wch: 30 },
         { wch: 25 },
@@ -64,8 +74,10 @@ export async function GET() {
         { wch: 12 },
         { wch: 18 },
         { wch: 18 },
-        { wch: 12 },
     ];
+    
+    const warehouseCols = warehouses.map(() => ({ wch: 25 }));
+    ws['!cols'] = [...baseCols, ...warehouseCols];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Products');

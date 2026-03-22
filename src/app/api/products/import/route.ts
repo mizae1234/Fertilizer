@@ -20,9 +20,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'ไฟล์ Excel ต้องมีข้อมูลอย่างน้อย 1 แถว (ไม่นับ header)' }, { status: 400 });
         }
 
+        // Get active warehouses
+        const warehouses = await prisma.warehouse.findMany({ where: { isActive: true }, orderBy: { createdAt: 'asc' } });
+        if (warehouses.length === 0) {
+            return NextResponse.json({ error: 'ไม่พบคลังสินค้า กรุณาสร้างคลังสินค้าก่อน' }, { status: 400 });
+        }
+
         // Find the header row (look for the row that contains 'code' and 'name')
         let headerRowIdx = 0;
-        const fieldNames = ['code', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging', 'productGroup', 'initialStock'];
+        const baseFieldNames = ['code', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging', 'productGroup', 'initialStock'];
+        const warehouseFields = warehouses.map(w => `stock_${w.id}`);
+        const fieldNames = [...baseFieldNames, ...warehouseFields];
+        
         for (let i = 0; i < Math.min(rows.length, 5); i++) {
             const row = rows[i].map((c: any) => String(c).trim().toLowerCase());
             if (row.includes('code') && row.includes('name')) {
@@ -39,6 +48,10 @@ export async function POST(request: Request) {
             const idx = headerRow.indexOf(field.toLowerCase());
             if (idx !== -1) colMap[field] = idx;
         }
+
+        // Support for legacy default "initialStock" column
+        const legacyStockIdx = headerRow.indexOf('initialstock');
+        if (legacyStockIdx !== -1) colMap['initialStock'] = legacyStockIdx;
 
         if (!('name' in colMap)) {
             return NextResponse.json({ error: 'ไม่พบคอลัมน์ "name" ใน Excel — ต้องมีอย่างน้อย code และ name' }, { status: 400 });
@@ -149,31 +162,47 @@ export async function POST(request: Request) {
                 existingCodes.add(code.toLowerCase());
                 results.created++;
 
-                // Create initial stock if specified (allow negative values too)
-                const initialStock = Math.floor(parseNum(getValue('initialStock'), 0));
-                if (initialStock !== 0) {
-                    const costVal = parseNum(getValue('cost'), 0);
-                    const createdProduct = await prisma.product.findFirst({ where: { code }, select: { id: true } });
-                    if (createdProduct) {
-                        await prisma.productStock.create({
-                            data: {
-                                productId: createdProduct.id,
-                                warehouseId: defaultWarehouse.id,
-                                quantity: initialStock,
-                                avgCost: costVal,
-                                lastCost: costVal,
-                            },
-                        });
-                        await prisma.stockTransaction.create({
-                            data: {
-                                productId: createdProduct.id,
-                                warehouseId: defaultWarehouse.id,
-                                type: initialStock > 0 ? 'GOODS_RECEIVE' : 'ADJUSTMENT',
-                                quantity: initialStock,
-                                unitCost: costVal,
-                                notes: `สต็อกตั้งต้น (Import Excel)${initialStock < 0 ? ' — ติดลบ' : ''}`,
-                            },
-                        });
+                // Create initial stock for multiple warehouses
+                const costVal = parseNum(getValue('cost'), 0);
+                const createdProduct = await prisma.product.findFirst({ where: { code }, select: { id: true } });
+                
+                if (createdProduct) {
+                    for (let wIndex = 0; wIndex < warehouses.length; wIndex++) {
+                        const w = warehouses[wIndex];
+                        let stockVal = 0;
+                        
+                        const wStockStr = getValue(`stock_${w.id}`);
+                        if (wStockStr !== null) {
+                            stockVal = Math.floor(parseNum(wStockStr, 0));
+                        } else if (wIndex === 0 && colMap['initialStock'] !== undefined) {
+                            // Backwards compatibility for templates with a single "initialStock" column
+                            const legacyStockStr = getValue('initialStock');
+                            if (legacyStockStr !== null) {
+                                stockVal = Math.floor(parseNum(legacyStockStr, 0));
+                            }
+                        }
+
+                        if (stockVal !== 0) {
+                            await prisma.productStock.create({
+                                data: {
+                                    productId: createdProduct.id,
+                                    warehouseId: w.id,
+                                    quantity: stockVal,
+                                    avgCost: costVal,
+                                    lastCost: costVal,
+                                },
+                            });
+                            await prisma.stockTransaction.create({
+                                data: {
+                                    productId: createdProduct.id,
+                                    warehouseId: w.id,
+                                    type: stockVal > 0 ? 'GOODS_RECEIVE' : 'ADJUSTMENT',
+                                    quantity: stockVal,
+                                    unitCost: costVal,
+                                    notes: `สต็อกตั้งต้น (Import Excel)${stockVal < 0 ? ' — ติดลบ' : ''}`,
+                                },
+                            });
+                        }
                     }
                 }
             } catch (error: any) {

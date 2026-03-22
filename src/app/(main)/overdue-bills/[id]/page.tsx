@@ -35,7 +35,7 @@ export default async function OverdueBillDetailPage({ params }: Props) {
             id: item.id,
             productName: item.product.name,
             productCode: item.product.code,
-            unit: item.product.unit,
+            unit: item.unitName || item.product.unit,
             warehouseName: item.warehouse.name,
             quantity: item.quantity,
             unitPrice: Number(item.unitPrice),
@@ -133,7 +133,7 @@ export default async function OverdueBillDetailPage({ params }: Props) {
                                     <p className="text-sm text-gray-800">{item.product.name}</p>
                                     <p className="text-[11px] text-gray-400">{item.product.code}</p>
                                 </td>
-                                <td className="px-4 py-2.5 text-sm text-right text-gray-600">{item.quantity} {item.product.unit}</td>
+                                <td className="px-4 py-2.5 text-sm text-right text-gray-600">{item.quantity} {item.unitName || item.product.unit}</td>
                                 <td className="px-4 py-2.5 text-sm text-right text-gray-600">{formatCurrency(Number(item.unitPrice))}</td>
                                 <td className="px-4 py-2.5 text-sm text-right font-medium text-gray-800">{formatCurrency(Number(item.totalPrice))}</td>
                             </tr>
