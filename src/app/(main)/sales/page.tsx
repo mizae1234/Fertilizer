@@ -30,6 +30,7 @@ export default async function SalesPage({ searchParams }: Props) {
         where.OR = [
             { saleNumber: { contains: searchQuery, mode: 'insensitive' as const } },
             { customer: { name: { contains: searchQuery, mode: 'insensitive' as const } } },
+            { createdBy: { name: { contains: searchQuery, mode: 'insensitive' as const } } },
         ];
     }
 
@@ -112,12 +113,13 @@ export default async function SalesPage({ searchParams }: Props) {
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">รายการสินค้า</th>
                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">มูลค่า</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สถานะ</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้ทำรายการ</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">วันที่</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {sales.length === 0 ? (
-                            <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
+                            <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
                         ) : (
                             sales.map(sale => (
                                 <tr key={sale.id} className="hover:bg-gray-50">
@@ -157,6 +159,7 @@ export default async function SalesPage({ searchParams }: Props) {
                                     </td>
                                     <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(sale.totalAmount))}</td>
                                     <td className="px-4 py-3"><StatusBadge status={sale.status} /></td>
+                                    <td className="px-4 py-3 text-sm text-gray-500">{sale.createdBy?.name || '-'}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(sale.createdAt)}</td>
                                 </tr>
                             ))

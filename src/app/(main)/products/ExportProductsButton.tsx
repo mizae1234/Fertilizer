@@ -1,15 +1,26 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import * as XLSX from 'xlsx';
 
 export default function ExportProductsButton() {
     const [loading, setLoading] = useState(false);
+    const currentParams = useSearchParams();
 
     const handleExport = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/products/export');
+            // Forward current search/filter params to the export API
+            const params = new URLSearchParams();
+            const search = currentParams.get('search');
+            const warehouse = currentParams.get('warehouse');
+            const group = currentParams.get('group');
+            if (search) params.set('search', search);
+            if (warehouse) params.set('warehouse', warehouse);
+            if (group) params.set('group', group);
+
+            const res = await fetch(`/api/products/export?${params.toString()}`);
             const products = await res.json();
 
             const rows = products.map((p: any) => {

@@ -235,13 +235,32 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
     };
     const handleExportCustomers = () => {
         if (!customerData) return;
-        exportToExcel(customerData.map(c => ({ 'ชื่อลูกค้า': c.name, 'กลุ่ม': c.group, 'โทร': c.phone, 'จำนวนบิล': c.orderCount, 'ยอดซื้อรวม': c.totalAmount })),
+        const cq = customerSearch.toLowerCase().trim();
+        const filtered = cq ? customerData.filter(c => c.name.toLowerCase().includes(cq) || c.group.toLowerCase().includes(cq)) : customerData;
+        exportToExcel(filtered.map(c => ({ 'ชื่อลูกค้า': c.name, 'กลุ่ม': c.group, 'โทร': c.phone, 'จำนวนบิล': c.orderCount, 'ยอดซื้อรวม': c.totalAmount })),
             `รายงานลูกค้า_${dateFrom || 'all'}_${dateTo || 'all'}`);
     };
     const handleExportDetail = () => {
         if (!detailData) return;
+        // Apply same filters as the display
+        const q = detailSearch.toLowerCase().trim();
+        const filtered = detailData
+            .map(sale => {
+                const items = sale.items.filter(item => {
+                    if (detailWarehouse && item.warehouse !== detailWarehouse) return false;
+                    return true;
+                });
+                if (items.length === 0) return null;
+                if (q) {
+                    const saleMatch = sale.saleNumber.toLowerCase().includes(q) || sale.customer.toLowerCase().includes(q);
+                    const itemMatch = items.some(i => i.productName.toLowerCase().includes(q) || i.productCode.toLowerCase().includes(q));
+                    if (!saleMatch && !itemMatch) return null;
+                }
+                return { ...sale, items };
+            })
+            .filter(Boolean) as typeof detailData;
         const rows: Record<string, unknown>[] = [];
-        for (const s of detailData) {
+        for (const s of filtered) {
             for (const item of s.items) {
                 rows.push({
                     'เลขที่': s.saleNumber, 'ลูกค้า': s.customer, 'วันที่': new Date(s.createdAt).toLocaleDateString('th-TH'), 'ชำระ': s.paymentMethod,
@@ -621,7 +640,9 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
 
     const handleExportDetail = () => {
         if (!detailData) return;
-        exportToExcel(detailData.map(d => ({
+        const q = detailSearch.toLowerCase().trim();
+        const filtered = q ? detailData.filter(d => d.productName.toLowerCase().includes(q) || d.productCode.toLowerCase().includes(q)) : detailData;
+        exportToExcel(filtered.map(d => ({
             'รหัส': d.productCode, 'สินค้า': d.productName, 'ขายไป': d.qtySold,
             'ยอดขาย': d.revenue, 'ต้นทุน': d.cogs, 'กำไร': d.profit,
             'Margin%': Math.round(d.margin * 100) / 100, 'คงเหลือ': d.stockRemaining,
@@ -877,8 +898,10 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
 
     const handleExportPnlBill = () => {
         if (!pnlDetail) return;
-        exportToExcel(pnlDetail.byBill.map(b => ({
-            'เลขที่บิล': b.saleNumber, 'ลูกค้า': b.customer, 'วันที่': formatDate(b.createdAt),
+        const q = pnlBillSearch.toLowerCase().trim();
+        const filtered = q ? pnlDetail.byBill.filter(b => b.saleNumber.toLowerCase().includes(q) || b.customer.toLowerCase().includes(q) || (b.createdByName || '').toLowerCase().includes(q)) : pnlDetail.byBill;
+        exportToExcel(filtered.map(b => ({
+            'เลขที่บิล': b.saleNumber, 'ลูกค้า': b.customer, 'ผู้ทำรายการ': b.createdByName || '-', 'วันที่': formatDate(b.createdAt),
             'รายการ': b.itemCount, 'ยอดขาย': b.revenue, 'ต้นทุน': b.cogs,
             'กำไร': b.profit, 'Margin%': Math.round(b.margin * 100) / 100,
         })), `PnL_รายบิล_${dateFrom || 'all'}_${dateTo || 'all'}`);
@@ -886,8 +909,10 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
 
     const handleExportPnlItem = () => {
         if (!pnlDetail) return;
-        exportToExcel(pnlDetail.byItem.map(i => ({
-            'เลขที่บิล': i.saleNumber, 'ลูกค้า': i.customer, 'สินค้า': i.productName,
+        const q = pnlItemSearch.toLowerCase().trim();
+        const filtered = q ? pnlDetail.byItem.filter(i => i.saleNumber.toLowerCase().includes(q) || i.customer.toLowerCase().includes(q) || i.productName.toLowerCase().includes(q) || i.productCode.toLowerCase().includes(q) || (i.createdByName || '').toLowerCase().includes(q)) : pnlDetail.byItem;
+        exportToExcel(filtered.map(i => ({
+            'เลขที่บิล': i.saleNumber, 'ลูกค้า': i.customer, 'ผู้ทำรายการ': i.createdByName || '-', 'สินค้า': i.productName,
             'รหัส': i.productCode, 'จำนวน': i.quantity, 'ราคาขาย': i.unitPrice,
             'ต้นทุน/หน่วย': i.unitCost, 'ยอดขาย': i.revenue, 'ต้นทุน': i.cogs,
             'กำไร': i.profit, 'Margin%': Math.round(i.margin * 100) / 100,
@@ -907,9 +932,17 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
 
     const handleExportAR = () => {
         if (!cashData) return;
+        const aq = arSearch.toLowerCase().trim();
+        const filterItem = (item: { dueDate?: string | null; saleNumber: string }, customer: string) => {
+            if (aq && !customer.toLowerCase().includes(aq) && !item.saleNumber.toLowerCase().includes(aq)) return false;
+            if (arDueFilter === 'overdue' && (!item.dueDate || new Date(item.dueDate) >= new Date())) return false;
+            if (arDueFilter === 'upcoming' && (!item.dueDate || new Date(item.dueDate) < new Date())) return false;
+            return true;
+        };
         const rows: Record<string, unknown>[] = [];
         for (const cust of cashData.ar.byCustomer) {
             for (const item of cust.items) {
+                if (!filterItem(item, cust.customer)) continue;
                 rows.push({ 'ลูกค้า': cust.customer, 'เลขที่': item.saleNumber, 'ยอดเครดิต': item.amount, 'ชำระแล้ว': item.paidAmount, 'คงเหลือ': item.remainingAmount, 'กำหนดชำระ': item.dueDate ? new Date(item.dueDate).toLocaleDateString('th-TH') : '-' });
             }
         }
@@ -970,7 +1003,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
 
                     {section === 'pnl-bill' && pnlDetail && (() => {
                         const q = pnlBillSearch.toLowerCase().trim();
-                        const filtered = q ? pnlDetail.byBill.filter(b => b.saleNumber.toLowerCase().includes(q) || b.customer.toLowerCase().includes(q)) : pnlDetail.byBill;
+                        const filtered = q ? pnlDetail.byBill.filter(b => b.saleNumber.toLowerCase().includes(q) || b.customer.toLowerCase().includes(q) || (b.createdByName || '').toLowerCase().includes(q)) : pnlDetail.byBill;
                         const totalPages = Math.ceil(filtered.length / PNL_PAGE_SIZE);
                         const paged = filtered.slice((pnlBillPage - 1) * PNL_PAGE_SIZE, pnlBillPage * PNL_PAGE_SIZE);
                         const totalRevenue = filtered.reduce((s, b) => s + b.revenue, 0);
@@ -1013,6 +1046,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                                     <thead><tr className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
                                                         <th className="text-left py-2 px-2 font-medium">เลขที่บิล</th>
                                                         <th className="text-left py-2 px-2 font-medium">ลูกค้า</th>
+                                                        <th className="text-left py-2 px-2 font-medium">ผู้ทำรายการ</th>
                                                         <th className="text-left py-2 px-2 font-medium">วันที่</th>
                                                         <th className="text-right py-2 px-2 font-medium">รายการ</th>
                                                         <th className="text-right py-2 px-2 font-medium">ยอดขาย</th>
@@ -1025,6 +1059,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                                             <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                                                                 <td className="py-1.5 px-2 text-blue-600 font-medium">{b.saleNumber}</td>
                                                                 <td className="py-1.5 px-2 text-gray-700">{b.customer}</td>
+                                                                <td className="py-1.5 px-2 text-gray-500 text-xs">{b.createdByName || '-'}</td>
                                                                 <td className="py-1.5 px-2 text-gray-400 text-xs">{formatDate(b.createdAt)}</td>
                                                                 <td className="py-1.5 px-2 text-right text-gray-500">{b.itemCount}</td>
                                                                 <td className="py-1.5 px-2 text-right text-emerald-600 font-medium">{formatCurrency(b.revenue)}</td>
@@ -1046,7 +1081,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
 
                     {section === 'pnl-item' && pnlDetail && (() => {
                         const q = pnlItemSearch.toLowerCase().trim();
-                        const filtered = q ? pnlDetail.byItem.filter(i => i.saleNumber.toLowerCase().includes(q) || i.customer.toLowerCase().includes(q) || i.productName.toLowerCase().includes(q) || i.productCode.toLowerCase().includes(q)) : pnlDetail.byItem;
+                        const filtered = q ? pnlDetail.byItem.filter(i => i.saleNumber.toLowerCase().includes(q) || i.customer.toLowerCase().includes(q) || i.productName.toLowerCase().includes(q) || i.productCode.toLowerCase().includes(q) || (i.createdByName || '').toLowerCase().includes(q)) : pnlDetail.byItem;
                         const totalPages = Math.ceil(filtered.length / PNL_PAGE_SIZE);
                         const paged = filtered.slice((pnlItemPage - 1) * PNL_PAGE_SIZE, pnlItemPage * PNL_PAGE_SIZE);
                         const totalRevenue = filtered.reduce((s, i) => s + i.revenue, 0);
@@ -1090,6 +1125,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                                         <th className="text-left py-2 px-2 font-medium">เลขที่บิล</th>
                                                         <th className="text-left py-2 px-2 font-medium">วันที่ขาย</th>
                                                         <th className="text-left py-2 px-2 font-medium">ลูกค้า</th>
+                                                        <th className="text-left py-2 px-2 font-medium">ผู้ทำรายการ</th>
                                                         <th className="text-left py-2 px-2 font-medium">สินค้า</th>
                                                         <th className="text-left py-2 px-2 font-medium">รหัส</th>
                                                         <th className="text-right py-2 px-2 font-medium">จำนวน</th>
@@ -1106,6 +1142,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                                                 <td className="py-1.5 px-2 text-blue-600 font-medium">{item.saleNumber}</td>
                                                                 <td className="py-1.5 px-2 text-gray-400 text-xs">{formatDate(item.createdAt)}</td>
                                                                 <td className="py-1.5 px-2 text-gray-700">{item.customer}</td>
+                                                                <td className="py-1.5 px-2 text-gray-500 text-xs">{item.createdByName || '-'}</td>
                                                                 <td className="py-1.5 px-2 text-gray-700 font-medium">{item.productName}</td>
                                                                 <td className="py-1.5 px-2 text-gray-400">{item.productCode}</td>
                                                                 <td className="py-1.5 px-2 text-right text-gray-700">{item.quantity}</td>

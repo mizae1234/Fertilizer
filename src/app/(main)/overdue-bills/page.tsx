@@ -37,6 +37,7 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
         where.OR = [
             { saleNumber: { contains: q, mode: 'insensitive' } },
             { customer: { name: { contains: q, mode: 'insensitive' } } },
+            { createdBy: { name: { contains: q, mode: 'insensitive' } } },
         ];
     }
 
@@ -179,12 +180,13 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">ค้างจ่าย</th>
                             <SortableHeader label="กำหนดชำระ" field="creditDueDate" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สถานะ</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้ทำรายการ</th>
                             <SortableHeader label="วันที่ขาย" field="createdAt" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {sales.length === 0 ? (
-                            <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
+                            <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
                         ) : (
                             sales.map(sale => {
                                 const daysOverdue = getDaysOverdue(sale.creditDueDate);
@@ -214,6 +216,7 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
                                                 {isOverdue ? '🔴' : '🟢'} {getOverdueLabel(daysOverdue)}
                                             </span>
                                         </td>
+                                        <td className="px-4 py-3 text-sm text-gray-500">{sale.createdBy?.name || '-'}</td>
                                         <td className="px-4 py-3 text-sm text-gray-500">{formatDate(sale.createdAt)}</td>
                                     </tr>
                                 );

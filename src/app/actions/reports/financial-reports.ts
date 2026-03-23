@@ -298,6 +298,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
             totalAmount: true,
             createdAt: true,
             customer: { select: { name: true } },
+            createdBy: { select: { name: true } },
             items: {
                 select: {
                     id: true,
@@ -342,6 +343,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
         return {
             saleNumber: sale.saleNumber,
             customer: sale.customer?.name || '-',
+            createdByName: sale.createdBy?.name || '-',
             createdAt: sale.createdAt.toISOString(),
             itemCount: sale.items.length,
             revenue,
@@ -373,6 +375,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
                 return {
                     saleNumber: sale.saleNumber,
                     customer: sale.customer?.name || '-',
+                    createdByName: sale.createdBy?.name || '-',
                     createdAt: sale.createdAt.toISOString(),
                     productName: item.product.name,
                     productCode: item.product.code,
@@ -386,7 +389,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
                 };
             })
             .filter(Boolean) as {
-                saleNumber: string; customer: string; createdAt: string;
+                saleNumber: string; customer: string; createdByName: string; createdAt: string;
                 productName: string; productCode: string; quantity: number;
                 unitPrice: number; unitCost: number; revenue: number;
                 cogs: number; profit: number; margin: number;
