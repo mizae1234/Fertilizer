@@ -97,6 +97,7 @@ const txTypeLabels: Record<string, { label: string; color: string; icon: string 
     TRANSFER_OUT: { label: 'โอนออก', color: 'text-orange-700 bg-orange-50', icon: '➡️' },
     ADJUSTMENT: { label: 'ปรับ', color: 'text-gray-700 bg-gray-50', icon: '🔧' },
     FACTORY_RETURN: { label: 'เคลมคืน', color: 'text-red-700 bg-red-50', icon: '🔙' },
+    WITHDRAWAL: { label: 'เบิกจ่าย', color: 'text-violet-700 bg-violet-50', icon: '📤' },
 };
 
 export default function ProductDetailPage() {
@@ -976,12 +977,13 @@ export default function ProductDetailPage() {
                                                     const rows = product.stockTransactions.map(tx => {
                                                         const currentBalance = balance;
                                                         // Reverse the effect: newest tx first, so subtract its effect to get previous balance
-                                                        const isOut = tx.type === 'SALE' || tx.type === 'TRANSFER_OUT';
+                                                        const isOut = tx.quantity < 0;
                                                         balance = balance + (isOut ? Math.abs(tx.quantity) : -Math.abs(tx.quantity));
                                                         return { tx, balance: currentBalance };
                                                     });
                                                     return rows.map(({ tx, balance: bal }) => {
                                                         const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
+                                                        const isOut = tx.quantity < 0;
                                                         return (
                                                             <tr key={tx.id} className="hover:bg-gray-50">
                                                                 <td className="px-4 py-3 text-sm text-gray-600">{formatDateTime(tx.createdAt)}</td>
@@ -992,8 +994,8 @@ export default function ProductDetailPage() {
                                                                 </td>
                                                                 <td className="px-4 py-3 text-sm text-gray-600">{tx.warehouse.name}</td>
                                                                 <td className="px-4 py-3 text-sm text-right">
-                                                                    <span className={tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}>
-                                                                        {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
+                                                                    <span className={isOut ? 'text-red-600' : 'text-emerald-600'}>
+                                                                        {isOut ? '-' : '+'}
                                                                         {Math.abs(tx.quantity).toLocaleString()} {product.unit}
                                                                     </span>
                                                                 </td>
@@ -1032,14 +1034,15 @@ export default function ProductDetailPage() {
                                     <div className="sm:hidden divide-y divide-gray-50">
                                         {product.stockTransactions.map(tx => {
                                             const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
+                                            const isOut = tx.quantity < 0;
                                             return (
                                                 <div key={tx.id} className="p-4">
                                                     <div className="flex items-center justify-between mb-2">
                                                         <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
                                                             {info.icon} {info.label}
                                                         </span>
-                                                        <span className={`text-sm font-bold ${tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? 'text-red-600' : 'text-emerald-600'}`}>
-                                                            {tx.type === 'SALE' || tx.type === 'TRANSFER_OUT' ? '-' : '+'}
+                                                        <span className={`text-sm font-bold ${isOut ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                            {isOut ? '-' : '+'}
                                                             {Math.abs(tx.quantity).toLocaleString()} {product.unit}
                                                         </span>
                                                     </div>
