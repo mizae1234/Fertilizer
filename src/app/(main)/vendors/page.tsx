@@ -20,7 +20,7 @@ export default async function VendorsPage({ searchParams }: Props) {
         where.OR = [
             { name: { contains: searchQuery } },
             { phone: { contains: searchQuery } },
-            { contactName: { contains: searchQuery } },
+            { lineId: { contains: searchQuery } },
         ];
     }
 
