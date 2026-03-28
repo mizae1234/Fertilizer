@@ -50,7 +50,7 @@ prisma/
 |------|--------|
 | `UserRole` | `ADMIN`, `STAFF` |
 | `OrderStatus` | `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED` |
-| `TransactionType` | `GOODS_RECEIVE`, `SALE`, `SALE_CANCEL`, `SALE_RETURN`, `TRANSFER_IN`, `TRANSFER_OUT`, `ADJUSTMENT`, `FACTORY_RETURN` |
+| `TransactionType` | `GOODS_RECEIVE`, `SALE`, `SALE_CANCEL`, `SALE_RETURN`, `TRANSFER_IN`, `TRANSFER_OUT`, `ADJUSTMENT`, `FACTORY_RETURN`, `WITHDRAWAL` |
 
 ### Core Models
 
@@ -108,13 +108,15 @@ prisma/
 | `DebtPayment` | ชำระหนี้: saleId, amount, method, dueDate |
 | `DebtInterest` | ดอกเบี้ย: saleId, percentage, baseAmount, amount |
 
-### Transfer & Adjustment Models
+### Transfer, Adjustment & Withdrawal Models
 
 | Model | Description |
 |-------|-------------|
 | `StockTransfer` | โอนย้ายสินค้า: transferNumber, fromWarehouseId, toWarehouseId, status |
 | `StockTransferItem` | รายการโอน: productId, warehouseId, quantity |
-| `StockTransaction` | ทุก stock movement: productId, warehouseId, type(TransactionType), quantity, unitCost, reference, lotNo |
+| `StockTransaction` | ทุก stock movement: productId, warehouseId, type(TransactionType), quantity(positive/negative), unitCost, reference, lotNo |
+| `StockWithdrawal` | เบิกสินค้า: withdrawalNumber, requesterName, approverName, notes, status |
+| `StockWithdrawalItem` | รายการเบิก: productId, warehouseId, quantity, unitCost |
 
 ### Factory Return & Quotation Models
 
@@ -232,6 +234,12 @@ prisma/
 |----------|--------|-------------|
 | `getStockAdjustments(page, search, from, to)` | page=1 | List ADJUSTMENT type transactions |
 | `createStockAdjustment(data)` | {adjustmentType(increase/decrease), note, items[], userId} | Adjust stock + create StockTransaction(ADJUSTMENT) |
+
+### stock-withdrawals.ts — เบิกสินค้า
+| Function | Params | Description |
+|----------|--------|-------------|
+| `getStockWithdrawals(page, search, from, to)` | page=1 | List withdrawals with date filtering |
+| `createStockWithdrawal(data)` | {requesterName, approverName, note, items[], userId} | Deduct stock + create StockTransaction(WITHDRAWAL) |
 
 ### customers.ts — ลูกค้า
 | Function | Params | Description |
@@ -369,7 +377,7 @@ prisma/
 |----------|-------------|
 | `generateNumber(prefix)` | Generate `PREFIX-YYYY-XXXXXXXX` format (e.g. `SL-2026-00000001`) |
 
-Prefix mapping: SL→Sale, QT→Quotation, EXP→Expense, TF→Transfer, ADJ→StockAdjustment, GR→GoodsReceive, FR→FactoryReturn, RT→SaleReturn
+Prefix mapping: SL→Sale, QT→Quotation, EXP→Expense, TF→StockTransfer, ADJ→StockTransaction(reference), GR→GoodsReceive, FR→FactoryReturn, RT→SaleReturn, WD→StockWithdrawal
 
 ### utils.ts
 | Function | Description |
@@ -476,6 +484,8 @@ Prefix mapping: SL→Sale, QT→Quotation, EXP→Expense, TF→Transfer, ADJ→S
 | `/transfers` | Transfers | โอนย้ายสินค้า list |
 | `/transfers/new` | New Transfer | สร้างใบโอน |
 | `/stock-adjustments` | Stock Adjustments | ปรับปรุง Stock list + create |
+| `/stock-withdrawals` | Stock Withdrawals | เบิกสินค้า list |
+| `/stock-withdrawals/new` | New Withdrawal | สร้างใบเบิกสินค้า |
 | `/factory-returns` | Factory Returns | เคลมคืนโรงงาน list |
 | `/factory-returns/new` | New FR | สร้างเคลมคืน |
 | `/quotations` | Quotations | ใบเสนอราคา list |
@@ -538,4 +548,6 @@ When a site needs to be reset (e.g., clearing test data while keeping master con
 If a Server Action throws an unhandled database error (e.g., `PrismaClientKnownRequestError: Unique constraint failed`), Next.js 14+ masks the error in production builds with the message:
 `An error occurred in the Server Components render. The specific message is omitted in production builds...`
 
-**Example Case:** `generateNumber.ts` had a typo mapping the prefix `TF` to a non-existent Prisma model `Transfer` (instead of `StockTransfer`). The function caught the `undefined` error silently and continuously returned the first number `TF-XXX-00000001`. The second transfer attempt violated the `@unique` constraint in the database, causing the action to fail and throw the masked Next.js error into the client's `AlertModal`.
+**Example Case 1:** `generateNumber.ts` had a typo mapping the prefix `TF` to a non-existent Prisma model `Transfer` (instead of `StockTransfer`). The function caught the `undefined` error silently and continuously returned the first number `TF-XXX-00000001`. The second transfer attempt violated the `@unique` constraint in the database, causing the action to fail and throw the masked Next.js error into the client's `AlertModal`.
+
+**Example Case 2:** The prefix `ADJ` was mapped to a non-existent `StockAdjustment` model. The same fallback logic occurred, causing multiple separate adjustment groups to silently share identical IDs (`ADJ-2026-00000001`) without explicitly crashing, since `StockTransaction.reference` is not constrained by `@unique`. This is resolved by querying `StockTransaction` by the `reference` schema field.
