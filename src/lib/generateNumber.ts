@@ -10,6 +10,7 @@ const PREFIX_TABLE_MAP: Record<string, { table: string; column: string }> = {
     GR: { table: 'GoodsReceive', column: 'grNumber' },
     FR: { table: 'FactoryReturn', column: 'returnNumber' },
     RT: { table: 'SaleReturn', column: 'returnNumber' },
+    WD: { table: 'StockWithdrawal', column: 'withdrawalNumber' },
 };
 
 /**

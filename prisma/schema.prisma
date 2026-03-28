@@ -28,6 +28,7 @@ enum TransactionType {
   TRANSFER_OUT
   ADJUSTMENT
   FACTORY_RETURN
+  WITHDRAWAL
 }
 
 // ============ Users ============
@@ -55,6 +56,7 @@ model User {
   saleReturns       SaleReturn[]
   saleEditLogs      SaleEditLog[]
   quotations        Quotation[]
+  stockWithdrawals  StockWithdrawal[]
 }
 
 // ============ Warehouse ============
@@ -79,6 +81,7 @@ model Warehouse {
   factoryReturnItems    FactoryReturnItem[]
   defaultWarehouseUsers User[]              @relation("UserDefaultWarehouse")
   saleReturnItems       SaleReturnItem[]
+  stockWithdrawalItems  StockWithdrawalItem[]
 }
 
 // ============ Receipt Templates ============
@@ -147,6 +150,7 @@ model Product {
   factoryReturnItems FactoryReturnItem[]
   saleReturnItems    SaleReturnItem[]
   quotationItems     QuotationItem[]
+  stockWithdrawalItems StockWithdrawalItem[]
 }
 
 // ============ Product Audit Log ============
@@ -624,4 +628,37 @@ model QuotationItem {
 
   quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   product   Product   @relation(fields: [productId], references: [id])
+}
+
+// ============ Stock Withdrawals (เบิกสินค้า) ============
+model StockWithdrawal {
+  id               String      @id @default(cuid())
+  withdrawalNumber String      @unique
+  requesterName    String      // ผู้เบิกสินค้า (free text)
+  status           OrderStatus @default(APPROVED)
+  totalAmount      Decimal     @default(0) @db.Decimal(12, 2)
+  notes            String?
+  approverName     String?     // ผู้อนุมัติการเบิก
+  withdrawerName   String?     // ผู้ขอเบิกสินค้า
+  createdById      String
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  deletedAt        DateTime?
+
+  createdBy User                  @relation(fields: [createdById], references: [id])
+  items     StockWithdrawalItem[]
+}
+
+model StockWithdrawalItem {
+  id                String  @id @default(cuid())
+  stockWithdrawalId String
+  productId         String
+  warehouseId       String
+  quantity          Int
+  unitCost          Decimal @db.Decimal(12, 2)
+  totalCost         Decimal @db.Decimal(12, 2)
+
+  stockWithdrawal StockWithdrawal @relation(fields: [stockWithdrawalId], references: [id], onDelete: Cascade)
+  product         Product         @relation(fields: [productId], references: [id])
+  warehouse       Warehouse       @relation(fields: [warehouseId], references: [id])
 }

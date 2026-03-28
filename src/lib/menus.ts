@@ -31,6 +31,7 @@ export const MENU_GROUPS = [
             { name: 'โอนย้ายสินค้า', href: '/transfers', icon: '🔄' },
             { name: 'ปรับปรุง Stock', href: '/stock-adjustments', icon: '📉' },
             { name: 'เคลมคืนโรงงาน', href: '/factory-returns', icon: '🔙' },
+            { name: 'เบิกสินค้า', href: '/stock-withdrawals', icon: '📤' },
             { name: 'ใบเสนอราคา', href: '/quotations', icon: '📋' },
             { name: 'บันทึกรายจ่าย', href: '/expenses', icon: '💸' },
         ],
