@@ -6,7 +6,7 @@ const PREFIX_TABLE_MAP: Record<string, { table: string; column: string }> = {
     QT: { table: 'Quotation', column: 'quotationNumber' },
     EXP: { table: 'Expense', column: 'expenseNumber' },
     TF: { table: 'StockTransfer', column: 'transferNumber' },
-    ADJ: { table: 'StockAdjustment', column: 'adjustmentNumber' },
+    ADJ: { table: 'StockTransaction', column: 'reference' },
     GR: { table: 'GoodsReceive', column: 'grNumber' },
     FR: { table: 'FactoryReturn', column: 'returnNumber' },
     RT: { table: 'SaleReturn', column: 'returnNumber' },
