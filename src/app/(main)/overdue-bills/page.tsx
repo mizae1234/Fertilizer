@@ -100,8 +100,19 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
         return { paidAmount, remaining: remaining > 0 ? remaining : 0 };
     };
 
-    // Filter out fully-paid bills
-    const unpaidSales = allSales.filter(sale => getPaymentSplit(sale).remaining > 0);
+    // Filter out fully-paid bills (use same tolerance as debt.ts isPaidOff: <= 0.01)
+    const unpaidSales = allSales.filter(sale => getPaymentSplit(sale).remaining > 0.01);
+
+    // Auto-fix: mark any fully-paid bills as 'PAID' if they were missed
+    const paidButNotMarked = allSales.filter(sale =>
+        getPaymentSplit(sale).remaining <= 0.01 && sale.paymentMethod !== 'PAID'
+    );
+    if (paidButNotMarked.length > 0) {
+        await Promise.all(paidButNotMarked.map(sale =>
+            prisma.sale.update({ where: { id: sale.id }, data: { paymentMethod: 'PAID' } })
+        ));
+    }
+
     const total = unpaidSales.length;
     const totalPages = Math.ceil(total / perPage);
     const sales = unpaidSales.slice((page - 1) * perPage, page * perPage);
