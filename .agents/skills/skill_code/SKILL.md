@@ -519,7 +519,7 @@ Prefix mapping: SL→Sale, QT→Quotation, EXP→Expense, TF→StockTransfer, AD
 
 1. **Soft Delete**: Most models use `deletedAt` field, filter with `deletedAt: null`
 2. **Number Generation**: `generateNumber(prefix)` → `PREFIX-YYYY-XXXXXXXX` with collision retry
-3. **Stock Flow**: All stock changes recorded in `StockTransaction` with appropriate `TransactionType`
+3. **Stock Flow**: All stock changes recorded in `StockTransaction` with appropriate `TransactionType`. *UI Note: When rendering stock history (+/-), always rely on `quantity > 0` vs `quantity < 0` instead of hardcoding transaction types to ensure accuracy across complex mappings (e.g. Withdrawals, Factory Returns).*
 4. **Cost Calculation**: Product cost tracked via `costMethod` (AVG/LAST/MANUAL), auto-updated on GR approval
 5. **Auth**: JWT cookie-based, parsed client-side via `useUser()`, server-side via `getServerUser()`
 6. **Pagination**: Standard pattern with `page`, `perPage=10`, returns `{ data, totalPages }`
@@ -536,7 +536,7 @@ Prefix mapping: SL→Sale, QT→Quotation, EXP→Expense, TF→StockTransfer, AD
 When a site needs to be reset (e.g., clearing test data while keeping master configurations), **NEVER drop/recreate the entire database**, as it destroys users and shop settings. Instead, execute precise `DELETE` statements in the following foreign-key-safe order:
 1. `SaleReturnItem`, `SaleReturn`, `SaleEditLog`, `DebtPayment`, `DebtInterest`, `SaleItem`, `Sale`
 2. `GoodsReceiveItem`, `GoodsReceive`
-3. `StockTransferItem`, `StockTransfer`
+3. `StockTransferItem`, `StockTransfer`, `StockWithdrawalItem`, `StockWithdrawal`
 4. `FactoryReturnItem`, `FactoryReturn`
 5. `QuotationItem`, `Quotation`
 6. `StockTransaction`, `ProductStock`

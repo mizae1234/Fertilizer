@@ -573,6 +573,14 @@ export default function POSPage() {
             };
         });
 
+        // Rounding adjustment: ensure sub-item totals sum to exactly bundlePrice
+        const subTotal = subItems.reduce((s, si) => s + si.quantity * si.unitPrice, 0);
+        const roundingDiff = Math.round((bundlePrice - subTotal) * 100) / 100;
+        if (roundingDiff !== 0 && subItems.length > 0) {
+            const lastItem = subItems[subItems.length - 1];
+            lastItem.unitPrice = Math.round((lastItem.unitPrice + roundingDiff / lastItem.quantity) * 100) / 100;
+        }
+
         // Check if same bundle already in cart → increment qty
         const existing = cart.find(c => c.isBundle && c.bundleId === bundle.id);
         if (existing) {
@@ -581,7 +589,7 @@ export default function POSPage() {
                     ? {
                         ...c,
                         quantity: c.quantity + 1,
-                        bundleItems: c.bundleItems?.map(si => ({ ...si, quantity: si.quantity / (c.quantity) * (c.quantity + 1) })),
+                        // bundleItems keep per-1-bundle quantities; confirmPayment multiplies by c.quantity
                     }
                     : c
             ));
