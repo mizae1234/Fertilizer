@@ -634,11 +634,23 @@ export default function POSPage() {
         triggerPulse(item.productId);
     };
 
-    const updateCartWarehouse = (idx: number, warehouseId: string) => {
-        const item = cart[idx];
-        const product = products.find(p => p.id === item.productId);
-        const stock = product ? getStock(product, warehouseId) : 0;
-        setCart(cart.map((c, i) => i === idx ? { ...c, warehouseId, availableStock: stock } : c));
+    const updateCartWarehouse = async (idx: number, warehouseId: string) => {
+        // Update warehouse immediately, then fetch real stock from API
+        setCart(prev => prev.map((c, i) => i === idx ? { ...c, warehouseId } : c));
+        try {
+            const item = cart[idx];
+            const res = await fetch(`/api/products?search=${encodeURIComponent(item.productCode)}&warehouseId=${warehouseId}`);
+            const data = await res.json();
+            const product = Array.isArray(data) ? data.find((p: any) => p.id === item.productId) : null;
+            const stock = product?.productStocks?.[0]?.quantity ?? 0;
+            setCart(prev => prev.map((c, i) => i === idx && c.warehouseId === warehouseId ? { ...c, availableStock: stock } : c));
+        } catch {
+            // Fallback: try from products state
+            const item = cart[idx];
+            const product = products.find(p => p.id === item.productId);
+            const stock = product ? getStock(product, warehouseId) : 0;
+            setCart(prev => prev.map((c, i) => i === idx ? { ...c, availableStock: stock } : c));
+        }
     };
 
     const removeFromCart = (idx: number) => setCart(cart.filter((_, i) => i !== idx));
