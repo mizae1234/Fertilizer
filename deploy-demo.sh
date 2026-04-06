@@ -17,19 +17,23 @@ APP_DIR="/home/web/FertilizerDemo"
 DOMAIN="fertilizer.popcorn-creator.com"
 PORT=3008
 REPO_URL="https://github.com/mizae1234/Fertilizer.git"
-DB_URL='postgresql://pop_user:%40Kanitta12PRD@srv1100100.hstgr.cloud:5432/fertilizer_demo?schema=public&options=-c%20timezone%3DAsia%2FBangkok'
+# Docker container uses host.docker.internal to reach host's PostgreSQL
+DB_URL_DOCKER='postgresql://pop_user:%40Kanitta12PRD@host.docker.internal:5432/fertilizer_demo?schema=public&options=-c%20timezone%3DAsia%2FBangkok'
+# Host uses localhost to reach PostgreSQL
+DB_URL_HOST='postgresql://pop_user:%40Kanitta12PRD@localhost:5432/fertilizer_demo?schema=public&options=-c%20timezone%3DAsia%2FBangkok'
 
 echo "══════════════════════════════════════"
 echo "🚀 Fertilizer Demo — Deploying to $DOMAIN"
 echo "══════════════════════════════════════"
 echo ""
 
-ssh "$SERVER" bash -s -- "$APP_DIR" "$DOMAIN" "$PORT" "$REPO_URL" "$DB_URL" << 'ENDSSH'
+ssh "$SERVER" bash -s -- "$APP_DIR" "$DOMAIN" "$PORT" "$REPO_URL" "$DB_URL_DOCKER" "$DB_URL_HOST" << 'ENDSSH'
 APP_DIR="$1"
 DOMAIN="$2"
 PORT="$3"
 REPO_URL="$4"
-DB_URL="$5"
+DB_URL_DOCKER="$5"
+DB_URL_HOST="$6"
 
 set -e
 
@@ -52,7 +56,7 @@ echo "✅ Code ready"
 echo ""
 echo "📝 Step 2: Creating .env..."
 cat > .env << ENVEOF
-DATABASE_URL="$DB_URL"
+DATABASE_URL="$DB_URL_DOCKER"
 TZ=Asia/Bangkok
 ENVEOF
 echo "✅ .env created"
@@ -91,16 +95,18 @@ echo ""
 echo "⏳ Step 5: Waiting for container to start..."
 sleep 5
 
-# ── 6. Push schema to empty DB ──
+# ── 6. Push schema to empty DB (run from host with localhost URL) ──
 echo ""
 echo "🗄️ Step 6: Pushing Prisma schema to database..."
-docker compose exec -T web npx prisma db push --skip-generate
+npm install 2>&1 | tail -3
+npx prisma generate 2>&1 | tail -3
+npx prisma db push --url "$DB_URL_HOST"
 echo "✅ Schema created"
 
-# ── 7. Run demo seed ──
+# ── 7. Run demo seed (run from host) ──
 echo ""
 echo "🌱 Step 7: Running demo seed..."
-docker compose exec -T web npx tsx prisma/seed-demo.ts
+DATABASE_URL="$DB_URL_HOST" npx tsx prisma/seed-demo.ts
 echo "✅ Demo data seeded"
 
 # ── 8. Setup Nginx + SSL ──
