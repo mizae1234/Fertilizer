@@ -37,8 +37,13 @@ prisma/
 ├── schema.prisma        # Database schema (28 models)
 ├── seed.ts              # Dev seed
 ├── seed-production.ts   # Production seed
+├── seed-demo.ts         # Demo site seed
 ├── backfill-conversion-rate.ts
 └── backfill-sale-cost.ts
+deploy.sh                # Single site deploy
+deploy-all.sh            # Production multi-site deploy
+deploy-demo.sh           # Demo site deploy
+setup.sh                 # Initial server setup
 ```
 
 ---
