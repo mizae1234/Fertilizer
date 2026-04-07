@@ -1,6 +1,6 @@
 import { getStockWithdrawals } from '@/app/actions/stock-withdrawals';
 import Link from 'next/link';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { formatDateTime } from '@/lib/utils';
 import { Suspense } from 'react';
 import DateRangeFilter from '@/components/DateRangeFilter';
 import PageHeader from '@/components/PageHeader';
@@ -47,7 +47,6 @@ export default async function StockWithdrawalsPage({ searchParams }: Props) {
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เลขที่</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้เบิกสินค้า</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">รายการ</th>
-                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">มูลค่ารวม</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สถานะ</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สร้างโดย</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">วันที่</th>
@@ -55,14 +54,13 @@ export default async function StockWithdrawalsPage({ searchParams }: Props) {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {records.length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
+                            <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
                         ) : (
                             records.map(r => (
                                 <tr key={r.id} className="hover:bg-gray-50">
                                     <td className="px-4 py-3"><Link href={`/stock-withdrawals/${r.id}`} className="text-sm font-medium text-violet-600 hover:underline">{r.withdrawalNumber}</Link></td>
                                     <td className="px-4 py-3 text-sm text-gray-800">{r.requesterName}</td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{r._count.items} รายการ</td>
-                                    <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(r.totalAmount))}</td>
                                     <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{r.createdBy.name}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(r.createdAt)}</td>
@@ -91,7 +89,7 @@ export default async function StockWithdrawalsPage({ searchParams }: Props) {
                             </div>
                             <p className="text-sm font-medium text-gray-800 mb-1">ผู้เบิก: {r.requesterName}</p>
                             <div className="flex items-center justify-between text-xs text-gray-500">
-                                <span>{r._count.items} รายการ · {formatCurrency(Number(r.totalAmount))}</span>
+                                <span>{r._count.items} รายการ</span>
                                 <span>{formatDateTime(r.createdAt)}</span>
                             </div>
                         </Link>

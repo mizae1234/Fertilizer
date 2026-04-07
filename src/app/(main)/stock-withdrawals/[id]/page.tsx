@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { formatDateTime } from '@/lib/utils';
 import { notFound } from 'next/navigation';
 import CancelWithdrawalButton from './CancelWithdrawalButton';
+import PrintWithdrawalButton from './PrintWithdrawalButton';
 import { isServerAdmin } from '@/lib/server-auth';
 import StatusBadge from '@/components/StatusBadge';
 
@@ -42,6 +43,7 @@ export default async function StockWithdrawalDetailPage({ params }: Props) {
                 </div>
                 <div className="flex items-center gap-2">
                     {!isCancelled && adminUser && <CancelWithdrawalButton id={id} withdrawalNumber={wd.withdrawalNumber} />}
+                    <PrintWithdrawalButton id={id} />
                     <Link href="/stock-withdrawals" className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
                         ← กลับ
                     </Link>
@@ -60,15 +62,11 @@ export default async function StockWithdrawalDetailPage({ params }: Props) {
 
             {/* Summary */}
             <div className={`bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-4 ${isCancelled ? 'opacity-60' : ''}`}>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                         <p className="text-xs text-gray-500">ผู้เบิกสินค้า</p>
                         <p className="text-sm font-semibold text-gray-800">{wd.requesterName}</p>
                     </div>
-                    {adminUser && <div>
-                        <p className="text-xs text-gray-500">มูลค่ารวม</p>
-                        <p className={`text-sm font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-violet-600'}`}>{formatCurrency(Number(wd.totalAmount))}</p>
-                    </div>}
                     <div>
                         <p className="text-xs text-gray-500">สร้างโดย</p>
                         <p className="text-sm text-gray-800">{wd.createdBy.name}</p>
@@ -98,10 +96,6 @@ export default async function StockWithdrawalDetailPage({ params }: Props) {
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">สินค้า</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
-                            {adminUser && <>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ราคาต้นทุน</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">รวม</th>
-                            </>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -114,21 +108,9 @@ export default async function StockWithdrawalDetailPage({ params }: Props) {
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600">{item.warehouse.name}</td>
                                 <td className="px-4 py-3 text-sm text-gray-800 text-right">{item.quantity} {item.product.unit}</td>
-                                {adminUser && <>
-                                    <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitCost))}</td>
-                                    <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(item.totalCost))}</td>
-                                </>}
                             </tr>
                         ))}
                     </tbody>
-                    <tfoot>
-                        <tr className="border-t-2 border-gray-200">
-                            {adminUser && <>
-                                <td colSpan={4} className="px-4 py-3 text-right text-sm font-bold text-gray-700">ยอดรวมทั้งหมด</td>
-                                <td className={`px-4 py-3 text-right text-lg font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-violet-600'}`}>{formatCurrency(Number(wd.totalAmount))}</td>
-                            </>}
-                        </tr>
-                    </tfoot>
                 </table>
             </div>
 

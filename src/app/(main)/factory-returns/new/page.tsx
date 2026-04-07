@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createFactoryReturn } from '@/app/actions/factory-returns';
-import { formatCurrency } from '@/lib/utils';
 import AlertModal from '@/components/AlertModal';
 
 interface Vendor { id: string; name: string }
@@ -79,7 +78,7 @@ export default function NewFactoryReturnPage() {
             productId: product.id, productName: product.name, productCode: product.code, unit: product.unit,
             warehouseId: defaultWhId,
             quantity: 1,
-            unitCost: Number(product.cost),
+            unitCost: Number(product.cost), // ใช้ต้นทุน ณ ตอนนั้น (ไม่แสดงบนหน้าจอ)
             availableStock: stock?.quantity || 0,
         }]);
         setShowProductPicker(false);
@@ -96,8 +95,6 @@ export default function NewFactoryReturnPage() {
     };
 
     const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
-
-    const totalAmount = items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
 
     const handleSubmit = async () => {
         if (!vendorId) {
@@ -133,7 +130,7 @@ export default function NewFactoryReturnPage() {
                     productId: i.productId,
                     warehouseId: i.warehouseId,
                     quantity: i.quantity,
-                    unitCost: i.unitCost,
+                    unitCost: i.unitCost, // ส่งต้นทุน ณ ตอนนั้นไปเก็บในระบบ
                 })),
                 senderName: senderName || undefined,
                 receiverName: receiverName || undefined,
@@ -217,7 +214,7 @@ export default function NewFactoryReturnPage() {
                                             <button key={p.id} onClick={() => addProduct(p)}
                                                 className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-50 last:border-0">
                                                 <p className="text-sm font-medium text-gray-800">{p.name}</p>
-                                                <p className="text-xs text-gray-400">{p.code} · {p.unit} · ต้นทุน {formatCurrency(Number(p.cost))}</p>
+                                                <p className="text-xs text-gray-400">{p.code} · {p.unit}</p>
                                             </button>
                                         ))
                                     )}
@@ -244,8 +241,6 @@ export default function NewFactoryReturnPage() {
                                         <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">สินค้า</th>
                                         <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">คลัง</th>
                                         <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">จำนวน</th>
-                                        <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">ราคาต้นทุน</th>
-                                        <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">รวม</th>
                                         <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 w-10"></th>
                                     </tr>
                                 </thead>
@@ -268,24 +263,12 @@ export default function NewFactoryReturnPage() {
                                                 <input type="number" min={1} value={item.quantity} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
                                                     className="w-20 px-2 py-1 rounded border border-gray-200 text-sm text-right outline-none focus:ring-1 focus:ring-orange-500" />
                                             </td>
-                                            <td className="px-3 py-2">
-                                                <input type="number" step="0.01" value={item.unitCost} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
-                                                    className="w-24 px-2 py-1 rounded border border-gray-200 text-sm text-right outline-none focus:ring-1 focus:ring-orange-500" />
-                                            </td>
-                                            <td className="px-3 py-2 text-sm font-semibold text-gray-800 text-right">{formatCurrency(item.quantity * item.unitCost)}</td>
                                             <td className="px-3 py-2 text-center">
                                                 <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">✕</button>
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
-                                <tfoot>
-                                    <tr className="border-t-2 bg-gray-50">
-                                        <td colSpan={5} className="px-3 py-3 text-right text-sm font-bold text-gray-700">ยอดรวมทั้งหมด</td>
-                                        <td className="px-3 py-3 text-right text-lg font-bold text-orange-600">{formatCurrency(totalAmount)}</td>
-                                        <td></td>
-                                    </tr>
-                                </tfoot>
                             </table>
                         </div>
 
@@ -313,22 +296,9 @@ export default function NewFactoryReturnPage() {
                                             <input type="number" min={1} value={item.quantity} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
                                                 className="w-full px-2 py-1 rounded border border-gray-200 text-xs text-right outline-none" />
                                         </div>
-                                        <div>
-                                            <label className="text-[10px] text-gray-400">ราคาต้นทุน</label>
-                                            <input type="number" step="0.01" value={item.unitCost} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
-                                                className="w-full px-2 py-1 rounded border border-gray-200 text-xs text-right outline-none" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] text-gray-400">รวม</label>
-                                            <p className="text-sm font-semibold text-gray-800 mt-1">{formatCurrency(item.quantity * item.unitCost)}</p>
-                                        </div>
                                     </div>
                                 </div>
                             ))}
-                            <div className="bg-orange-50 rounded-xl p-3 text-right">
-                                <span className="text-sm text-gray-600 mr-2">ยอดรวม:</span>
-                                <span className="text-lg font-bold text-orange-600">{formatCurrency(totalAmount)}</span>
-                            </div>
                         </div>
                     </>
                 )}

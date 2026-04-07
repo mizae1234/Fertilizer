@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { formatDateTime } from '@/lib/utils';
 import { notFound } from 'next/navigation';
 import PrintFactoryReturnButton from './PrintFactoryReturnButton';
 import CancelFactoryReturnButton from './CancelFactoryReturnButton';
@@ -66,15 +66,11 @@ export default async function FactoryReturnDetailPage({ params }: Props) {
 
             {/* Summary */}
             <div className={`bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-4 ${isCancelled ? 'opacity-60' : ''}`}>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                         <p className="text-xs text-gray-500">ผู้ขาย/โรงงาน/บริษัท</p>
                         <p className="text-sm font-semibold text-gray-800">{fr.vendor.name}</p>
                     </div>
-                    {adminUser && <div>
-                        <p className="text-xs text-gray-500">มูลค่ารวม</p>
-                        <p className={`text-sm font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-orange-600'}`}>{formatCurrency(Number(fr.totalAmount))}</p>
-                    </div>}
                     <div>
                         <p className="text-xs text-gray-500">สร้างโดย</p>
                         <p className="text-sm text-gray-800">{fr.createdBy.name}</p>
@@ -104,10 +100,6 @@ export default async function FactoryReturnDetailPage({ params }: Props) {
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">สินค้า</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
-                            {adminUser && <>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ราคาต้นทุน</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">รวม</th>
-                            </>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -120,21 +112,9 @@ export default async function FactoryReturnDetailPage({ params }: Props) {
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600">{item.warehouse.name}</td>
                                 <td className="px-4 py-3 text-sm text-gray-800 text-right">{item.quantity} {item.product.unit}</td>
-                                {adminUser && <>
-                                    <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitCost))}</td>
-                                    <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(item.totalCost))}</td>
-                                </>}
                             </tr>
                         ))}
                     </tbody>
-                    <tfoot>
-                        <tr className="border-t-2 border-gray-200">
-                            {adminUser && <>
-                                <td colSpan={4} className="px-4 py-3 text-right text-sm font-bold text-gray-700">ยอดรวมทั้งหมด</td>
-                                <td className={`px-4 py-3 text-right text-lg font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-orange-600'}`}>{formatCurrency(Number(fr.totalAmount))}</td>
-                            </>}
-                        </tr>
-                    </tfoot>
                 </table>
             </div>
 
@@ -165,4 +145,3 @@ export default async function FactoryReturnDetailPage({ params }: Props) {
         </div>
     );
 }
-

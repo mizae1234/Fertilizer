@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 
-interface FactoryReturnData {
-    returnNumber: string;
-    vendor: { name: string };
+interface WithdrawalData {
+    withdrawalNumber: string;
+    requesterName: string;
     createdBy: { name: string };
     notes: string | null;
-    senderName: string | null;
-    receiverName: string | null;
+    approverName: string | null;
+    withdrawerName: string | null;
     createdAt: string;
     items: {
         id: string;
@@ -18,7 +18,7 @@ interface FactoryReturnData {
     }[];
 }
 
-export default function PrintFactoryReturnButton({ id }: { id: string }) {
+export default function PrintWithdrawalButton({ id }: { id: string }) {
     const [loading, setLoading] = useState(false);
 
     const handlePrint = async () => {
@@ -26,11 +26,11 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
         try {
             // Fetch data + shop info + template (for logo fallback)
             const [res, shopRes, tmplRes] = await Promise.all([
-                fetch(`/api/factory-returns/${id}`),
+                fetch(`/api/stock-withdrawals/${id}`),
                 fetch('/api/shop-info').catch(() => null),
                 fetch('/api/receipt-templates').catch(() => null),
             ]);
-            const data: FactoryReturnData = await res.json();
+            const data: WithdrawalData = await res.json();
             const shopInfo = shopRes ? await shopRes.json().catch(() => null) : null;
             const templates = tmplRes ? await tmplRes.json().catch(() => []) : [];
             const template = Array.isArray(templates) ? templates.find((t: any) => t.isDefault) || templates[0] : null;
@@ -61,18 +61,18 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
     ${logoUrl ? `<div style="text-align:center;margin-bottom:8px;"><img src="${logoUrl}" style="max-height:60px;max-width:200px;object-fit:contain;display:block;margin:0 auto;" /></div>` : ''}
     ${shopInfo?.name ? `<div style="text-align:center;font-size:14px;font-weight:700;margin-bottom:2px;">${shopInfo.name}</div>` : ''}
     ${shopInfo?.address ? `<div style="text-align:center;font-size:10px;color:#666;margin-bottom:6px;">${shopInfo.address}</div>` : ''}
-    <h1 style="text-align:center;font-size:18px;margin-bottom:8px;font-weight:700;border-top:1px solid #e5e7eb;padding-top:8px;">ใบเคลมสินค้าคืนโรงงาน</h1>
+    <h1 style="text-align:center;font-size:18px;margin-bottom:8px;font-weight:700;border-top:1px solid #e5e7eb;padding-top:8px;">ใบเบิกสินค้า</h1>
 
     <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
         <div></div>
         <div style="text-align:right;font-size:12px;">
-            <div>เลขที่: <strong>${data.returnNumber}</strong></div>
+            <div>เลขที่: <strong>${data.withdrawalNumber}</strong></div>
             <div>วันที่: ${dateStr}</div>
         </div>
     </div>
 
     <div style="background:#f8f9fa;border:1px solid #ddd;border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:12px;">
-        <div style="margin-bottom:4px;"><strong>ผู้ขาย/โรงงาน/บริษัท:</strong> ${data.vendor.name}</div>
+        <div style="margin-bottom:4px;"><strong>ผู้เบิกสินค้า:</strong> ${data.requesterName}</div>
         <div><strong>ผู้สร้าง:</strong> ${data.createdBy.name}</div>
         ${data.notes ? `<div style="margin-top:4px;"><strong>หมายเหตุ:</strong> ${data.notes}</div>` : ''}
     </div>
@@ -101,13 +101,13 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
 
     <div style="margin-top:50px;display:flex;justify-content:space-around;">
         <div style="text-align:center;width:200px;">
-            ${data.senderName ? `<div style="font-weight:700;margin-bottom:4px;">${data.senderName}</div>` : '<div style="height:20px;"></div>'}
-            <div style="border-top:1px dashed #999;padding-top:6px;font-size:11px;">ผู้ส่งสินค้าคืน</div>
+            ${data.approverName ? `<div style="font-weight:700;margin-bottom:4px;">${data.approverName}</div>` : '<div style="height:20px;"></div>'}
+            <div style="border-top:1px dashed #999;padding-top:6px;font-size:11px;">ผู้อนุมัติการเบิก</div>
             <div style="font-size:10px;color:#888;margin-top:6px;">วันที่ ____/____/____</div>
         </div>
         <div style="text-align:center;width:200px;">
-            ${data.receiverName ? `<div style="font-weight:700;margin-bottom:4px;">${data.receiverName}</div>` : '<div style="height:20px;"></div>'}
-            <div style="border-top:1px dashed #999;padding-top:6px;font-size:11px;">ผู้ตรวจนับและรับสินค้าคืน</div>
+            ${data.withdrawerName ? `<div style="font-weight:700;margin-bottom:4px;">${data.withdrawerName}</div>` : '<div style="height:20px;"></div>'}
+            <div style="border-top:1px dashed #999;padding-top:6px;font-size:11px;">ผู้ขอเบิกสินค้า</div>
             <div style="font-size:10px;color:#888;margin-top:6px;">วันที่ ____/____/____</div>
         </div>
     </div>
@@ -156,7 +156,7 @@ export default function PrintFactoryReturnButton({ id }: { id: string }) {
             document.body.removeChild(container);
 
             // Save
-            doc.save(`${data.returnNumber}.pdf`);
+            doc.save(`${data.withdrawalNumber}.pdf`);
         } catch (err) {
             console.error('PDF generation failed:', err);
         }

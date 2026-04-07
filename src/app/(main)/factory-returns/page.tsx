@@ -1,6 +1,6 @@
 import { getFactoryReturns } from '@/app/actions/factory-returns';
 import Link from 'next/link';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { formatDateTime } from '@/lib/utils';
 import { Suspense } from 'react';
 import DateRangeFilter from '@/components/DateRangeFilter';
 import PageHeader from '@/components/PageHeader';
@@ -53,21 +53,19 @@ export default async function FactoryReturnsPage({ searchParams }: Props) {
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เลขที่</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้ขาย/โรงงาน/บริษัท</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">รายการ</th>
-                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">มูลค่ารวม</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สร้างโดย</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">วันที่</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {records.length === 0 ? (
-                            <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
+                            <tr><td colSpan={5} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
                         ) : (
                             records.map(r => (
                                 <tr key={r.id} className="hover:bg-gray-50">
                                     <td className="px-4 py-3"><Link href={`/factory-returns/${r.id}`} className="text-sm font-medium text-orange-600 hover:underline">{r.returnNumber}</Link></td>
                                     <td className="px-4 py-3 text-sm text-gray-800">{r.vendor.name}</td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{r._count.items} รายการ</td>
-                                    <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(r.totalAmount))}</td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{r.createdBy.name}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(r.createdAt)}</td>
                                 </tr>
@@ -91,7 +89,6 @@ export default async function FactoryReturnsPage({ searchParams }: Props) {
                             className="block bg-white rounded-xl shadow-md border border-gray-100 p-4 hover:shadow-lg transition-shadow">
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-semibold text-orange-600">{r.returnNumber}</span>
-                                <span className="text-sm font-semibold text-gray-800">{formatCurrency(Number(r.totalAmount))}</span>
                             </div>
                             <p className="text-sm font-medium text-gray-800 mb-1">{r.vendor.name}</p>
                             <div className="flex items-center justify-between text-xs text-gray-500">
