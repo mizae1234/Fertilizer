@@ -833,14 +833,25 @@ export default function POSPage() {
             const saleItems: { productId: string; warehouseId: string; quantity: number; unitPrice: number; points: number; conversionRate: number; unitName?: string; itemDiscount?: number }[] = [];
             for (const c of cart) {
                 if (c.isBundle && c.bundleItems) {
+                    const bundleTotal = Math.round(c.unitPrice * c.quantity * 100) / 100;
+                    let currentSum = 0;
+                    const bItems = [];
                     for (const si of c.bundleItems) {
-                        saleItems.push({
+                        const itemQty = si.quantity * c.quantity;
+                        const lineTotal = Math.round(si.unitPrice * itemQty * 100) / 100;
+                        currentSum += lineTotal;
+                        bItems.push({
                             productId: si.productId, warehouseId: si.warehouseId,
-                            quantity: si.quantity * c.quantity, unitPrice: si.unitPrice, points: si.points * c.quantity,
+                            quantity: itemQty, unitPrice: si.unitPrice, points: si.points * c.quantity,
                             conversionRate: 1,
                             unitName: si.unit,
                         });
                     }
+                    const diff = Math.round((currentSum - bundleTotal) * 100) / 100;
+                    if (diff !== 0 && bItems.length > 0) {
+                        bItems[bItems.length - 1].itemDiscount = diff;
+                    }
+                    saleItems.push(...bItems);
                 } else {
                     saleItems.push({
                         productId: c.productId, warehouseId: c.warehouseId,

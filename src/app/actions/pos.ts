@@ -36,10 +36,10 @@ export async function createSaleFromPOS(data: {
         0
     );
     const billDiscount = data.discount || 0;
-    const totalAmount = subtotal - itemDiscountsTotal - billDiscount;
+    const totalAmount = Math.round((subtotal - itemDiscountsTotal - billDiscount) * 100) / 100;
 
     // Validate payments sum
-    const paymentSum = data.payments.reduce((s, p) => s + p.amount, 0);
+    const paymentSum = Math.round(data.payments.reduce((s, p) => s + p.amount, 0) * 100) / 100;
     if (Math.abs(paymentSum - totalAmount) > 0.01) {
         throw new Error(`ยอดชำระไม่ตรง: ยอดรวม ${totalAmount} แต่ชำระ ${paymentSum}`);
     }
