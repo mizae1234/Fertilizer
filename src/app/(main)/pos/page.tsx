@@ -835,7 +835,7 @@ export default function POSPage() {
                 if (c.isBundle && c.bundleItems) {
                     const bundleTotal = Math.round(c.unitPrice * c.quantity * 100) / 100;
                     let currentSum = 0;
-                    const bItems = [];
+                    const bItems: { productId: string; warehouseId: string; quantity: number; unitPrice: number; points: number; conversionRate: number; unitName?: string; itemDiscount?: number }[] = [];
                     for (const si of c.bundleItems) {
                         const itemQty = si.quantity * c.quantity;
                         const lineTotal = Math.round(si.unitPrice * itemQty * 100) / 100;
