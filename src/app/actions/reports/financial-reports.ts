@@ -255,7 +255,7 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
     const revenueAmount = Number(revenue._sum.totalAmount || 0);
     const expenseAmount = Number(expenses._sum.amount || 0);
     const factoryReturnAmount = Number(factoryReturns._sum.totalAmount || 0);
-    const grossProfit = revenueAmount - cogsAmount - factoryReturnAmount;
+    const grossProfit = revenueAmount - cogsAmount;
     const netProfit = grossProfit - expenseAmount;
 
     const expenseByCategory = await prisma.expense.groupBy({

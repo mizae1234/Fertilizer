@@ -636,9 +636,22 @@ export default function POSPage() {
 
     const updateCartWarehouse = async (idx: number, warehouseId: string) => {
         // Update warehouse immediately, then fetch real stock from API
-        setCart(prev => prev.map((c, i) => i === idx ? { ...c, warehouseId } : c));
+        setCart(prev => prev.map((c, i) => {
+            if (i !== idx) return c;
+            const updated = { ...c, warehouseId };
+            if (updated.isBundle && updated.bundleItems) {
+                updated.bundleItems = updated.bundleItems.map(bi => ({ ...bi, warehouseId }));
+            }
+            return updated;
+        }));
+        
+        const item = cart[idx];
+        if (item.isBundle) {
+            setCart(prev => prev.map((c, i) => i === idx ? { ...c, availableStock: 9999 } : c));
+            return;
+        }
+
         try {
-            const item = cart[idx];
             const res = await fetch(`/api/products?search=${encodeURIComponent(item.productCode)}&warehouseId=${warehouseId}`);
             const data = await res.json();
             const product = Array.isArray(data) ? data.find((p: any) => p.id === item.productId) : null;
@@ -646,7 +659,6 @@ export default function POSPage() {
             setCart(prev => prev.map((c, i) => i === idx && c.warehouseId === warehouseId ? { ...c, availableStock: stock } : c));
         } catch {
             // Fallback: try from products state
-            const item = cart[idx];
             const product = products.find(p => p.id === item.productId);
             const stock = product ? getStock(product, warehouseId) : 0;
             setCart(prev => prev.map((c, i) => i === idx ? { ...c, availableStock: stock } : c));
@@ -1223,7 +1235,13 @@ export default function POSPage() {
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-xs lg:text-sm font-semibold text-purple-800 truncate">🎁 {item.productName}</p>
-                                                        <p className="text-[10px] lg:text-xs text-purple-400">{item.productCode} · {formatCurrency(item.unitPrice)}/ชุด</p>
+                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                            <p className="text-[10px] lg:text-xs text-purple-400">{item.productCode} · {formatCurrency(item.unitPrice)}/ชุด</p>
+                                                            <select value={item.warehouseId} onChange={e => updateCartWarehouse(idx, e.target.value)}
+                                                                className="px-1.5 py-0.5 rounded border border-purple-200 text-[10px] bg-purple-50 text-purple-700 outline-none">
+                                                                {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                                            </select>
+                                                        </div>
                                                     </div>
                                                     <div className="flex items-center gap-1 shrink-0">
                                                         <button onClick={() => updateCartQty(idx, item.quantity - 1)}
@@ -1389,8 +1407,8 @@ export default function POSPage() {
                                 🏷️{billDiscount > 0 ? ` -${formatCurrency(billDiscount)}` : ''}
                             </button>
                             <button type="button" onClick={() => setShowNotes(!showNotes)}
-                                className={`shrink-0 px-3 py-2.5 rounded-lg text-xs transition-colors ${saleNotes ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
-                                📝
+                                className={`shrink-0 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${saleNotes ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
+                                Note
                             </button>
                             <button
                                 onClick={openPaymentModal}

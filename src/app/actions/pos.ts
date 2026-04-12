@@ -106,9 +106,11 @@ export async function createSaleFromPOS(data: {
                     },
                 });
 
-                // Deduct stock + create stock transactions in parallel per item
-                await Promise.all(data.items.map(async (item, idx) => {
+                // Deduct stock + create stock transactions sequentially per item to avoid transaction deadlocks
+                for (let idx = 0; idx < data.items.length; idx++) {
+                    const item = data.items[idx];
                     const stockToDeduct = item.quantity * (item.conversionRate || 1);
+                    
                     await tx.productStock.upsert({
                         where: {
                             productId_warehouseId: {
@@ -138,7 +140,7 @@ export async function createSaleFromPOS(data: {
                             notes: `ขายสินค้า ${saleNumber}${(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
                         },
                     });
-                }));
+                }
 
                 // Award customer points
                 if (data.customerId && totalPoints > 0) {

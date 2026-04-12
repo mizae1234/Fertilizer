@@ -17,6 +17,7 @@ export default function NewCustomerPage() {
     const [groups, setGroups] = useState<CustomerGroup[]>([]);
     const [form, setForm] = useState({ name: '', phone: '', customerGroupId: '', address: '', taxId: '' });
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
+    const [existingMatches, setExistingMatches] = useState<{name: string, phone: string}[]>([]);
 
     useEffect(() => {
         fetch('/api/customer-groups').then(r => r.json()).then(data => {
@@ -26,6 +27,20 @@ export default function NewCustomerPage() {
             else if (data.length > 0) setForm(f => ({ ...f, customerGroupId: data[0].id }));
         });
     }, []);
+
+    useEffect(() => {
+        if (!form.name || form.name.length < 2) {
+            setExistingMatches([]);
+            return;
+        }
+        const timer = setTimeout(() => {
+            fetch(`/api/customers?search=${encodeURIComponent(form.name)}`)
+                .then(r => r.json())
+                .then(data => setExistingMatches(data))
+                .catch(() => setExistingMatches([]));
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [form.name]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -38,6 +53,8 @@ export default function NewCustomerPage() {
         } finally { setLoading(false); }
     };
 
+    const isDuplicate = existingMatches.some(c => c.name.trim().toLowerCase() === form.name.trim().toLowerCase());
+
     return (
         <div className="max-w-lg mx-auto animate-fade-in">
             <PageHeader title="ลงทะเบียนลูกค้าใหม่" />
@@ -47,6 +64,8 @@ export default function NewCustomerPage() {
                     value={form.name}
                     onChange={e => setForm({ ...form, name: e.target.value })}
                     required
+                    suggestions={existingMatches.map(c => c.name)}
+                    error={isDuplicate ? '⚠️ มีชื่อลูกค้านี้อยู่ในระบบแล้ว' : undefined}
                 />
                 <FormInput
                     label="เบอร์โทร"
@@ -54,6 +73,7 @@ export default function NewCustomerPage() {
                     value={form.phone}
                     onChange={e => setForm({ ...form, phone: e.target.value })}
                     placeholder="0812345678"
+                    suggestions={existingMatches.filter(c => c.phone).map(c => c.phone)}
                 />
                 <FormSelect
                     label="กลุ่มลูกค้า"
