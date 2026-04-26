@@ -95,6 +95,8 @@ export default function SaleDetailPage() {
     // Edit state
     const [items, setItems] = useState<EditItem[]>([]);
     const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+    const [customerSearchText, setCustomerSearchText] = useState<string>('');
+    const [showCustomerDropdown, setShowCustomerDropdown] = useState<boolean>(false);
     const [editNotes, setEditNotes] = useState<string>('');
     const [editBillDiscount, setEditBillDiscount] = useState(0);
     const [saving, setSaving] = useState(false);
@@ -139,6 +141,12 @@ export default function SaleDetailPage() {
         setWarehouses(whs);
         setCustomers(custs);
         setSelectedCustomerId(sale.customerId || '');
+        if (sale.customerId) {
+            const c = custs.find((x: Customer) => x.id === sale.customerId);
+            setCustomerSearchText(c ? `${c.name} (${c.phone})` : '');
+        } else {
+            setCustomerSearchText('');
+        }
         setEditNotes(sale.notes || '');
         // Calculate bill-level discount = total discount - sum of item discounts
         const totalDiscount = Number(sale.discount || 0);
@@ -436,11 +444,47 @@ export default function SaleDetailPage() {
                     <div>
                         <p className="text-xs text-gray-500">ลูกค้า</p>
                         {isEditing ? (
-                            <select value={selectedCustomerId} onChange={e => setSelectedCustomerId(e.target.value)}
-                                className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
-                                <option value="">ลูกค้าทั่วไป</option>
-                                {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>)}
-                            </select>
+                            <div className="relative mt-1">
+                                <input
+                                    type="text"
+                                    placeholder="ค้นหาลูกค้าทั่วไป..."
+                                    value={customerSearchText}
+                                    onChange={e => {
+                                        setCustomerSearchText(e.target.value);
+                                        setSelectedCustomerId(''); // reset ID when typing
+                                        setShowCustomerDropdown(true);
+                                    }}
+                                    onFocus={() => setShowCustomerDropdown(true)}
+                                    onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                />
+                                {showCustomerDropdown && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                        <button type="button" 
+                                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-emerald-50 transition-colors"
+                                            onClick={() => {
+                                                setSelectedCustomerId('');
+                                                setCustomerSearchText('');
+                                                setShowCustomerDropdown(false);
+                                            }}
+                                        >
+                                            ลูกค้าทั่วไป
+                                        </button>
+                                        {customers.filter(c => c.name.toLowerCase().includes(customerSearchText.toLowerCase()) || c.phone.includes(customerSearchText)).map(c => (
+                                            <button key={c.id} type="button" 
+                                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-emerald-50 transition-colors"
+                                                onClick={() => {
+                                                    setSelectedCustomerId(c.id);
+                                                    setCustomerSearchText(`${c.name} (${c.phone})`);
+                                                    setShowCustomerDropdown(false);
+                                                }}
+                                            >
+                                                {c.name} {c.phone ? `(${c.phone})` : ''}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         ) : (
                             <p className="text-sm font-medium text-gray-800">{sale.customer?.name || 'ลูกค้าทั่วไป'}</p>
                         )}

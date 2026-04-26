@@ -83,7 +83,8 @@ export async function approveSale(id: string) {
 
     for (const item of sale.items) {
         const stock = stockMap.get(`${item.productId}_${item.warehouseId}`);
-        if (!stock || stock.quantity < item.quantity) {
+        const stockToDeduct = item.quantity * Number(item.conversionRate || 1);
+        if (!stock || stock.quantity < stockToDeduct) {
             throw new Error('สินค้ามี stock ไม่เพียงพอ');
         }
     }
@@ -97,6 +98,8 @@ export async function approveSale(id: string) {
 
         // Deduct stock + create stock transactions in parallel
         await Promise.all(sale.items.map(async (item) => {
+            const stockToDeduct = item.quantity * Number(item.conversionRate || 1);
+            
             await tx.productStock.update({
                 where: {
                     productId_warehouseId: {
@@ -105,7 +108,7 @@ export async function approveSale(id: string) {
                     },
                 },
                 data: {
-                    quantity: { decrement: item.quantity },
+                    quantity: { decrement: stockToDeduct },
                 },
             });
 
@@ -115,11 +118,11 @@ export async function approveSale(id: string) {
                     productId: item.productId,
                     warehouseId: item.warehouseId,
                     type: 'SALE',
-                    quantity: -item.quantity,
+                    quantity: -stockToDeduct,
                     unitCost: item.unitCost,
                     reference: sale.saleNumber,
                     userId: sale.createdById,
-                    notes: `ขายสินค้า ${sale.saleNumber}`,
+                    notes: `ขายสินค้า ${sale.saleNumber}${(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
                 },
             });
         }));
@@ -241,9 +244,15 @@ export async function updateSale(id: string, data: {
         // If APPROVED, reverse old stock first
         if (existing.status === 'APPROVED') {
             for (const item of existing.items) {
-                await tx.productStock.update({
+                const stockToRestore = item.quantity * Number(item.conversionRate || 1);
+                await tx.productStock.upsert({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
-                    data: { quantity: { increment: item.quantity } },
+                    update: { quantity: { increment: stockToRestore } },
+                    create: {
+                        productId: item.productId,
+                        warehouseId: item.warehouseId,
+                        quantity: stockToRestore,
+                    },
                 });
             }
             // Remove old stock transactions
@@ -297,20 +306,26 @@ export async function updateSale(id: string, data: {
         // If APPROVED, deduct new stock
         if (existing.status === 'APPROVED') {
             for (const item of data.items) {
-                await tx.productStock.update({
+                const stockToDeduct = item.quantity * (item.conversionRate || 1);
+                await tx.productStock.upsert({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
-                    data: { quantity: { decrement: item.quantity } },
+                    update: { quantity: { decrement: stockToDeduct } },
+                    create: {
+                        productId: item.productId,
+                        warehouseId: item.warehouseId,
+                        quantity: -stockToDeduct,
+                    },
                 });
                 await tx.stockTransaction.create({
                     data: {
                         productId: item.productId,
                         warehouseId: item.warehouseId,
                         type: 'SALE',
-                        quantity: -item.quantity,
+                        quantity: -stockToDeduct,
                         unitCost: item.unitPrice,
                         reference: existing.saleNumber,
                         userId: existing.createdById,
-                        notes: `ขายสินค้า ${existing.saleNumber} (แก้ไข)`,
+                        notes: `ขายสินค้า ${existing.saleNumber} (แก้ไข)${(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
                     },
                 });
             }
@@ -397,11 +412,16 @@ export async function cancelSale(id: string, userId?: string) {
                 );
                 // Use the absolute value of the stock transaction quantity (which is in base units)
                 // Fallback to item.quantity if no stock transaction found
-                const baseQtyToRestore = matchingTx ? Math.abs(matchingTx.quantity) : item.quantity;
+                const baseQtyToRestore = matchingTx ? Math.abs(matchingTx.quantity) : item.quantity * Number(item.conversionRate || 1);
 
-                await tx.productStock.update({
+                await tx.productStock.upsert({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
-                    data: { quantity: { increment: baseQtyToRestore } },
+                    update: { quantity: { increment: baseQtyToRestore } },
+                    create: {
+                        productId: item.productId,
+                        warehouseId: item.warehouseId,
+                        quantity: baseQtyToRestore,
+                    },
                 });
 
                 // Create SALE_CANCEL stock transaction (positive qty = stock returned)
