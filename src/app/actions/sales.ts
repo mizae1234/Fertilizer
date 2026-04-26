@@ -122,7 +122,7 @@ export async function approveSale(id: string) {
                     unitCost: item.unitCost,
                     reference: sale.saleNumber,
                     userId: sale.createdById,
-                    notes: `ขายสินค้า ${sale.saleNumber}${(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
+                    notes: `ขายสินค้า ${sale.saleNumber}${Number(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${Number(item.conversionRate || 1)} = ${stockToDeduct} base unit)` : ''}`,
                 },
             });
         }));
