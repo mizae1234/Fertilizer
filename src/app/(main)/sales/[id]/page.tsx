@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { updateSale, cancelSale } from '@/app/actions/sales';
 import { createSaleReturn } from '@/app/actions/sale-returns';
@@ -129,21 +129,33 @@ export default function SaleDetailPage() {
 
     useEffect(() => { fetchSale(); }, [fetchSale]);
 
+    // Live search customers from API when typing in edit mode
+    const customerSearchTimer = useRef<NodeJS.Timeout | null>(null);
+    useEffect(() => {
+        if (!isEditing) return;
+        if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current);
+        customerSearchTimer.current = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/customers?search=${encodeURIComponent(customerSearchText)}`);
+                const data = await res.json();
+                setCustomers(data);
+            } catch { /* ignore */ }
+        }, 300);
+        return () => { if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); };
+    }, [customerSearchText, isEditing]);
+
     const startEditing = async () => {
         if (!sale) return;
-        // Load reference data
-        const [prods, whs, custs] = await Promise.all([
+        const [prods, whs] = await Promise.all([
             fetch('/api/products').then(r => r.json()),
             fetch('/api/warehouses').then(r => r.json()),
-            fetch('/api/customers').then(r => r.json()),
         ]);
         setProducts(prods);
         setWarehouses(whs);
-        setCustomers(custs);
+        // Load current sale's customer for display
         setSelectedCustomerId(sale.customerId || '');
-        if (sale.customerId) {
-            const c = custs.find((x: Customer) => x.id === sale.customerId);
-            setCustomerSearchText(c ? `${c.name} (${c.phone})` : '');
+        if (sale.customerId && sale.customer) {
+            setCustomerSearchText(`${sale.customer.name} (${sale.customer.phone || ''})`);
         } else {
             setCustomerSearchText('');
         }
@@ -470,7 +482,7 @@ export default function SaleDetailPage() {
                                         >
                                             ลูกค้าทั่วไป
                                         </button>
-                                        {customers.filter(c => c.name.toLowerCase().includes(customerSearchText.toLowerCase()) || c.phone.includes(customerSearchText)).map(c => (
+                                        {customers.map(c => (
                                             <button key={c.id} type="button" 
                                                 className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-emerald-50 transition-colors"
                                                 onClick={() => {
