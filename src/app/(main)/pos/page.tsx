@@ -68,11 +68,12 @@ const PAYMENT_METHODS = [
     { value: 'CREDIT', label: '📋 ค้างชำระ', color: 'amber' },
 ];
 
-function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType }: {
+function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, allowCredit = true }: {
     total: number; loading: boolean;
     onConfirm: (payments: { method: string; amount: number; dueDate?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number) => void;
     onClose: () => void;
     defaultPrintType?: 'bill' | 'invoice' | 'none';
+    allowCredit?: boolean;
 }) {
     const [lines, setLines] = useState<PaymentLine[]>([
         { method: 'CASH', amount: total, dueDate: '' }
@@ -163,16 +164,23 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType }: 
                         <div key={idx} className="rounded-xl border border-gray-200 p-3 space-y-2 bg-gray-50/50">
                             {/* Method selector */}
                             <div className="flex gap-1">
-                                {PAYMENT_METHODS.map(m => (
+                                {PAYMENT_METHODS.map(m => {
+                                    const isDisabled = m.value === 'CREDIT' && !allowCredit;
+                                    return (
                                     <button key={m.value} type="button"
-                                        onClick={() => handleMethodChange(idx, m.value)}
-                                        className={`flex-1 rounded-lg text-xs font-medium py-1.5 transition-all ${line.method === m.value
-                                            ? 'bg-emerald-500 text-white shadow-sm'
-                                            : 'bg-white border border-gray-200 text-gray-600 hover:border-emerald-300'
+                                        onClick={() => !isDisabled && handleMethodChange(idx, m.value)}
+                                        disabled={isDisabled}
+                                        title={isDisabled ? 'ต้องเลือกลูกค้าก่อนจึงจะใช้ค้างชำระได้' : ''}
+                                        className={`flex-1 rounded-lg text-xs font-medium py-1.5 transition-all ${isDisabled
+                                            ? 'bg-gray-100 text-gray-300 border border-gray-100 cursor-not-allowed'
+                                            : line.method === m.value
+                                                ? 'bg-emerald-500 text-white shadow-sm'
+                                                : 'bg-white border border-gray-200 text-gray-600 hover:border-emerald-300'
                                             }`}>
                                         {m.label}
                                     </button>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             {/* Bank account selector for TRANSFER */}
@@ -1254,12 +1262,15 @@ export default function POSPage() {
                                                             </select>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1 shrink-0">
-                                                        <button onClick={() => updateCartQty(idx, item.quantity - 1)}
-                                                            className="w-6 h-6 lg:w-8 lg:h-8 rounded bg-purple-100 border border-purple-200 text-purple-600 text-xs flex items-center justify-center">−</button>
-                                                        <span className="font-bold text-xs lg:text-sm w-6 text-center text-purple-700">{item.quantity}</span>
-                                                        <button onClick={() => updateCartQty(idx, item.quantity + 1)}
-                                                            className="w-6 h-6 lg:w-8 lg:h-8 rounded bg-purple-100 border border-purple-200 text-purple-600 text-xs flex items-center justify-center">+</button>
+                                                    <div className="flex items-center shrink-0">
+                                                        <input type="number" value={item.quantity}
+                                                            onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
+                                                            onChange={e => { const raw = e.target.value.replace(/^0+(?=\d)/, ''); const val = parseInt(raw); if (!isNaN(val) && val >= 1) updateCartQty(idx, val); }}
+                                                            onBlur={e => { const val = parseInt(e.target.value) || 1; updateCartQty(idx, Math.max(1, val)); }}
+                                                            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                                            className="font-bold text-xs lg:text-sm text-center w-10 lg:w-12 rounded border border-purple-200 bg-purple-50 py-0.5 outline-none focus:ring-1 focus:ring-purple-400 text-purple-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                            min={1}
+                                                        />
                                                     </div>
                                                     <p className="text-xs lg:text-sm font-bold text-purple-600 shrink-0">{formatCurrency(item.quantity * item.unitPrice)}</p>
                                                     <button onClick={() => removeFromCart(idx)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
@@ -1305,25 +1316,21 @@ export default function POSPage() {
                                                             <span className="text-gray-400">฿</span>
                                                             <input type="number" value={item.unitPrice}
                                                                 onChange={e => updateCartPrice(idx, parseFloat(e.target.value) || 0)}
-                                                                className="w-20 px-1 py-0.5 rounded border border-gray-200 text-[11px] outline-none text-right font-semibold"
+                                                                className="w-20 px-1 py-0.5 rounded border border-gray-200 text-[11px] outline-none text-right font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                 step="0.01" min={0}
                                                             />
                                                             <span className="text-gray-400">/{item.selectedUnitName}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1 shrink-0">
-                                                        <button onClick={() => updateCartQty(idx, item.quantity - 1)}
-                                                            className="w-6 h-6 lg:w-7 lg:h-7 rounded bg-gray-50 border border-gray-200 text-gray-600 text-xs flex items-center justify-center">−</button>
+                                                    <div className="flex items-center shrink-0">
                                                         <input type="number" value={item.quantity}
                                                             onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
-                                                            onChange={e => { const val = parseInt(e.target.value); if (!isNaN(val) && val >= 1) updateCartQty(idx, val); }}
+                                                            onChange={e => { const raw = e.target.value.replace(/^0+(?=\d)/, ''); const val = parseInt(raw); if (!isNaN(val) && val >= 1) updateCartQty(idx, val); }}
                                                             onBlur={e => { const val = parseInt(e.target.value) || 1; updateCartQty(idx, Math.max(1, val)); }}
                                                             onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                                                            className="font-bold text-xs lg:text-sm text-center w-8 lg:w-10 rounded border border-gray-200 py-0.5 outline-none focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                            className="font-bold text-xs lg:text-sm text-center w-10 lg:w-12 rounded border border-gray-200 py-0.5 outline-none focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                             min={1}
                                                         />
-                                                        <button onClick={() => updateCartQty(idx, item.quantity + 1)}
-                                                            className="w-6 h-6 lg:w-7 lg:h-7 rounded bg-gray-50 border border-gray-200 text-gray-600 text-xs flex items-center justify-center">+</button>
                                                     </div>
                                                     <p className="text-xs lg:text-sm font-bold text-emerald-600 shrink-0 min-w-[60px] lg:min-w-[80px] text-right">{formatCurrency(item.quantity * item.unitPrice)}</p>
                                                     <button onClick={() => removeFromCart(idx)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
@@ -1365,7 +1372,7 @@ export default function POSPage() {
                                                         <span className="text-gray-400">฿</span>
                                                         <input type="number" value={item.unitPrice}
                                                             onChange={e => updateCartPrice(idx, parseFloat(e.target.value) || 0)}
-                                                            className="w-16 px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none text-right font-semibold"
+                                                            className="w-16 px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none text-right font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                             step="0.01" min={0}
                                                         />
                                                         <span className="text-gray-400">/{item.selectedUnitName}</span>
@@ -1456,6 +1463,7 @@ export default function POSPage() {
                     onConfirm={confirmPayment}
                     onClose={() => setShowPaymentModal(false)}
                     defaultPrintType={userPrintSetting as 'bill' | 'invoice' | 'none'}
+                    allowCredit={!!selectedCustomer}
                 />
             )}
 
