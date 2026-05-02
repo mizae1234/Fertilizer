@@ -1255,7 +1255,17 @@ export default function POSPage() {
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-xs lg:text-sm font-semibold text-purple-800 truncate">🎁 {item.productName}</p>
                                                         <div className="flex items-center gap-2 mt-0.5">
-                                                            <p className="text-[10px] lg:text-xs text-purple-400">{item.productCode} · {formatCurrency(item.unitPrice)}/ชุด</p>
+                                                            <p className="text-[10px] lg:text-xs text-purple-400">{item.productCode} ·</p>
+                                                            <div className="flex items-center gap-0.5 text-[10px] lg:text-xs text-purple-600 font-medium">
+                                                                <span>฿</span>
+                                                                <input type="number" value={item.unitPrice}
+                                                                    onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
+                                                                    onChange={e => updateCartPrice(idx, parseFloat(e.target.value) || 0)}
+                                                                    className="w-16 lg:w-20 px-1 py-0.5 rounded border border-purple-200 bg-purple-50 text-purple-700 outline-none text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-1 focus:ring-purple-400"
+                                                                    step="0.01" min={0}
+                                                                />
+                                                                <span>/ชุด</span>
+                                                            </div>
                                                             <select value={item.warehouseId} onChange={e => updateCartWarehouse(idx, e.target.value)}
                                                                 className="px-1.5 py-0.5 rounded border border-purple-200 text-[10px] bg-purple-50 text-purple-700 outline-none">
                                                                 {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
