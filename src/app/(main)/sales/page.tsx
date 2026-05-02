@@ -42,6 +42,10 @@ export default async function SalesPage({ searchParams }: Props) {
                 customer: { select: { name: true } },
                 createdBy: { select: { name: true } },
                 _count: { select: { items: true } },
+                paymentMethod: true,
+                payments: true,
+                debtPayments: { select: { amount: true, method: true } },
+                debtInterests: { select: { amount: true } },
                 items: {
                     select: { id: true, quantity: true, unitName: true, product: { select: { name: true, unit: true, productUnits: { select: { unitName: true, conversionRate: true } } } } },
                 },
@@ -158,7 +162,27 @@ export default async function SalesPage({ searchParams }: Props) {
                                         </div>
                                     </td>
                                     <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(sale.totalAmount))}</td>
-                                    <td className="px-4 py-3"><StatusBadge status={sale.status} /></td>
+                                    <td className="px-4 py-3">
+                                        {(() => {
+                                            if (sale.status === 'CANCELLED') {
+                                                return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-100">🚫 ยกเลิกบิล</span>;
+                                            }
+                                            const hasCredit = sale.paymentMethod === 'CREDIT' || sale.paymentMethod === 'SPLIT';
+                                            if (hasCredit) {
+                                                const payments = (sale.payments && Array.isArray(sale.payments) ? sale.payments : []) as { method: string; amount: number }[];
+                                                const totalInterest = sale.debtInterests.reduce((s, di) => s + Number(di.amount), 0);
+                                                const grandTotal = Number(sale.totalAmount) + totalInterest;
+                                                const initialPaid = payments.filter(p => p.method !== 'CREDIT').reduce((s, p) => s + Number(p.amount), 0);
+                                                const debtPaid = sale.debtPayments.filter(dp => dp.method !== 'CREDIT').reduce((s, dp) => s + Number(dp.amount), 0);
+                                                const totalPaid = initialPaid + debtPaid;
+                                                const remaining = Math.max(0, grandTotal - totalPaid);
+                                                if (remaining > 0) {
+                                                    return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100">⏳ ค้างชำระ</span>;
+                                                }
+                                            }
+                                            return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100">✅ ชำระแล้ว</span>;
+                                        })()}
+                                    </td>
                                     <td className="px-4 py-3 text-sm text-gray-500">{sale.createdBy?.name || '-'}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(sale.createdAt)}</td>
                                 </tr>

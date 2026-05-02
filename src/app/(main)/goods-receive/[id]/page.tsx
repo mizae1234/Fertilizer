@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { updateGoodsReceive, approveGoodsReceive, rejectGoodsReceive, deleteGoodsReceive, updateGoodsReceivePayment } from '@/app/actions/goods-receive';
 import StatusBadge from '@/components/StatusBadge';
@@ -69,6 +69,8 @@ export default function GoodsReceiveDetailPage() {
     const [receivedDate, setReceivedDate] = useState('');
     const [notes, setNotes] = useState('');
     const [items, setItems] = useState<GRItem[]>([]);
+    const [vendorSearchText, setVendorSearchText] = useState('');
+    const [showVendorDropdown, setShowVendorDropdown] = useState(false);
 
     // Payment tracking
     const [goodsPaid, setGoodsPaid] = useState(false);
@@ -119,6 +121,7 @@ export default function GoodsReceiveDetailPage() {
                 setGoodsPaid(data.goodsPaid || false);
                 setShippingPaid(data.shippingPaid || false);
                 setShippingCost(Number(data.shippingCost) ? String(Number(data.shippingCost)) : '');
+                setVendorSearchText(data.vendor?.name || '');
                 setLoading(false);
             });
     }, [id]);
@@ -288,13 +291,40 @@ export default function GoodsReceiveDetailPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs text-gray-500 mb-1 block">ผู้ขาย</label>
-                            <select
-                                value={vendorId}
-                                onChange={e => setVendorId(e.target.value)}
-                                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
-                            >
-                                {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                            </select>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="ค้นหาผู้ขาย..."
+                                    value={vendorSearchText}
+                                    onChange={e => {
+                                        setVendorSearchText(e.target.value);
+                                        setVendorId('');
+                                        setShowVendorDropdown(true);
+                                    }}
+                                    onFocus={() => setShowVendorDropdown(true)}
+                                    onBlur={() => setTimeout(() => setShowVendorDropdown(false), 200)}
+                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                                />
+                                {showVendorDropdown && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                        {vendors.filter(v => v.name.toLowerCase().includes(vendorSearchText.toLowerCase()) || (v.phone && v.phone.includes(vendorSearchText))).map(v => (
+                                            <button key={v.id} type="button"
+                                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-emerald-50 transition-colors"
+                                                onClick={() => {
+                                                    setVendorId(v.id);
+                                                    setVendorSearchText(v.name);
+                                                    setShowVendorDropdown(false);
+                                                }}
+                                            >
+                                                {v.name} {v.phone ? `(${v.phone})` : ''}
+                                            </button>
+                                        ))}
+                                        {vendors.filter(v => v.name.toLowerCase().includes(vendorSearchText.toLowerCase()) || (v.phone && v.phone.includes(vendorSearchText))).length === 0 && (
+                                            <div className="px-3 py-2 text-sm text-gray-400">ไม่พบผู้ขาย</div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <div>
                             <label className="text-xs text-gray-500 mb-1 block">เลขที่ PO</label>
