@@ -65,7 +65,7 @@ src/
 ## ⚙️ โลจิกและฟังก์ชันการทำงานหลัก (Core Business Logic)
 
 ### 1. ระบบขายสินค้าหน้าร้าน (POS Flow - `pos/page.tsx` & `actions/pos.ts`)
-- **UI Logic**: หน้าต่าง POS จะดึงสินค้าและเก็บ state ลงใน `sessionStorage` (ตะกร้าสินค้า `cart` และลูกค้า `selectedCustomer`) เพื่อไม่ให้ข้อมูลหายเมื่อเผลอรีเฟรชหน้า
+- **UI Logic**: หน้าต่าง POS จะดึงสินค้าและเก็บ state ลงใน `sessionStorage` (ตะกร้าสินค้า `cart` และลูกค้า `selectedCustomer`) เพื่อไม่ให้ข้อมูลหายเมื่อเผลอรีเฟรชหน้า มีการปรับ UX โดยใช้การกรอกตัวเลขจำนวนโดยตรง (ไม่มีปุ่ม +/-) และบังคับไม่ให้เลือกชำระแบบ "ค้างชำระ" (CREDIT) หากเป็นลูกค้าทั่วไป
 - **Pricing Logic**: ทันทีที่มีการเลือกลูกค้า ระบบจะดึง `customerGroupId` เพื่อนำไปเช็คกับ `ProductPrice` หากพบราคาพิเศษ จะอัปเดตราคาในตะกร้าอัตโนมัติ (และคิดแยกตาม `ProductUnit` ที่เลือกด้วย)
 - **Bundle Logic**: ชุดสินค้าจะถูกนำมาคำนวณราคาของแต่ละชิ้นข้างในเฉลี่ยตามสัดส่วน (Proportion calculation) เพื่อให้ยอดรวมเท่ากับ `bundlePrice` พอดี ลดปัญหาเรื่องทศนิยมไม่ลงตัว
 - **Submit Logic**: เมื่อกดชำระเงิน จะส่งเข้า `createSaleFromPOS` (Server Action) เพื่อ:
@@ -86,8 +86,13 @@ src/
 - `middleware.ts` จะป้องกันไม่ให้ผู้ใช้ที่ไม่มี Cookie หลุดเข้ามาในระบบ 
 - ในส่วน UI Component (เช่น `Sidebar`) จะใช้ Hook `useUser` ดึงข้อมูล `allowedMenus` เพื่อซ่อนเมนูที่ STAFF ไม่มีสิทธิ์เห็น
 
-### 4. ฟังก์ชันการตรวจสอบข้อมูลซ้ำแบบ Real-time (ตัวอย่าง: ลูกค้าใหม่)
-- ในหน้า `customers/new/page.tsx` มีการนำเทคนิค **Debounce** (หน่วงเวลาพิมพ์ 400ms) เพื่อยิง API `/api/customers?search=...` และใช้เพื่อเตือนแบบ Real-time บน UI หากชื่อลูกค้าที่กำลังพิมพ์ ตรงกับลูกค้าในระบบแล้ว (`isDuplicate`) ช่วยลดความผิดพลาดในการสร้างลูกค้าซ้ำซ้อน
+### 4. การค้นหาข้อมูลแบบ Real-time API Search (Dropdowns & Validation)
+- เนื่องจากข้อจำกัดเรื่อง Pagination (เช่น โหลดแค่ 50 รายการแรก) การค้นหาข้อมูลลูกค้าและผู้ขายในหน้าแก้ไขบิล (`sales/[id]/page.tsx`) และหน้ารับสินค้า (`goods-receive/[id]/page.tsx`) จึงใช้ **Debounce** ยิง API ค้นหาแบบ Real-time แทนการฟิลเตอร์ฝั่ง Client เพื่อให้มั่นใจว่าจะเจอข้อมูลครบถ้วน
+- ในหน้า `customers/new/page.tsx` ใช้เทคนิคเดียวกันเพื่อเตือนบน UI แบบ Real-time ว่าชื่อลูกค้าที่กำลังพิมพ์ ซ้ำกับในระบบหรือไม่ (`isDuplicate`) ช่วยลดความผิดพลาดในการสร้างลูกค้าซ้ำ
+
+### 5. การประมวลผลสถานะการชำระเงิน (Sales List Status)
+- ในหน้ารายการขาย (`sales/page.tsx`) มีการคำนวณสถานะบิลแยกเป็น **ชำระแล้ว**, **ค้างชำระ** และ **ยกเลิกบิล**
+- คำนวณแบบ Real-time จากฝั่ง Server Component ผ่าน Prisma query (ดึง `paymentMethod`, `payments`, `debtPayments` และ `debtInterests`) โดยไม่ต้องสร้าง Request หรือ JOIN พิเศษใดๆ เพิ่ม เพื่อประเมินยอดหนี้คงเหลือ (`remaining = grandTotal - totalPaid`)
 
 ---
 
