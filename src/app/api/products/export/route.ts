@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
             productStocks: {
                 select: { quantity: true, warehouse: { select: { name: true } } },
                 ...(warehouse ? { where: { warehouseId: warehouse } } : {}),
+                orderBy: [{ warehouse: { isMain: 'desc' } }, { warehouse: { name: 'asc' } }],
             },
         },
         orderBy: { code: 'asc' },

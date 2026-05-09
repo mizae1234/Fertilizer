@@ -32,6 +32,11 @@ export default async function SalesPage({ searchParams }: Props) {
             { customer: { name: { contains: searchQuery, mode: 'insensitive' as const } } },
             { createdBy: { name: { contains: searchQuery, mode: 'insensitive' as const } } },
         ];
+
+        const numQuery = Number(searchQuery.replace(/,/g, ''));
+        if (!isNaN(numQuery) && searchQuery.trim() !== '') {
+            (where.OR as Record<string, unknown>[]).push({ totalAmount: { equals: numQuery } });
+        }
     }
 
     const [sales, total] = await Promise.all([
@@ -103,7 +108,7 @@ export default async function SalesPage({ searchParams }: Props) {
             {/* Search */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">
                 <Suspense fallback={<div className="h-11 bg-gray-100 rounded-xl animate-pulse" />}>
-                    <SearchBar placeholder="🔍 ค้นหาเลขบิล หรือชื่อลูกค้า..." />
+                    <SearchBar placeholder="🔍 ค้นหาเลขบิล, ชื่อลูกค้า หรือมูลค่าบิล..." />
                 </Suspense>
             </div>
 

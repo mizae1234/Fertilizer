@@ -28,6 +28,7 @@ export async function GET(
                 productGroup: { select: { name: true } },
                 productStocks: {
                     include: { warehouse: { select: { id: true, name: true } } },
+                    orderBy: [{ warehouse: { isMain: 'desc' } }, { warehouse: { name: 'asc' } }],
                 },
                 productPrices: {
                     include: { customerGroup: { select: { name: true } }, productUnit: { select: { id: true, unitName: true } } },

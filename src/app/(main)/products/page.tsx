@@ -64,6 +64,7 @@ export default async function ProductsPage({ searchParams }: Props) {
                 productStocks: {
                     select: { warehouseId: true, quantity: true, warehouse: { select: { name: true } } },
                     ...(warehouseFilter ? { where: { warehouseId: warehouseFilter } } : {}),
+                    orderBy: [{ warehouse: { isMain: 'desc' } }, { warehouse: { name: 'asc' } }],
                 },
             },
             skip: (page - 1) * perPage,
