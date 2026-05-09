@@ -296,6 +296,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
             id: true,
             saleNumber: true,
             totalAmount: true,
+            discount: true,
             createdAt: true,
             customer: { select: { name: true } },
             createdBy: { select: { name: true } },
@@ -362,16 +363,39 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
             }
         }
 
+        // Calculate gross revenue of items in this bill to distribute discount proportionally
+        let billGrossItemRevenue = 0;
+        for (const item of sale.items) {
+            const returned = retMap.get(item.id) || 0;
+            const remaining = item.quantity - returned;
+            if (remaining > 0) {
+                billGrossItemRevenue += remaining * Number(item.unitPrice);
+            }
+        }
+
+        const billDiscount = Number(sale.discount || 0);
+
         return sale.items
             .map(item => {
                 const returned = retMap.get(item.id) || 0;
                 const remaining = item.quantity - returned;
                 if (remaining <= 0) return null;
+                
                 const unitCost = Number(item.unitCost);
                 const rate = Number(item.conversionRate ?? 1);
-                const revenue = remaining * Number(item.unitPrice);
+                
+                const grossItemRev = remaining * Number(item.unitPrice);
+                
+                // Distribute bill discount to this item proportionally
+                let itemDiscount = 0;
+                if (billGrossItemRevenue > 0) {
+                    itemDiscount = (grossItemRev / billGrossItemRevenue) * billDiscount;
+                }
+                
+                const revenue = grossItemRev - itemDiscount;
                 const cogs = remaining * rate * unitCost;
                 const profit = revenue - cogs;
+                
                 return {
                     saleNumber: sale.saleNumber,
                     customer: sale.customer?.name || '-',
