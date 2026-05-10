@@ -94,6 +94,57 @@ src/
 - ในหน้ารายการขาย (`sales/page.tsx`) มีการคำนวณสถานะบิลแยกเป็น **ชำระแล้ว**, **ค้างชำระ** และ **ยกเลิกบิล**
 - คำนวณแบบ Real-time จากฝั่ง Server Component ผ่าน Prisma query (ดึง `paymentMethod`, `payments`, `debtPayments` และ `debtInterests`) โดยไม่ต้องสร้าง Request หรือ JOIN พิเศษใดๆ เพิ่ม เพื่อประเมินยอดหนี้คงเหลือ (`remaining = grandTotal - totalPaid`)
 
+### 6. การค้นหารายการขาย (Sales Search)
+- หน้ารายการขาย (`sales/page.tsx`) รองรับการค้นหาแบบ Multi-field ด้วย Prisma `OR` condition
+- ฟิลด์ที่ค้นหาได้: **เลขที่บิล** (`saleNumber`), **ชื่อลูกค้า** (`customer.name`), **มูลค่าบิล** (`totalAmount`)
+- กรณีค้นหา `totalAmount`: ใช้ `Prisma.Decimal` แปลงค่าก่อน หากค่าที่พิมพ์ไม่ใช่ตัวเลขจะ skip เงื่อนไขนี้อัตโนมัติ
+
+### 7. การเรียงลำดับสต็อกสินค้า (Product Stock Sorting)
+- ทุกที่ที่แสดงสต็อกสินค้าแยกตามคลัง จะเรียงตาม **Warehouse** ด้วย Logic เดียวกันทั้งระบบ:
+  1. **`isMain: 'desc'`** — คลังหลัก (Main Warehouse) ขึ้นก่อนเสมอ
+  2. **`name: 'asc'`** — คลังรองเรียงตามตัวอักษร A-Z / ก-ฮ
+- ครอบคลุมทุกจุด:
+  - หน้ารายการสินค้า (`products/page.tsx`)
+  - API รายละเอียดสินค้า (`api/products/[id]/route.ts`)
+  - API Export Excel สินค้า (`api/products/export/route.ts`)
+
+### 8. การคำนวณกำไรสุทธิ (Net Profit Calculation)
+
+#### หลักการคำนวณ
+กำไรสุทธิ (Net Profit) = ยอดขายรวม (Revenue) − ต้นทุนขาย (COGS) − ค่าใช้จ่าย (Expenses)
+
+- **Revenue** = `Sale.totalAmount` (หลังหักส่วนลดท้ายบิลแล้ว ตรงนี้ Database เก็บค่าสุทธิไว้แล้ว)
+- **COGS** = Σ (netQty × conversionRate × unitCost) สำหรับแต่ละ SaleItem ที่ไม่ถูกคืน
+- **Expenses** = Σ ค่าใช้จ่ายทั้งหมดในช่วงเวลา (จากตาราง `Expense`)
+
+#### การหักรายการคืนสินค้า (Sale Returns)
+- ทุกจุดที่คำนวณ COGS และจำนวนชิ้นขาย ต้องหักจำนวนชิ้นที่ลูกค้าคืนออกก่อนเสมอ
+- **Logic:**
+  ```
+  returnedQty = Σ SaleReturnItem.quantity ที่ saleItemId ตรงกัน
+  netQty = max(0, SaleItem.quantity - returnedQty)
+  ```
+- ครอบคลุม: `api/owner-dashboard/route.ts` (Owner Dashboard)
+
+#### การกระจายส่วนลดรายบิล (Proportional Discount Distribution)
+- กรณีบิลมี `discount` ท้ายบิล (Bill-level discount) จะกระจายส่วนลดนั้นไปยังแต่ละสินค้าตามสัดส่วนมูลค่า
+- **Logic (ใช้ใน Per-item P&L Report):**
+  ```
+  billGrossRevenue = Σ (netQty × unitPrice) ทุกรายการในบิล
+  itemDiscount = (grossItemRevenue / billGrossRevenue) × billDiscount
+  itemNetRevenue = grossItemRevenue - itemDiscount
+  itemProfit = itemNetRevenue - (netQty × rate × unitCost)
+  ```
+- ครอบคลุม: `actions/reports/financial-reports.ts` → ฟังก์ชัน `getPnLDetail()` ส่วน `byItem`
+
+#### สรุปความแตกต่างของแต่ละรายงาน
+| รายงาน | Revenue | COGS | ส่วนลด |
+|---|---|---|---|
+| Owner Dashboard (กำไรสุทธิ) | `totalAmount` (สุทธิ) | netQty × unitCost (หักคืนแล้ว) | รวมอยู่ใน Revenue แล้ว |
+| P&L ภาพรวม (`getPnLReport`) | `totalAmount` (สุทธิ) | netQty × unitCost (หักคืนแล้ว) | รวมอยู่ใน Revenue แล้ว |
+| P&L รายบิล (`byBill`) | `totalAmount` (สุทธิ) | netQty × unitCost (หักคืนแล้ว) | รวมอยู่ใน Revenue แล้ว |
+| P&L รายชิ้น (`byItem`) | netQty × unitPrice − itemDiscount | netQty × unitCost (หักคืนแล้ว) | กระจายตามสัดส่วน |
+
 ---
 
 ## 💡 Best Practices & จุดที่ต้องระวังในการแก้ไขโค้ด
@@ -117,5 +168,5 @@ src/
 
 ---
 
-**อัปเดตล่าสุด:** เมษายน 2026
+**อัปเดตล่าสุด:** พฤษภาคม 2026
 *ไฟล์นี้สามารถใช้เป็นคู่มืออ้างอิงและ Onboard นักพัฒนาใหม่เข้าสู่ระบบได้ทันที*
