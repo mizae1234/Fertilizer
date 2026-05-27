@@ -4,10 +4,11 @@ import { formatCurrency, formatDateTime } from '@/lib/utils';
 import StatusBadge from '@/components/StatusBadge';
 import { Suspense } from 'react';
 import DateRangeFilter from '@/components/DateRangeFilter';
+import SearchBar from '@/components/SearchBar';
 import PageHeader from '@/components/PageHeader';
 import Pagination from '@/components/Pagination';
 
-interface Props { searchParams: Promise<{ page?: string; status?: string; from?: string; to?: string }> }
+interface Props { searchParams: Promise<{ page?: string; status?: string; from?: string; to?: string; search?: string }> }
 
 export default async function GoodsReceivePage({ searchParams }: Props) {
     const sp = await searchParams;
@@ -15,6 +16,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
     const status = sp.status || '';
     const from = sp.from || '';
     const to = sp.to || '';
+    const searchQuery = sp.search || '';
     const perPage = 10;
 
     const where: Record<string, unknown> = { deletedAt: null };
@@ -23,6 +25,18 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
         where.createdAt = {};
         if (from) (where.createdAt as Record<string, unknown>).gte = new Date(from);
         if (to) (where.createdAt as Record<string, unknown>).lte = new Date(to + 'T23:59:59');
+    }
+    if (searchQuery) {
+        where.OR = [
+            { grNumber: { contains: searchQuery, mode: 'insensitive' } },
+            { poNumber: { contains: searchQuery, mode: 'insensitive' } },
+            { vendor: { name: { contains: searchQuery, mode: 'insensitive' } } },
+            { notes: { contains: searchQuery, mode: 'insensitive' } },
+            { items: { some: { product: { OR: [
+                { name: { contains: searchQuery, mode: 'insensitive' } },
+                { code: { contains: searchQuery, mode: 'insensitive' } }
+            ] } } } }
+        ];
     }
 
     const [records, total] = await Promise.all([
@@ -44,7 +58,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
 
     const buildUrl = (params: Record<string, string>) => {
         const p = new URLSearchParams();
-        const vals = { page: String(page), status, from, to, ...params };
+        const vals = { page: String(page), status, from, to, search: searchQuery, ...params };
         Object.entries(vals).forEach(([k, v]) => { if (v) p.set(k, v); });
         return `/goods-receive?${p.toString()}`;
     };
@@ -78,6 +92,13 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                         <DateRangeFilter />
                     </Suspense>
                 </div>
+            </div>
+
+            {/* Search */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">
+                <Suspense fallback={<div className="h-11 bg-gray-100 rounded-xl animate-pulse" />}>
+                    <SearchBar placeholder="🔍 ค้นหาเลข GR, เลข PO, ผู้ขาย หรือสินค้า..." />
+                </Suspense>
             </div>
 
             {/* Desktop Table */}
@@ -118,7 +139,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                 </table>
 
                 {totalPages > 1 && (
-                    <Pagination page={page} totalPages={totalPages} basePath="/goods-receive" params={{ status, from, to }} />
+                    <Pagination page={page} totalPages={totalPages} basePath="/goods-receive" params={{ status, from, to, search: searchQuery }} />
                 )}
             </div>
 
@@ -150,7 +171,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                     ))
                 )}
                 {totalPages > 1 && (
-                    <Pagination page={page} totalPages={totalPages} basePath="/goods-receive" params={{ status, from, to }} />
+                    <Pagination page={page} totalPages={totalPages} basePath="/goods-receive" params={{ status, from, to, search: searchQuery }} />
                 )}
             </div>
         </div>

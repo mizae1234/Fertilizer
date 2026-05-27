@@ -32,13 +32,22 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
         if (to) (where.creditDueDate as Record<string, unknown>).lte = new Date(to + 'T23:59:59');
     }
 
-    // Search by saleNumber or customer name
+    // Search by saleNumber, customer name, total amount, or product name/code
     if (q) {
         where.OR = [
             { saleNumber: { contains: q, mode: 'insensitive' } },
             { customer: { name: { contains: q, mode: 'insensitive' } } },
             { createdBy: { name: { contains: q, mode: 'insensitive' } } },
+            { items: { some: { product: { OR: [
+                { name: { contains: q, mode: 'insensitive' } },
+                { code: { contains: q, mode: 'insensitive' } }
+            ] } } } }
         ];
+
+        const numQuery = Number(q.replace(/,/g, ''));
+        if (!isNaN(numQuery) && q.trim() !== '') {
+            (where.OR as Record<string, unknown>[]).push({ totalAmount: { equals: numQuery } });
+        }
     }
 
     // Build orderBy from sort param

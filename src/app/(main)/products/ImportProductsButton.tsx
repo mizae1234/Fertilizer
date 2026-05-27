@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
+import { useUser } from '@/hooks/useUser';
 
 interface PreviewRow {
     code: string;
@@ -22,6 +23,8 @@ interface PreviewRow {
 export default function ImportProductsButton() {
     const [loading, setLoading] = useState(false);
     const [preview, setPreview] = useState<PreviewRow[] | null>(null);
+    const user = useUser();
+    const isStaff = user?.role === 'STAFF';
     const [file, setFile] = useState<File | null>(null);
     const [result, setResult] = useState<{ created: number; skipped: number; errors: string[] } | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
@@ -213,7 +216,7 @@ export default function ImportProductsButton() {
                                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">หน่วย</th>
                                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">หมวดหมู่</th>
                                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">ยี่ห้อ</th>
-                                            <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">ทุน</th>
+                                            {!isStaff && <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">ทุน</th>}
                                             <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">ราคาขาย</th>
                                             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">บรรจุภัณฑ์</th>
                                             <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">แต้ม</th>
@@ -230,7 +233,7 @@ export default function ImportProductsButton() {
                                                 <td className="px-3 py-2 text-gray-600">{row.unit}</td>
                                                 <td className="px-3 py-2 text-gray-600">{row.productGroup || <span className="text-gray-300">-</span>}</td>
                                                 <td className="px-3 py-2 text-gray-600">{row.brand || '-'}</td>
-                                                <td className="px-3 py-2 text-right text-gray-600">{row.cost.toLocaleString()}</td>
+                                                {!isStaff && <td className="px-3 py-2 text-right text-gray-600">{row.cost.toLocaleString()}</td>}
                                                 <td className="px-3 py-2 text-right font-semibold text-gray-800">{row.price.toLocaleString()}</td>
                                                 <td className="px-3 py-2 text-gray-600">{row.packaging || '-'}</td>
                                                 <td className="px-3 py-2 text-right text-gray-600">{row.pointsPerUnit}</td>

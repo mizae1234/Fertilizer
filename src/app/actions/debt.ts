@@ -88,14 +88,26 @@ function computeDebtTotals<T extends {
     };
 }
 
-export async function addInterest(saleId: string, percentage: number, note?: string) {
+export async function addInterest(
+    saleId: string,
+    percentage: number,
+    months: number = 1,
+    days: number = 0,
+    note?: string
+) {
     const detail = await getDebtSummary(saleId);
     if (!detail) throw new Error('ไม่พบบิล');
 
     const baseAmount = detail.remaining;
     if (baseAmount <= 0) throw new Error('ไม่มียอดค้างชำระ');
 
-    const amount = Math.round(baseAmount * percentage / 100 * 100) / 100;
+    const timeMultiplier = months + (days / 30);
+    const calculatedPercentage = percentage * timeMultiplier;
+    const amount = Math.round(baseAmount * calculatedPercentage / 100 * 100) / 100;
+
+    const timeLabel = days > 0 
+        ? `${months} เดือน ${days} วัน` 
+        : `${months} เดือน`;
 
     await prisma.debtInterest.create({
         data: {
@@ -103,12 +115,52 @@ export async function addInterest(saleId: string, percentage: number, note?: str
             percentage,
             baseAmount,
             amount,
-            note: note || `ดอกเบี้ย ${percentage}% ของยอดค้าง ${baseAmount.toFixed(2)}`,
+            note: note || `ดอกเบี้ย ${percentage}% ต่อเดือน สำหรับเวลา ${timeLabel} (รวม ${calculatedPercentage.toFixed(2)}%) ของยอดค้าง ${baseAmount.toFixed(2)}`,
         },
     });
 
     revalidatePath(`/overdue-bills/${saleId}`);
     return { amount };
+}
+
+export async function deleteInterest(interestId: string, saleId: string) {
+    await prisma.$transaction(async (tx) => {
+        await tx.debtInterest.delete({
+            where: { id: interestId }
+        });
+
+        const [sale, debtPayments, debtInterests] = await Promise.all([
+            tx.sale.findUnique({
+                where: { id: saleId },
+                select: { id: true, totalAmount: true, payments: true, paymentMethod: true, creditDueDate: true },
+            }),
+            tx.debtPayment.findMany({ where: { saleId } }),
+            tx.debtInterest.findMany({ where: { saleId } }),
+        ]);
+        if (!sale) throw new Error('ไม่พบบิล');
+
+        const detail = computeDebtTotals({ ...sale, debtPayments, debtInterests });
+        
+        if (detail.isPaidOff && sale.paymentMethod !== 'PAID') {
+            await tx.sale.update({
+                where: { id: saleId },
+                data: { paymentMethod: 'PAID' },
+            });
+        } else if (!detail.isPaidOff && sale.paymentMethod === 'PAID') {
+            let hasInitialNonCredit = false;
+            if (sale.payments && Array.isArray(sale.payments)) {
+                hasInitialNonCredit = (sale.payments as any[]).some(p => p.method !== 'CREDIT');
+            }
+            await tx.sale.update({
+                where: { id: saleId },
+                data: { paymentMethod: hasInitialNonCredit ? 'SPLIT' : 'CREDIT' },
+            });
+        }
+    });
+
+    revalidatePath(`/overdue-bills/${saleId}`);
+    revalidatePath('/overdue-bills');
+    return { success: true };
 }
 
 export async function payDebt(

@@ -31,6 +31,10 @@ export default async function SalesPage({ searchParams }: Props) {
             { saleNumber: { contains: searchQuery, mode: 'insensitive' as const } },
             { customer: { name: { contains: searchQuery, mode: 'insensitive' as const } } },
             { createdBy: { name: { contains: searchQuery, mode: 'insensitive' as const } } },
+            { items: { some: { product: { OR: [
+                { name: { contains: searchQuery, mode: 'insensitive' as const } },
+                { code: { contains: searchQuery, mode: 'insensitive' as const } }
+            ] } } } }
         ];
 
         const numQuery = Number(searchQuery.replace(/,/g, ''));

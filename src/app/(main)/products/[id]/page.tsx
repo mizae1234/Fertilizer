@@ -1054,7 +1054,7 @@ export default function ProductDetailPage() {
                                                         <span>
                                                             {(tx.type === 'SALE' || tx.type === 'SALE_CANCEL' || tx.type === 'SALE_RETURN')
                                                                 ? <span className="text-blue-600 font-medium">ราคาขาย {formatCurrency(tx.sellingPrice ?? Number(tx.unitCost))}</span>
-                                                                : <>@ {formatCurrency(Number(tx.unitCost))}</>}
+                                                                : (user?.role === 'ADMIN' ? <>@ {formatCurrency(Number(tx.unitCost))}</> : null)}
                                                         </span>
                                                         {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
                                                     </div>

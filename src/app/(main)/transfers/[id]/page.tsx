@@ -7,6 +7,7 @@ import StatusBadge from '@/components/StatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
 import { formatDate } from '@/lib/utils';
+import { useUser } from '@/hooks/useUser';
 
 interface TransferDetail {
     id: string; transferNumber: string; status: string; notes: string | null; createdAt: string;
@@ -22,6 +23,7 @@ interface TransferDetail {
 export default function TransferDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const user = useUser();
     const [transfer, setTransfer] = useState<TransferDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
@@ -98,7 +100,7 @@ export default function TransferDetailPage() {
                 </table>
             </div>
 
-            {transfer.status === 'PENDING' && (
+            {transfer.status === 'PENDING' && user?.role !== 'STAFF' && (
                 <div className="flex gap-3">
                     <button onClick={() => setShowReject(true)} className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-500 text-white font-medium text-sm hover:from-red-600 hover:to-rose-600">ปฏิเสธ</button>
                     <button onClick={() => setShowApprove(true)} className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200">อนุมัติ</button>

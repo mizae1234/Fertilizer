@@ -177,6 +177,8 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
     const [detailPage, setDetailPage] = useState(1);
     const [customerSearch, setCustomerSearch] = useState('');
     const [customerPage, setCustomerPage] = useState(1);
+    const [productSearch, setProductSearch] = useState('');
+    const [productPage, setProductPage] = useState(1);
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
     const [customerItems, setCustomerItems] = useState<{ saleNumber: string; createdAt: string; productName: string; productCode: string; quantity: number; unit: string; unitPrice: number; total: number; warehouse: string }[]>([]);
     const [loadingCustomerItems, setLoadingCustomerItems] = useState(false);
@@ -230,7 +232,11 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
     };
     const handleExportProducts = () => {
         if (!productData) return;
-        exportToExcel(productData.topProducts.map(p => ({ 'รหัส': p.code, 'ชื่อสินค้า': p.name, 'หมวดหมู่': p.group, 'จำนวนขาย': p.quantity, 'ยอดขาย': p.totalAmount, 'จำนวนบิล': p.orderCount })),
+        const pq = productSearch.toLowerCase().trim();
+        const filtered = pq
+            ? productData.topProducts.filter(p => p.name.toLowerCase().includes(pq) || p.code.toLowerCase().includes(pq) || p.group.toLowerCase().includes(pq))
+            : productData.topProducts;
+        exportToExcel(filtered.map(p => ({ 'รหัส': p.code, 'ชื่อสินค้า': p.name, 'หมวดหมู่': p.group, 'จำนวนขาย': p.quantity, 'ยอดขาย': p.totalAmount, 'จำนวนบิล': p.orderCount })),
             `สินค้าขายดี_${dateFrom || 'all'}_${dateTo || 'all'}`);
     };
     const handleExportCustomers = () => {
@@ -334,56 +340,86 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                         </div>
                     )}
 
-                    {section === 'products' && productData && (
-                        <div className="space-y-4">
-                            <div className="flex justify-end"><ExportButton onClick={handleExportProducts} /></div>
-                            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                                <h3 className="font-semibold text-gray-800 text-sm mb-3">🏆 สินค้าขายดี</h3>
-                                {productData.topProducts.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">ไม่มีข้อมูล</p> : (
-                                    <table className="w-full"><thead><tr className="text-xs text-gray-500 border-b border-gray-100">
-                                        <th className="text-left py-2 pr-2">#</th><th className="text-left py-2">สินค้า</th>
-                                        <th className="text-right py-2">จำนวน</th><th className="text-right py-2">ยอดขาย</th>
-                                    </tr></thead><tbody>
-                                            {productData.topProducts.map((p, i) => (
-                                                <tr key={p.productId} className="border-b border-gray-50">
-                                                    <td className="py-2 pr-2 text-sm text-gray-400">{i + 1}</td>
-                                                    <td className="py-2"><p className="text-sm font-medium text-gray-800">{p.name}</p><p className="text-xs text-gray-400">{p.code} · {p.group}</p></td>
-                                                    <td className="py-2 text-right text-sm text-gray-600">{p.quantity}</td>
-                                                    <td className="py-2 text-right text-sm font-semibold text-emerald-600">{formatCurrency(p.totalAmount)}</td>
-                                                </tr>
+                    {section === 'products' && productData && (() => {
+                        const pq = productSearch.toLowerCase().trim();
+                        const filteredProducts = pq
+                            ? productData.topProducts.filter(p => p.name.toLowerCase().includes(pq) || p.code.toLowerCase().includes(pq) || p.group.toLowerCase().includes(pq))
+                            : productData.topProducts;
+                        const prodTotalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
+                        const prodPageData = filteredProducts.slice((productPage - 1) * PAGE_SIZE, productPage * PAGE_SIZE);
+                        return (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <div className="flex-1 min-w-[200px]">
+                                        <input type="text" value={productSearch}
+                                            onChange={e => { setProductSearch(e.target.value); setProductPage(1); }}
+                                            placeholder="🔍 ค้นหาสินค้า..."
+                                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400" />
+                                    </div>
+                                    <p className="text-sm text-gray-500 shrink-0">{filteredProducts.length} รายการ</p>
+                                    <ExportButton onClick={handleExportProducts} />
+                                </div>
+                                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                                    <h3 className="font-semibold text-gray-800 text-sm mb-3">🏆 สินค้าขายดี</h3>
+                                    {filteredProducts.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">ไม่พบข้อมูล</p> : (
+                                        <>
+                                            <table className="w-full">
+                                                <thead>
+                                                    <tr className="text-xs text-gray-500 border-b border-gray-100">
+                                                        <th className="text-left py-2 pr-2">#</th>
+                                                        <th className="text-left py-2">สินค้า</th>
+                                                        <th className="text-right py-2">จำนวน</th>
+                                                        <th className="text-right py-2">ยอดขาย</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {prodPageData.map((p, i) => (
+                                                        <tr key={p.productId} className="border-b border-gray-50">
+                                                            <td className="py-2 pr-2 text-sm text-gray-400">{(productPage - 1) * PAGE_SIZE + i + 1}</td>
+                                                            <td className="py-2">
+                                                                <p className="text-sm font-medium text-gray-800">{p.name}</p>
+                                                                <p className="text-xs text-gray-400">{p.code} · {p.group}</p>
+                                                            </td>
+                                                            <td className="py-2 text-right text-sm text-gray-600">{p.quantity}</td>
+                                                            <td className="py-2 text-right text-sm font-semibold text-emerald-600">{formatCurrency(p.totalAmount)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                            <Pagination page={productPage} totalPages={prodTotalPages} onPageChange={setProductPage} />
+                                        </>
+                                    )}
+                                </div>
+                                {productData.byCategory.length > 0 && (
+                                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                                        <h3 className="font-semibold text-gray-800 text-sm mb-3">📁 ตามหมวดหมู่</h3>
+                                        {productData.byCategory.map((c, i) => {
+                                            const max = Math.max(...productData.byCategory.map(x => x.totalAmount));
+                                            return (
+                                                <div key={i} className="mb-2">
+                                                    <div className="flex justify-between text-sm mb-1"><span className="text-gray-700">{c.category}</span><span className="font-semibold text-gray-800">{formatCurrency(c.totalAmount)}</span></div>
+                                                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" style={{ width: `${(c.totalAmount / max) * 100}%` }} /></div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {productData.slowMovers.length > 0 && (
+                                    <div className="bg-white rounded-xl border border-orange-100 shadow-sm p-4">
+                                        <h3 className="font-semibold text-orange-600 text-sm mb-3">🐌 สินค้าไม่มีการขาย</h3>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                            {productData.slowMovers.map(p => (
+                                                <div key={p.id} className="bg-orange-50 rounded-lg px-3 py-2">
+                                                    <p className="text-sm font-medium text-gray-700 truncate">{p.name}</p>
+                                                    <p className="text-xs text-gray-400">{p.code}</p>
+                                                </div>
                                             ))}
-                                        </tbody></table>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
-                            {productData.byCategory.length > 0 && (
-                                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                                    <h3 className="font-semibold text-gray-800 text-sm mb-3">📁 ตามหมวดหมู่</h3>
-                                    {productData.byCategory.map((c, i) => {
-                                        const max = Math.max(...productData.byCategory.map(x => x.totalAmount));
-                                        return (
-                                            <div key={i} className="mb-2">
-                                                <div className="flex justify-between text-sm mb-1"><span className="text-gray-700">{c.category}</span><span className="font-semibold text-gray-800">{formatCurrency(c.totalAmount)}</span></div>
-                                                <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" style={{ width: `${(c.totalAmount / max) * 100}%` }} /></div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                            {productData.slowMovers.length > 0 && (
-                                <div className="bg-white rounded-xl border border-orange-100 shadow-sm p-4">
-                                    <h3 className="font-semibold text-orange-600 text-sm mb-3">🐌 สินค้าไม่มีการขาย</h3>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                        {productData.slowMovers.map(p => (
-                                            <div key={p.id} className="bg-orange-50 rounded-lg px-3 py-2">
-                                                <p className="text-sm font-medium text-gray-700 truncate">{p.name}</p>
-                                                <p className="text-xs text-gray-400">{p.code}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {
                         section === 'customers' && customerData && (() => {

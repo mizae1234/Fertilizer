@@ -36,7 +36,7 @@ export default function OverdueDateFilter() {
             <div>
                 <label className="text-xs text-gray-500 mb-1 block">ค้นหา</label>
                 <input type="text" value={q} onChange={e => setQ(e.target.value)}
-                    placeholder="เลขที่บิล / ชื่อลูกค้า..."
+                    placeholder="เลขบิล, ชื่อลูกค้า, มูลค่า, สินค้า..."
                     onKeyDown={e => e.key === 'Enter' && applyFilter()}
                     className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-48" />
             </div>

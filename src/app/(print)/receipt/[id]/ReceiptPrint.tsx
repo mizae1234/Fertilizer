@@ -13,7 +13,7 @@ interface SaleItem {
 interface Sale {
     id: string;
     saleNumber: string;
-    customer: { name: string; phone: string } | null;
+    customer: { name: string; phone: string; address?: string | null; taxId?: string | null } | null;
     createdBy: { name: string } | null;
     createdAt: string;
     totalAmount: number;
@@ -142,9 +142,11 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                         {(template?.showStaff !== false) && <span>พนง: {sale.createdBy?.name || '-'}</span>}
                     </div>
                     {(template?.showCustomer !== false) && sale.customer && (
-                        <div>
+                        <div style={{ borderBottom: '1px dashed #000', paddingBottom: '4px', marginBottom: '4px' }}>
                             <div>ลูกค้า: {sale.customer.name}</div>
                             {sale.customer.phone && <div>โทร: {sale.customer.phone}</div>}
+                            {sale.customer.address && <div>ที่อยู่: {sale.customer.address}</div>}
+                            {sale.customer.taxId && <div>เลขผู้เสียภาษี: {sale.customer.taxId}</div>}
                         </div>
                     )}
                 </div>

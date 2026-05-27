@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { addInterest, payDebt } from '@/app/actions/debt';
+import { addInterest, payDebt, deleteInterest } from '@/app/actions/debt';
 import { useRouter } from 'next/navigation';
 
 const formatCurrency = (n: number) => '฿' + n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -206,20 +206,42 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
     const [loading, setLoading] = useState(false);
     const [showPayment, setShowPayment] = useState(false);
     const [interestPct, setInterestPct] = useState('');
+    const [interestMonths, setInterestMonths] = useState('1');
+    const [interestDays, setInterestDays] = useState('0');
     const [interestNote, setInterestNote] = useState('');
     const [alert, setAlert] = useState({ open: false, message: '', type: 'success' as 'success' | 'error' | 'warning', title: '' });
 
-    const calculatedInterest = sale.remaining * (parseFloat(interestPct) || 0) / 100;
+    const pct = parseFloat(interestPct) || 0;
+    const months = parseFloat(interestMonths) || 0;
+    const days = parseFloat(interestDays) || 0;
+    const calculatedInterest = sale.remaining * (pct / 100) * (months + (days / 30));
 
     const handleAddInterest = async () => {
-        const pct = parseFloat(interestPct);
-        if (!pct || pct <= 0) { setAlert({ open: true, message: 'กรุณาระบุ % ดอกเบี้ย', type: 'warning', title: 'ข้อมูลไม่ครบ' }); return; }
+        const pctVal = parseFloat(interestPct);
+        if (!pctVal || pctVal <= 0) { setAlert({ open: true, message: 'กรุณาระบุ % ดอกเบี้ย', type: 'warning', title: 'ข้อมูลไม่ครบ' }); return; }
+        const m = parseFloat(interestMonths) || 0;
+        const d = parseFloat(interestDays) || 0;
+        if (m === 0 && d === 0) { setAlert({ open: true, message: 'กรุณาระบุจำนวนเดือนหรือจำนวนวันอย่างน้อย 1 อย่าง', type: 'warning', title: 'ข้อมูลไม่ครบ' }); return; }
         setLoading(true);
         try {
-            const result = await addInterest(sale.id, pct, interestNote || undefined);
+            const result = await addInterest(sale.id, pctVal, m, d, interestNote || undefined);
             setAlert({ open: true, message: `เพิ่มดอกเบี้ย ${formatCurrency(result.amount)} สำเร็จ`, type: 'success', title: 'บันทึกดอกเบี้ย' });
             setInterestPct('');
+            setInterestMonths('1');
+            setInterestDays('0');
             setInterestNote('');
+            router.refresh();
+        } catch (err) {
+            setAlert({ open: true, message: (err as Error).message, type: 'error', title: 'เกิดข้อผิดพลาด' });
+        } finally { setLoading(false); }
+    };
+
+    const handleDeleteInterest = async (interestId: string) => {
+        if (!confirm('ยืนยันที่จะยกเลิกดอกเบี้ยนี้ใช่หรือไม่? ยอดค้างชำระจะลดลงทันที')) return;
+        setLoading(true);
+        try {
+            await deleteInterest(interestId, sale.id);
+            setAlert({ open: true, message: 'ยกเลิกดอกเบี้ยสำเร็จ', type: 'success', title: 'สำเร็จ' });
             router.refresh();
         } catch (err) {
             setAlert({ open: true, message: (err as Error).message, type: 'error', title: 'เกิดข้อผิดพลาด' });
@@ -252,30 +274,46 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
                         <h2 className="text-sm font-semibold text-gray-700">📊 เพิ่มดอกเบี้ย</h2>
                         <span className="text-[11px] text-gray-400">ยอดค้าง: {formatCurrency(sale.remaining)}</span>
                     </div>
-                    <div className="p-4">
-                        <div className="flex items-end gap-3 flex-wrap">
-                            <div className="flex-1 min-w-[120px]">
-                                <label className="text-xs text-gray-500 block mb-1">ดอกเบี้ย (%)</label>
+                    <div className="p-4 space-y-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div>
+                                <label className="text-xs text-gray-500 block mb-1">ดอกเบี้ยต่อเดือน (%)</label>
                                 <input type="number" value={interestPct}
                                     onChange={e => setInterestPct(e.target.value)}
                                     className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-orange-400"
                                     placeholder="เช่น 1.5" step="0.01" min={0} />
                             </div>
-                            <div className="flex-1 min-w-[120px]">
-                                <label className="text-xs text-gray-500 block mb-1">จำนวนเงิน</label>
+                            <div>
+                                <label className="text-xs text-gray-500 block mb-1">จำนวนเดือน</label>
+                                <input type="number" value={interestMonths}
+                                    onChange={e => setInterestMonths(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                                    placeholder="เช่น 1" min={0} />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500 block mb-1">จำนวนวันที่เกิน (วัน)</label>
+                                <input type="number" value={interestDays}
+                                    onChange={e => setInterestDays(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                                    placeholder="เช่น 15" min={0} />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500 block mb-1">ดอกเบี้ยที่คำนวณได้</label>
                                 <p className="px-3 py-2 rounded-lg bg-orange-50 border border-orange-200 text-sm font-semibold text-orange-600">
                                     {formatCurrency(calculatedInterest)}
                                 </p>
                             </div>
-                            <div className="flex-[2] min-w-[180px]">
+                        </div>
+                        <div className="flex items-end gap-3 flex-wrap">
+                            <div className="flex-1 min-w-[200px]">
                                 <label className="text-xs text-gray-500 block mb-1">หมายเหตุ</label>
                                 <input type="text" value={interestNote}
                                     onChange={e => setInterestNote(e.target.value)}
                                     className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-orange-400"
-                                    placeholder="(ไม่บังคับ)" />
+                                    placeholder="เว้นว่างไว้เพื่อสร้างหมายเหตุอัตโนมัติ" />
                             </div>
                             <button onClick={handleAddInterest} disabled={loading || !interestPct}
-                                className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 disabled:opacity-50 shrink-0">
+                                className="px-5 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 disabled:opacity-50 shrink-0">
                                 {loading ? '⏳' : '+ เพิ่มดอกเบี้ย'}
                             </button>
                         </div>
@@ -292,11 +330,20 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
                     <div className="divide-y divide-gray-50">
                         {sale.debtInterests.map(di => (
                             <div key={di.id} className="px-4 py-3 flex items-center justify-between">
-                                <div>
+                                <div className="flex-1 mr-4">
                                     <p className="text-sm text-gray-700">ดอกเบี้ย {di.percentage}% ของ {formatCurrency(di.baseAmount)}</p>
                                     <p className="text-[11px] text-gray-400">{di.note} · {formatDate(di.createdAt)}</p>
                                 </div>
-                                <span className="text-sm font-semibold text-orange-500">+{formatCurrency(di.amount)}</span>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm font-semibold text-orange-500">+{formatCurrency(di.amount)}</span>
+                                    <button
+                                        onClick={() => handleDeleteInterest(di.id)}
+                                        disabled={loading}
+                                        className="px-2.5 py-1 text-xs text-red-600 hover:text-red-700 font-medium rounded-lg bg-red-50 hover:bg-red-100 transition-colors"
+                                    >
+                                        ยกเลิก
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

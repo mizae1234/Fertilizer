@@ -5,10 +5,14 @@ import { useRouter } from 'next/navigation';
 import { approveGoodsReceive, rejectGoodsReceive } from '@/app/actions/goods-receive';
 import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
+import { useUser } from '@/hooks/useUser';
 
 export default function GoodsReceiveActions({ id }: { id: string }) {
     const router = useRouter();
+    const user = useUser();
     const [loading, setLoading] = useState('');
+
+    if (user?.role === 'STAFF') return null;
     const [showApprove, setShowApprove] = useState(false);
     const [showReject, setShowReject] = useState(false);
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; type: 'success' | 'error' }>({ open: false, message: '', type: 'error' });

@@ -12,7 +12,7 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
     const sale = await prisma.sale.findUnique({
         where: { id },
         include: {
-            customer: { select: { name: true, phone: true } },
+            customer: { select: { name: true, phone: true, address: true, taxId: true } },
             createdBy: { select: { name: true } },
             items: {
                 include: {

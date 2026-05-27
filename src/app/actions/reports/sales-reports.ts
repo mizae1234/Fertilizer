@@ -221,7 +221,6 @@ export async function getTopProducts(dateFrom?: string, dateTo?: string) {
 
     const topProducts = Array.from(productAgg.values())
         .sort((a, b) => b.totalAmount - a.totalAmount)
-        .slice(0, 20)
         .map(p => ({
             productId: p.productId,
             name: p.name,

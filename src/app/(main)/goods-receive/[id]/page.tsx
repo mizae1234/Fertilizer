@@ -7,6 +7,7 @@ import StatusBadge from '@/components/StatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { useUser } from '@/hooks/useUser';
 
 interface Vendor { id: string; name: string; phone: string | null; lineId: string | null }
 interface Product { id: string; name: string; code: string; unit: string }
@@ -57,6 +58,7 @@ export default function GoodsReceiveDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
+    const user = useUser();
 
     const [gr, setGr] = useState<GRDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -641,22 +643,24 @@ export default function GoodsReceiveDetailPage() {
                     </button>
 
                     {/* Approve / Reject buttons */}
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => setShowReject(true)}
-                            disabled={actionLoading !== ''}
-                            className="flex-1 py-2.5 rounded-xl border-2 border-red-200 text-red-600 font-medium text-sm hover:bg-red-50 disabled:opacity-50"
-                        >
-                            {actionLoading === 'reject' ? 'กำลังดำเนินการ...' : '❌ ปฏิเสธ'}
-                        </button>
-                        <button
-                            onClick={() => setShowApprove(true)}
-                            disabled={actionLoading !== ''}
-                            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200 disabled:opacity-50"
-                        >
-                            {actionLoading === 'approve' ? 'กำลังดำเนินการ...' : '✅ อนุมัติรับสินค้า'}
-                        </button>
-                    </div>
+                    {user?.role !== 'STAFF' && (
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowReject(true)}
+                                disabled={actionLoading !== ''}
+                                className="flex-1 py-2.5 rounded-xl border-2 border-red-200 text-red-600 font-medium text-sm hover:bg-red-50 disabled:opacity-50"
+                            >
+                                {actionLoading === 'reject' ? 'กำลังดำเนินการ...' : '❌ ปฏิเสธ'}
+                            </button>
+                            <button
+                                onClick={() => setShowApprove(true)}
+                                disabled={actionLoading !== ''}
+                                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200 disabled:opacity-50"
+                            >
+                                {actionLoading === 'approve' ? 'กำลังดำเนินการ...' : '✅ อนุมัติรับสินค้า'}
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 

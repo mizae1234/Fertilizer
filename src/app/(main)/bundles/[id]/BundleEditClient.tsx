@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { updateBundle, deleteBundle } from '@/app/actions/bundles';
 import AlertModal from '@/components/AlertModal';
 import { formatCurrency } from '@/lib/utils';
+import { useUser } from '@/hooks/useUser';
 
 interface Product {
     id: string;
@@ -39,6 +40,8 @@ interface BundleData {
 
 export default function BundleEditClient({ bundle }: { bundle: BundleData }) {
     const router = useRouter();
+    const user = useUser();
+    const isStaff = user?.role === 'STAFF';
     const [loading, setLoading] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [products, setProducts] = useState<Product[]>([]);
@@ -191,20 +194,22 @@ export default function BundleEditClient({ bundle }: { bundle: BundleData }) {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1.5">ต้นทุนชุด (Cost) *</label>
-                            <input
-                                type="number"
-                                value={form.bundleCost || ''}
-                                onChange={(e) => setForm({ ...form, bundleCost: parseFloat(e.target.value) || 0 })}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                placeholder="0.00"
-                                step="0.01"
-                                min={0}
-                                required
-                            />
-                        </div>
-                        <div>
+                        {!isStaff && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 mb-1.5">ต้นทุนชุด (Cost) *</label>
+                                <input
+                                    type="number"
+                                    value={form.bundleCost || ''}
+                                    onChange={(e) => setForm({ ...form, bundleCost: parseFloat(e.target.value) || 0 })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min={0}
+                                    required={!isStaff}
+                                />
+                            </div>
+                        )}
+                        <div className={isStaff ? 'col-span-2' : ''}>
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">ราคาขายชุด (Price) *</label>
                             <input
                                 type="number"
@@ -226,17 +231,19 @@ export default function BundleEditClient({ bundle }: { bundle: BundleData }) {
                                 <span>ราคาแยกรวม (ขายเดี่ยว)</span>
                                 <span>{formatCurrency(totalRetailPrice)}</span>
                             </div>
-                            <div className="flex justify-between text-sm text-gray-500">
-                                <span>ต้นทุนสินค้ารวม (จากสินค้าย่อย)</span>
-                                <span>{formatCurrency(totalItemCost)}</span>
-                            </div>
+                            {!isStaff && (
+                                <div className="flex justify-between text-sm text-gray-500">
+                                    <span>ต้นทุนสินค้ารวม (จากสินค้าย่อย)</span>
+                                    <span>{formatCurrency(totalItemCost)}</span>
+                                </div>
+                            )}
                             {form.bundlePrice > 0 && (
                                 <>
                                     <div className="border-t border-gray-200 pt-1.5 flex justify-between text-sm font-medium">
                                         <span className="text-emerald-700">ลูกค้าประหยัด</span>
                                         <span className={savings > 0 ? 'text-emerald-600' : 'text-gray-400'}>{formatCurrency(savings)}</span>
                                     </div>
-                                    {form.bundleCost > 0 && (
+                                    {!isStaff && form.bundleCost > 0 && (
                                         <div className="flex justify-between text-sm font-medium">
                                             <span className="text-blue-700">กำไรต่อชุด</span>
                                             <span className={profit > 0 ? 'text-blue-600' : 'text-red-600'}>{formatCurrency(profit)}</span>

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
 import PageHeader from '@/components/PageHeader';
 import Pagination from '@/components/Pagination';
+import { isServerAdmin } from '@/lib/server-auth';
 
 interface Props {
     searchParams: Promise<{ page?: string; search?: string }>;
@@ -11,6 +12,7 @@ interface Props {
 export default async function BundlesPage({ searchParams }: Props) {
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
+    const isAdmin = await isServerAdmin();
     const search = sp.search || '';
     const perPage = 10;
 
@@ -85,7 +87,7 @@ export default async function BundlesPage({ searchParams }: Props) {
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">รหัส</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ชื่อชุดสินค้า</th>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">สินค้าในชุด</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ต้นทุนชุด</th>
+                                {isAdmin && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ต้นทุนชุด</th>}
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ราคาชุด</th>
                                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">สถานะ</th>
                             </tr>
@@ -93,7 +95,7 @@ export default async function BundlesPage({ searchParams }: Props) {
                         <tbody className="divide-y divide-gray-50">
                             {bundles.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-4 py-12 text-center text-gray-400">ไม่พบชุดสินค้า</td>
+                                    <td colSpan={isAdmin ? 6 : 5} className="px-4 py-12 text-center text-gray-400">ไม่พบชุดสินค้า</td>
                                 </tr>
                             ) : (
                                 bundles.map((bundle) => (
@@ -118,7 +120,7 @@ export default async function BundlesPage({ searchParams }: Props) {
                                                 ))}
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatCurrency(Number(bundle.bundleCost))}</td>
+                                        {isAdmin && <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatCurrency(Number(bundle.bundleCost))}</td>}
                                         <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(bundle.bundlePrice))}</td>
                                         <td className="px-4 py-3 text-center">
                                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${bundle.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>

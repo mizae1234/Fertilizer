@@ -310,6 +310,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
                     unitCost: true,
                     totalPrice: true,
                     conversionRate: true,
+                    discount: true,
                     product: { select: { name: true, code: true } },
                 },
             },
@@ -363,36 +364,42 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
             }
         }
 
-        // Calculate gross revenue of items in this bill to distribute discount proportionally
-        let billGrossItemRevenue = 0;
-        for (const item of sale.items) {
+        // Sum up item-level discounts
+        const sumAllItemDiscounts = sale.items.reduce((sum, item) => sum + Number(item.discount || 0), 0);
+        // Calculate the actual bill-level discount (sale.discount includes both item-level and bill-level discounts)
+        const actualBillDiscount = Math.max(0, Number(sale.discount || 0) - sumAllItemDiscounts);
+
+        // Calculate item net values before bill-level discount to distribute actualBillDiscount proportionally
+        const itemNetValues = sale.items.map(item => {
             const returned = retMap.get(item.id) || 0;
             const remaining = item.quantity - returned;
-            if (remaining > 0) {
-                billGrossItemRevenue += remaining * Number(item.unitPrice);
-            }
-        }
+            if (remaining <= 0) return { id: item.id, netBeforeBill: 0, remaining, grossItemRev: 0, remainingItemDiscount: 0 };
+            
+            const grossItemRev = remaining * Number(item.unitPrice);
+            // Pro-rate item-level discount if partially returned
+            const remainingItemDiscount = (remaining / item.quantity) * Number(item.discount || 0);
+            const netBeforeBill = Math.max(0, grossItemRev - remainingItemDiscount);
+            return { id: item.id, netBeforeBill, remaining, grossItemRev, remainingItemDiscount };
+        });
 
-        const billDiscount = Number(sale.discount || 0);
+        const totalNetBeforeBillDiscount = itemNetValues.reduce((s, x) => s + x.netBeforeBill, 0);
 
         return sale.items
-            .map(item => {
-                const returned = retMap.get(item.id) || 0;
-                const remaining = item.quantity - returned;
+            .map((item, idx) => {
+                const vals = itemNetValues[idx];
+                const remaining = vals.remaining;
                 if (remaining <= 0) return null;
                 
                 const unitCost = Number(item.unitCost);
                 const rate = Number(item.conversionRate ?? 1);
                 
-                const grossItemRev = remaining * Number(item.unitPrice);
-                
-                // Distribute bill discount to this item proportionally
-                let itemDiscount = 0;
-                if (billGrossItemRevenue > 0) {
-                    itemDiscount = (grossItemRev / billGrossItemRevenue) * billDiscount;
+                // Distribute actual bill-level discount proportionally based on the item net before bill discount
+                let itemBillDiscountShare = 0;
+                if (totalNetBeforeBillDiscount > 0) {
+                    itemBillDiscountShare = (vals.netBeforeBill / totalNetBeforeBillDiscount) * actualBillDiscount;
                 }
                 
-                const revenue = grossItemRev - itemDiscount;
+                const revenue = vals.netBeforeBill - itemBillDiscountShare;
                 const cogs = remaining * rate * unitCost;
                 const profit = revenue - cogs;
                 

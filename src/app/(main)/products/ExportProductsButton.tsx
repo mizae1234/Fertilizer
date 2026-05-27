@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import * as XLSX from 'xlsx';
+import { useUser } from '@/hooks/useUser';
 
 export default function ExportProductsButton() {
     const [loading, setLoading] = useState(false);
     const currentParams = useSearchParams();
+    const user = useUser();
+    const isStaff = user?.role === 'STAFF';
 
     const handleExport = async () => {
         setLoading(true);
@@ -26,19 +29,24 @@ export default function ExportProductsButton() {
             const rows = products.map((p: any) => {
                 const totalStock = p.productStocks.reduce((s: number, ps: any) => s + ps.quantity, 0);
                 const stockDetail = p.productStocks.map((ps: any) => `${ps.warehouse.name}: ${ps.quantity}`).join(' | ');
-                return {
+                const row: any = {
                     'รหัส': p.code,
                     'ชื่อสินค้า': p.name,
                     'หมวดหมู่': p.productGroup?.name || '',
                     'ยี่ห้อ': p.brand || '',
                     'บรรจุภัณฑ์': p.packaging || '',
                     'หน่วย': p.unit,
-                    'ต้นทุน': Number(p.cost),
-                    'ราคาขาย': Number(p.price),
-                    'Stock รวม': totalStock,
-                    'Stock แยกคลัง': stockDetail,
-                    'ประเภทต้นทุน': p.costMethod === 'AVG' ? 'เฉลี่ย' : p.costMethod === 'LAST' ? 'ล่าสุด' : 'กำหนดเอง',
                 };
+                if (!isStaff) {
+                    row['ต้นทุน'] = Number(p.cost);
+                }
+                row['ราคาขาย'] = Number(p.price);
+                row['Stock รวม'] = totalStock;
+                row['Stock แยกคลัง'] = stockDetail;
+                if (!isStaff) {
+                    row['ประเภทต้นทุน'] = p.costMethod === 'AVG' ? 'เฉลี่ย' : p.costMethod === 'LAST' ? 'ล่าสุด' : 'กำหนดเอง';
+                }
+                return row;
             });
 
             const ws = XLSX.utils.json_to_sheet(rows);

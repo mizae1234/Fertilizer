@@ -14,7 +14,7 @@ interface SaleData {
     notes: string | null;
     debtPaid: number;
     createdAt: string;
-    customer: { name: string; phone: string } | null;
+    customer: { name: string; phone: string; address?: string | null; taxId?: string | null } | null;
     createdBy: { name: string };
     items: {
         id: string;
@@ -215,12 +215,16 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
 
                 {/* Customer + Staff info */}
                 {(template?.showCustomer || template?.showStaff || !template) && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 8, alignItems: 'flex-start' }}>
                         {(template?.showCustomer || !template) && sale.customer && (
-                            <div>ลูกค้า: <strong style={{ color: '#222' }}>{sale.customer.name}</strong> {sale.customer.phone && `(${sale.customer.phone})`}</div>
+                            <div>
+                                <div>ลูกค้า: <strong style={{ color: '#222' }}>{sale.customer.name}</strong> {sale.customer.phone && `(${sale.customer.phone})`}</div>
+                                {sale.customer.address && <div style={{ marginTop: 2 }}>ที่อยู่: {sale.customer.address}</div>}
+                                {sale.customer.taxId && <div style={{ marginTop: 2 }}>เลขประจำตัวผู้เสียภาษี: {sale.customer.taxId}</div>}
+                            </div>
                         )}
                         {(template?.showStaff || !template) && (
-                            <div>พนักงาน: <strong style={{ color: '#222' }}>{sale.createdBy.name}</strong></div>
+                            <div style={{ textAlign: 'right' }}>พนักงาน: <strong style={{ color: '#222' }}>{sale.createdBy.name}</strong></div>
                         )}
                     </div>
                 )}
