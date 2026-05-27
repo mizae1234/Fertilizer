@@ -27,13 +27,7 @@ echo "🚀 Fertilizer Demo — Deploying to $DOMAIN"
 echo "══════════════════════════════════════"
 echo ""
 
-ssh "$SERVER" bash -s -- "$APP_DIR" "$DOMAIN" "$PORT" "$REPO_URL" "$DB_URL_DOCKER" "$DB_URL_HOST" << 'ENDSSH'
-APP_DIR="$1"
-DOMAIN="$2"
-PORT="$3"
-REPO_URL="$4"
-DB_URL_DOCKER="$5"
-DB_URL_HOST="$6"
+ssh "$SERVER" "APP_DIR='$APP_DIR' DOMAIN='$DOMAIN' PORT='$PORT' REPO_URL='$REPO_URL' DB_URL_DOCKER='$DB_URL_DOCKER' DB_URL_HOST='$DB_URL_HOST' bash" << 'ENDSSH'
 
 set -e
 
