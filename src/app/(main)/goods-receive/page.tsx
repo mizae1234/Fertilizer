@@ -1,3 +1,5 @@
+import { getServerUser } from '@/lib/server-auth';
+import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -11,6 +13,11 @@ import Pagination from '@/components/Pagination';
 interface Props { searchParams: Promise<{ page?: string; status?: string; from?: string; to?: string; search?: string }> }
 
 export default async function GoodsReceivePage({ searchParams }: Props) {
+    const user = await getServerUser();
+    if (!user || user.role === 'STAFF') {
+        redirect('/');
+    }
+
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
     const status = sp.status || '';

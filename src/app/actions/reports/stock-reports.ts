@@ -2,10 +2,14 @@
 
 import { prisma } from '@/lib/prisma';
 import { getDateRange } from './utils';
+import { isServerAdmin } from '@/lib/server-auth';
 
 // ==================== STOCK DETAIL REPORT ====================
 
 export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
+    if (!(await isServerAdmin())) {
+        throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูล');
+    }
     const dateRange = getDateRange(dateFrom, dateTo);
     const saleWhere = {
         status: 'APPROVED' as const,
@@ -130,6 +134,9 @@ export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
 // ==================== INVENTORY REPORTS ====================
 
 export async function getInventoryReport() {
+    if (!(await isServerAdmin())) {
+        throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูล');
+    }
     const [stocks, lowStockCount] = await Promise.all([
         prisma.productStock.findMany({
             include: {

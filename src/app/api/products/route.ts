@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getServerUser } from '@/lib/server-auth';
 
 export async function GET(request: Request) {
     try {
+        const user = await getServerUser();
+        const isStaff = user?.role === 'STAFF';
         const { searchParams } = new URL(request.url);
         const search = searchParams.get('search') || '';
         const warehouseId = searchParams.get('warehouseId') || '';
@@ -38,7 +41,14 @@ export async function GET(request: Request) {
             orderBy: { name: 'asc' },
         });
 
-        return NextResponse.json(JSON.parse(JSON.stringify(products)));
+        const serialized = JSON.parse(JSON.stringify(products));
+        if (isStaff) {
+            serialized.forEach((p: any) => {
+                p.cost = 0;
+            });
+        }
+
+        return NextResponse.json(serialized);
     } catch (error: any) {
         console.error('GET /api/products ERROR:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });

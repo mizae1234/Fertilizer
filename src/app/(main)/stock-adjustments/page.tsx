@@ -5,10 +5,12 @@ import { Suspense } from 'react';
 import DateRangeFilter from '@/components/DateRangeFilter';
 import PageHeader from '@/components/PageHeader';
 import Pagination from '@/components/Pagination';
+import { isServerAdmin } from '@/lib/server-auth';
 
 interface Props { searchParams: Promise<{ page?: string; search?: string; from?: string; to?: string }> }
 
 export default async function StockAdjustmentsPage({ searchParams }: Props) {
+    const isAdmin = await isServerAdmin();
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
     const search = sp.search || '';
@@ -64,7 +66,7 @@ export default async function StockAdjustmentsPage({ searchParams }: Props) {
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สินค้า</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">คลัง</th>
                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">จำนวน</th>
-                            <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">มูลค่า</th>
+                            {isAdmin && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">มูลค่า</th>}
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เหตุผล</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้ทำรายการ</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">วันที่</th>
@@ -72,7 +74,7 @@ export default async function StockAdjustmentsPage({ searchParams }: Props) {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {records.length === 0 ? (
-                            <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
+                            <tr><td colSpan={isAdmin ? 8 : 7} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
                         ) : (
                             records.map(r => (
                                 <tr key={r.id} className="hover:bg-gray-50">
@@ -83,7 +85,7 @@ export default async function StockAdjustmentsPage({ searchParams }: Props) {
                                     </td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{r.warehouse.name}</td>
                                     <td className={`px-4 py-3 text-sm font-semibold text-right ${r.quantity >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{r.quantity >= 0 ? '+' : ''}{r.quantity} {r.product.unit}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatCurrency(Math.abs(r.quantity) * Number(r.unitCost))}</td>
+                                    {isAdmin && <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatCurrency(Math.abs(r.quantity) * Number(r.unitCost))}</td>}
                                     <td className="px-4 py-3 text-sm text-gray-600 max-w-[200px] truncate">{r.notes || '-'}</td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{r.user?.name || '-'}</td>
                                     <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(r.createdAt)}</td>
@@ -114,7 +116,7 @@ export default async function StockAdjustmentsPage({ searchParams }: Props) {
                             {r.notes && <p className="text-xs text-gray-500 mb-2">💬 {r.notes}</p>}
                             <div className="flex items-center justify-between text-xs text-gray-400">
                                 <span>{formatDateTime(r.createdAt)}</span>
-                                <span className="text-gray-600">{r.user?.name || '-'} · {formatCurrency(Math.abs(r.quantity) * Number(r.unitCost))}</span>
+                                <span className="text-gray-600">{r.user?.name || '-'}{isAdmin ? ` · ${formatCurrency(Math.abs(r.quantity) * Number(r.unitCost))}` : ''}</span>
                             </div>
                         </div>
                     ))

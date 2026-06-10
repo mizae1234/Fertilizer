@@ -137,11 +137,32 @@ function Pagination({ page, totalPages, onPageChange }: { page: number; totalPag
     );
 }
 
+import { useUser } from '@/hooks/useUser';
+import { useRouter } from 'next/navigation';
+
 // ==================== MAIN PAGE ====================
 export default function ReportsPage() {
+    const router = useRouter();
+    const user = useUser();
     const [activeTab, setActiveTab] = useState<'sales' | 'inventory' | 'financial'>('sales');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+
+    useEffect(() => {
+        if (user && user.role === 'STAFF') {
+            router.push('/');
+        }
+    }, [user, router]);
+
+    if (!user) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    if (user.role === 'STAFF') return null;
 
     return (
         <div className="space-y-4">

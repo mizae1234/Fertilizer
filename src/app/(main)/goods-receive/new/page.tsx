@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createGoodsReceive } from '@/app/actions/goods-receive';
 import AlertModal from '@/components/AlertModal';
+import { useUser } from '@/hooks/useUser';
 
 interface Vendor { id: string; name: string; phone: string | null }
 interface Product { id: string; name: string; code: string; unit: string }
@@ -111,6 +112,14 @@ function ProductPicker({
 // ── Main Page ─────────────────────────────────────────────
 export default function NewGoodsReceivePage() {
     const router = useRouter();
+    const user = useUser();
+
+    useEffect(() => {
+        if (user && user.role === 'STAFF') {
+            router.push('/');
+        }
+    }, [user, router]);
+
     const [loading, setLoading] = useState(false);
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
@@ -216,6 +225,15 @@ export default function NewGoodsReceivePage() {
         const usedIds = items.map(i => i.productId).filter(id => id && id !== currentProductId);
         return products.filter(p => !usedIds.includes(p.id));
     };
+
+    if (!user) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+    if (user.role === 'STAFF') return null;
 
     return (
         <div className="animate-fade-in max-w-4xl mx-auto">

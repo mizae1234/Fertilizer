@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getServerUser } from '@/lib/server-auth';
 
 export async function GET(request: Request) {
+    const user = await getServerUser();
+    if (!user || user.role === 'STAFF') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const from = searchParams.get('from');
     const to = searchParams.get('to');

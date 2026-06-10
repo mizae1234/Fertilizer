@@ -52,14 +52,26 @@ function getPresetDates(preset: Preset): { from: string; to: string } {
     return { from: d.toISOString().split('T')[0], to: now.toISOString().split('T')[0] };
 }
 
+import { useUser } from '@/hooks/useUser';
+import { useRouter } from 'next/navigation';
+
 export default function OwnerDashboardPage() {
+    const router = useRouter();
+    const user = useUser();
     const [preset, setPreset] = useState<Preset>('30d');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [data, setData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
 
+    useEffect(() => {
+        if (user && user.role === 'STAFF') {
+            router.push('/');
+        }
+    }, [user, router]);
+
     const fetchData = useCallback(async (from: string, to: string) => {
+        if (!user || user.role === 'STAFF') return;
         setLoading(true);
         try {
             const res = await fetch(`/api/owner-dashboard?from=${from}&to=${to}`);
@@ -107,6 +119,15 @@ export default function OwnerDashboardPage() {
     const monthNames = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
     const now = new Date();
     const monthLabel = `${monthNames[now.getMonth()]} ${now.getFullYear() + 543}`;
+
+    if (!user) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+    if (user.role === 'STAFF') return null;
 
     return (
         <div className="animate-fade-in">

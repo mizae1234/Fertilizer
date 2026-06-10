@@ -261,13 +261,21 @@ export default function GoodsReceiveDetailPage() {
         }
     };
 
-    if (loading) {
+    useEffect(() => {
+        if (user && user.role === 'STAFF') {
+            router.push('/');
+        }
+    }, [user, router]);
+
+    if (!user || loading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
             </div>
         );
     }
+
+    if (user.role === 'STAFF') return null;
 
     if (!gr) return null;
 
@@ -643,24 +651,22 @@ export default function GoodsReceiveDetailPage() {
                     </button>
 
                     {/* Approve / Reject buttons */}
-                    {user?.role !== 'STAFF' && (
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowReject(true)}
-                                disabled={actionLoading !== ''}
-                                className="flex-1 py-2.5 rounded-xl border-2 border-red-200 text-red-600 font-medium text-sm hover:bg-red-50 disabled:opacity-50"
-                            >
-                                {actionLoading === 'reject' ? 'กำลังดำเนินการ...' : '❌ ปฏิเสธ'}
-                            </button>
-                            <button
-                                onClick={() => setShowApprove(true)}
-                                disabled={actionLoading !== ''}
-                                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200 disabled:opacity-50"
-                            >
-                                {actionLoading === 'approve' ? 'กำลังดำเนินการ...' : '✅ อนุมัติรับสินค้า'}
-                            </button>
-                        </div>
-                    )}
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => setShowReject(true)}
+                            disabled={actionLoading !== ''}
+                            className="flex-1 py-2.5 rounded-xl border-2 border-red-200 text-red-600 font-medium text-sm hover:bg-red-50 disabled:opacity-50"
+                        >
+                            {actionLoading === 'reject' ? 'กำลังดำเนินการ...' : '❌ ปฏิเสธ'}
+                        </button>
+                        <button
+                            onClick={() => setShowApprove(true)}
+                            disabled={actionLoading !== ''}
+                            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200 disabled:opacity-50"
+                        >
+                            {actionLoading === 'approve' ? 'กำลังดำเนินการ...' : '✅ อนุมัติรับสินค้า'}
+                        </button>
+                    </div>
                 </div>
             )}
 

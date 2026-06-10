@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getServerUser } from '@/lib/server-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,6 +125,24 @@ export async function GET(
                         tx.sellingPrice = info.sellingPrice;
                     }
                 }
+            }
+        }
+
+        const user = await getServerUser();
+        const isStaff = user?.role === 'STAFF';
+        if (isStaff) {
+            result.cost = 0;
+            result.costMethod = null;
+            result.computedAvgCost = 0;
+            result.computedLastCost = 0;
+            if (result.stockTransactions) {
+                result.stockTransactions.forEach((tx: any) => {
+                    tx.unitCost = 0;
+                    tx.actualCost = undefined;
+                });
+            }
+            if (result.productLogs) {
+                result.productLogs = result.productLogs.filter((log: any) => log.field !== 'cost' && log.field !== 'costMethod');
             }
         }
 

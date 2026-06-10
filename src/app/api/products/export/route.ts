@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getServerUser } from '@/lib/server-auth';
 
 export async function GET(request: NextRequest) {
+    const user = await getServerUser();
+    const isStaff = user?.role === 'STAFF';
     const { searchParams } = request.nextUrl;
     const search = searchParams.get('search') || '';
     const warehouse = searchParams.get('warehouse') || '';
@@ -36,5 +39,13 @@ export async function GET(request: NextRequest) {
         orderBy: { code: 'asc' },
     });
 
-    return NextResponse.json(products);
+    const serialized = JSON.parse(JSON.stringify(products));
+    if (isStaff) {
+        serialized.forEach((p: any) => {
+            p.cost = 0;
+            p.costMethod = null;
+        });
+    }
+
+    return NextResponse.json(serialized);
 }

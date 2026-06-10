@@ -2,10 +2,14 @@
 
 import { prisma } from '@/lib/prisma';
 import { getDateRange } from './utils';
+import { isServerAdmin } from '@/lib/server-auth';
 
 // ==================== FINANCIAL REPORTS ====================
 
 export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
+    if (!(await isServerAdmin())) {
+        throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูล');
+    }
     const dateRange = getDateRange(dateFrom, dateTo);
 
     const sales = await prisma.sale.findMany({
@@ -191,6 +195,9 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
 }
 
 export async function getPnLReport(dateFrom?: string, dateTo?: string) {
+    if (!(await isServerAdmin())) {
+        throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูล');
+    }
     const dateRange = getDateRange(dateFrom, dateTo);
     const saleWhere = {
         status: 'APPROVED' as const,
@@ -282,6 +289,9 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
 // ==================== P&L DETAIL (BY BILL & BY ITEM) ====================
 
 export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
+    if (!(await isServerAdmin())) {
+        throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูล');
+    }
     const dateRange = getDateRange(dateFrom, dateTo);
     const saleWhere = {
         status: 'APPROVED' as const,

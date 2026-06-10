@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createProduct } from '@/app/actions/products';
 import AlertModal from '@/components/AlertModal';
+import { useUser } from '@/hooks/useUser';
 
 interface CustomerGroup {
     id: string;
@@ -17,6 +18,8 @@ interface ProductGroup {
 
 export default function NewProductPage() {
     const router = useRouter();
+    const user = useUser();
+    const isStaff = user?.role === 'STAFF';
     const [loading, setLoading] = useState(false);
     const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([]);
     const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
@@ -190,19 +193,21 @@ export default function NewProductPage() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1.5">ต้นทุน (Cost)</label>
-                            <input
-                                type="number"
-                                value={form.cost || ''}
-                                onChange={(e) => setForm({ ...form, cost: parseFloat(e.target.value) || 0 })}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
-                                placeholder="0.00"
-                                step="0.01"
-                                min={0}
-                            />
-                        </div>
-                        <div>
+                        {!isStaff && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 mb-1.5">ต้นทุน (Cost)</label>
+                                <input
+                                    type="number"
+                                    value={form.cost || ''}
+                                    onChange={(e) => setForm({ ...form, cost: parseFloat(e.target.value) || 0 })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min={0}
+                                />
+                            </div>
+                        )}
+                        <div className={isStaff ? 'col-span-2' : ''}>
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">ราคาขาย (Price)</label>
                             <input
                                 type="number"
