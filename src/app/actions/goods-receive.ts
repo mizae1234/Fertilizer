@@ -3,12 +3,22 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { generateNumber } from '@/lib/generateNumber';
-import { isServerAdmin } from '@/lib/server-auth';
+import { isServerAdmin, getServerUser } from '@/lib/server-auth';
+
+async function checkGoodsReceiveAccess(isAdminOnly = false) {
+    const user = await getServerUser();
+    if (!user) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+    if (isAdminOnly) {
+        if (user.role !== 'ADMIN') throw new Error('ไม่มีสิทธิ์ทำรายการ (ADMIN Only)');
+    } else {
+        const hasAccess = user.role === 'ADMIN' || user.allowedMenus?.includes('/goods-receive');
+        if (!hasAccess) throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูล');
+    }
+    return user;
+}
 
 export async function getGoodsReceives(page = 1, status = '') {
-    if (!(await isServerAdmin())) {
-        throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูล');
-    }
+    await checkGoodsReceiveAccess(false);
     const perPage = 10;
     const where = {
         deletedAt: null,
@@ -34,9 +44,7 @@ export async function getGoodsReceives(page = 1, status = '') {
 }
 
 export async function getGoodsReceiveDetail(id: string) {
-    if (!(await isServerAdmin())) {
-        throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูล');
-    }
+    await checkGoodsReceiveAccess(false);
     return prisma.goodsReceive.findUnique({
         where: { id },
         include: {
@@ -66,9 +74,7 @@ export async function createGoodsReceive(data: {
     }[];
     userId: string;
 }) {
-    if (!(await isServerAdmin())) {
-        throw new Error('ไม่มีสิทธิ์ทำรายการ (ADMIN Only)');
-    }
+    await checkGoodsReceiveAccess(false);
     const totalAmount = data.items.reduce(
         (sum, item) => sum + item.quantity * item.unitCost,
         0
@@ -120,9 +126,7 @@ export async function updateGoodsReceive(id: string, data: {
         lotNo?: string;
     }[];
 }) {
-    if (!(await isServerAdmin())) {
-        throw new Error('ไม่มีสิทธิ์ทำรายการ (ADMIN Only)');
-    }
+    await checkGoodsReceiveAccess(false);
     const existing = await prisma.goodsReceive.findUnique({ where: { id } });
     if (!existing || existing.status !== 'PENDING') {
         throw new Error('ไม่สามารถแก้ไขรายการที่ไม่ใช่สถานะรออนุมัติ');
@@ -178,9 +182,7 @@ export async function updateGoodsReceive(id: string, data: {
 }
 
 export async function approveGoodsReceive(id: string, costMethodOverrides?: Record<string, string>) {
-    if (!(await isServerAdmin())) {
-        throw new Error('ไม่มีสิทธิ์ทำรายการ (ADMIN Only)');
-    }
+    await checkGoodsReceiveAccess(true);
     const gr = await prisma.goodsReceive.findUnique({
         where: { id },
         include: { items: true },
@@ -380,9 +382,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
 }
 
 export async function rejectGoodsReceive(id: string) {
-    if (!(await isServerAdmin())) {
-        throw new Error('ไม่มีสิทธิ์ทำรายการ (ADMIN Only)');
-    }
+    await checkGoodsReceiveAccess(true);
     await prisma.goodsReceive.update({
         where: { id },
         data: { status: 'REJECTED' },
@@ -391,9 +391,7 @@ export async function rejectGoodsReceive(id: string) {
 }
 
 export async function deleteGoodsReceive(id: string) {
-    if (!(await isServerAdmin())) {
-        throw new Error('ไม่มีสิทธิ์ทำรายการ (ADMIN Only)');
-    }
+    await checkGoodsReceiveAccess(false);
     const gr = await prisma.goodsReceive.findUnique({ where: { id } });
     if (!gr) throw new Error('ไม่พบรายการ');
     if (gr.status === 'APPROVED') throw new Error('ไม่สามารถลบรายการที่อนุมัติแล้วได้');
@@ -411,9 +409,7 @@ export async function updateGoodsReceivePayment(id: string, data: {
     shippingPaid: boolean;
     shippingCost: number;
 }) {
-    if (!(await isServerAdmin())) {
-        throw new Error('ไม่มีสิทธิ์ทำรายการ (ADMIN Only)');
-    }
+    await checkGoodsReceiveAccess(true);
     const gr = await prisma.goodsReceive.findUnique({ where: { id } });
     if (!gr) throw new Error('ไม่พบรายการ');
 

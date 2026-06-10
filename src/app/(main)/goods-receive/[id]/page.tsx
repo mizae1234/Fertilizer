@@ -262,8 +262,11 @@ export default function GoodsReceiveDetailPage() {
     };
 
     useEffect(() => {
-        if (user && user.role === 'STAFF') {
-            router.push('/');
+        if (user) {
+            const hasAccess = user.role === 'ADMIN' || user.allowedMenus?.includes('/goods-receive');
+            if (!hasAccess) {
+                router.push('/');
+            }
         }
     }, [user, router]);
 
@@ -275,7 +278,8 @@ export default function GoodsReceiveDetailPage() {
         );
     }
 
-    if (user.role === 'STAFF') return null;
+    const hasAccess = user.role === 'ADMIN' || user.allowedMenus?.includes('/goods-receive');
+    if (!hasAccess) return null;
 
     if (!gr) return null;
 
@@ -451,14 +455,16 @@ export default function GoodsReceiveDetailPage() {
                                         />
                                     </div>
                                     {/* Unit Cost */}
-                                    <div className="w-24 lg:w-auto lg:flex-[1]">
-                                        <label className="text-xs text-gray-400 mb-1 block">ต้นทุน/หน่วย</label>
-                                        <input
-                                            type="number" min={0} step="0.01" value={item.unitCost}
-                                            onChange={e => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
-                                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        />
-                                    </div>
+                                    {user?.role === 'ADMIN' && (
+                                        <div className="w-24 lg:w-auto lg:flex-[1]">
+                                            <label className="text-xs text-gray-400 mb-1 block">ต้นทุน/หน่วย</label>
+                                            <input
+                                                type="number" min={0} step="0.01" value={item.unitCost}
+                                                onChange={e => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
+                                                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 outline-none"
+                                            />
+                                        </div>
+                                    )}
                                     {/* Lot No */}
                                     <div className="w-28 lg:w-auto lg:flex-[1.5]">
                                         <label className="text-xs text-gray-400 mb-1 block">Lot No.</label>
@@ -470,20 +476,22 @@ export default function GoodsReceiveDetailPage() {
                                         />
                                     </div>
                                     {/* Cost Method */}
-                                    <div className="w-32 lg:w-auto lg:flex-[1.5]">
-                                        <label className="text-xs text-gray-400 mb-1 block">ประเภทต้นทุน</label>
-                                        <select
-                                            value={currentMethod}
-                                            onChange={e => setCostMethodOverrides(prev => ({ ...prev, [item.productId]: e.target.value }))}
-                                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        >
-                                            <option value="AVG">📊 เฉลี่ย</option>
-                                            <option value="LAST">🕐 ล่าสุด</option>
-                                            <option value="MANUAL">✏️ กำหนดเอง</option>
-                                        </select>
-                                    </div>
+                                    {user?.role === 'ADMIN' && (
+                                        <div className="w-32 lg:w-auto lg:flex-[1.5]">
+                                            <label className="text-xs text-gray-400 mb-1 block">ประเภทต้นทุน</label>
+                                            <select
+                                                value={currentMethod}
+                                                onChange={e => setCostMethodOverrides(prev => ({ ...prev, [item.productId]: e.target.value }))}
+                                                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                            >
+                                                <option value="AVG">📊 เฉลี่ย</option>
+                                                <option value="LAST">🕐 ล่าสุด</option>
+                                                <option value="MANUAL">✏️ กำหนดเอง</option>
+                                            </select>
+                                        </div>
+                                    )}
                                     {/* Manual cost input */}
-                                    {currentMethod === 'MANUAL' && (
+                                    {user?.role === 'ADMIN' && currentMethod === 'MANUAL' && (
                                         <div className="w-28 lg:w-auto lg:flex-[1]">
                                             <label className="text-xs text-gray-400 mb-1 block">ต้นทุนเอง</label>
                                             <input
@@ -505,10 +513,12 @@ export default function GoodsReceiveDetailPage() {
                                         )}
                                     </div>
                                 </div>
-                                <div className="text-right mt-1">
-                                    <span className="text-xs text-gray-400">รวม: </span>
-                                    <span className="text-sm font-semibold text-gray-700">{formatCurrency(item.quantity * item.unitCost)}</span>
-                                </div>
+                                {user?.role === 'ADMIN' && (
+                                    <div className="text-right mt-1">
+                                        <span className="text-xs text-gray-400">รวม: </span>
+                                        <span className="text-sm font-semibold text-gray-700">{formatCurrency(item.quantity * item.unitCost)}</span>
+                                    </div>
+                                )}
                             </div>
                             );
                         })}
@@ -524,8 +534,8 @@ export default function GoodsReceiveDetailPage() {
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">รวม</th>
+                                    {user?.role === 'ADMIN' && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>}
+                                    {user?.role === 'ADMIN' && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">รวม</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -538,8 +548,8 @@ export default function GoodsReceiveDetailPage() {
                                         <td className="px-4 py-3 text-sm text-gray-600">{item.warehouse.name}</td>
                                         <td className="px-4 py-3 text-sm text-gray-600">{item.lotNo || '-'}</td>
                                         <td className="px-4 py-3 text-sm text-gray-800 text-right">{item.quantity} {item.product.unit}</td>
-                                        <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitCost))}</td>
-                                        <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(item.totalCost))}</td>
+                                        {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitCost))}</td>}
+                                        {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(item.totalCost))}</td>}
                                     </tr>
                                 ))}
                             </tbody>
@@ -553,11 +563,11 @@ export default function GoodsReceiveDetailPage() {
                                             <p className="text-sm font-medium text-gray-800">{item.product.name}</p>
                                             <p className="text-xs text-gray-400">{item.product.code} · {item.warehouse.name}{item.lotNo ? ` · Lot: ${item.lotNo}` : ''}</p>
                                         </div>
-                                        <p className="text-sm font-bold text-gray-800">{formatCurrency(Number(item.totalCost))}</p>
+                                        {user?.role === 'ADMIN' && <p className="text-sm font-bold text-gray-800">{formatCurrency(Number(item.totalCost))}</p>}
                                     </div>
                                     <div className="flex justify-between text-xs text-gray-500">
                                         <span>{item.quantity} {item.product.unit}</span>
-                                        <span>@ {formatCurrency(Number(item.unitCost))}</span>
+                                        {user?.role === 'ADMIN' && <span>@ {formatCurrency(Number(item.unitCost))}</span>}
                                     </div>
                                 </div>
                             ))}
@@ -566,77 +576,81 @@ export default function GoodsReceiveDetailPage() {
                 )}
 
                 {/* Total */}
-                <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-3 flex justify-between items-center">
-                    <span className="text-sm font-semibold text-gray-600">มูลค่ารวม</span>
-                    <span className="text-lg font-bold text-emerald-600">{formatCurrency(isPending ? total : Number(gr.totalAmount))}</span>
-                </div>
+                {user?.role === 'ADMIN' && (
+                    <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-3 flex justify-between items-center">
+                        <span className="text-sm font-semibold text-gray-600">มูลค่ารวม</span>
+                        <span className="text-lg font-bold text-emerald-600">{formatCurrency(isPending ? total : Number(gr.totalAmount))}</span>
+                    </div>
+                )}
             </div>
 
             {/* Payment Tracking */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-semibold text-gray-700">💰 สถานะการจ่ายเงิน</h2>
-                    <button
-                        onClick={async () => {
-                            setPaymentSaving(true);
-                            try {
-                                await updateGoodsReceivePayment(id, { goodsPaid, shippingPaid, shippingCost: parseFloat(shippingCost) || 0 });
-                                showAlert('บันทึกสถานะการจ่ายเงินเรียบร้อย', 'success', 'สำเร็จ');
-                            } catch (error) {
-                                showAlert((error as Error).message || 'ไม่สามารถบันทึกได้', 'error', 'เกิดข้อผิดพลาด');
-                            }
-                            setPaymentSaving(false);
-                        }}
-                        disabled={paymentSaving}
-                        className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium transition-colors disabled:opacity-50"
-                    >
-                        {paymentSaving ? 'กำลังบันทึก...' : '💾 บันทึก'}
-                    </button>
-                </div>
-                <div className="space-y-4">
-                    {/* ค่าสินค้า */}
-                    <label className="flex items-center gap-3 cursor-pointer group">
-                        <input
-                            type="checkbox"
-                            checked={goodsPaid}
-                            onChange={(e) => setGoodsPaid(e.target.checked)}
-                            className="w-5 h-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
-                        />
-                        <div className="flex-1">
-                            <span className="text-sm font-medium text-gray-700 group-hover:text-emerald-600 transition-colors">จ่ายค่าสินค้าแล้ว</span>
-                            <p className="text-xs text-gray-400">มูลค่า {formatCurrency(isPending ? total : Number(gr.totalAmount))}</p>
-                        </div>
-                        {goodsPaid && <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">✓ จ่ายแล้ว</span>}
-                    </label>
-
-                    {/* ค่ารถบรรทุก */}
-                    <div className="border-t border-gray-100 pt-4">
+            {user?.role === 'ADMIN' && (
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-sm font-semibold text-gray-700">💰 สถานะการจ่ายเงิน</h2>
+                        <button
+                            onClick={async () => {
+                                setPaymentSaving(true);
+                                try {
+                                    await updateGoodsReceivePayment(id, { goodsPaid, shippingPaid, shippingCost: parseFloat(shippingCost) || 0 });
+                                    showAlert('บันทึกสถานะการจ่ายเงินเรียบร้อย', 'success', 'สำเร็จ');
+                                } catch (error) {
+                                    showAlert((error as Error).message || 'ไม่สามารถบันทึกได้', 'error', 'เกิดข้อผิดพลาด');
+                                }
+                                setPaymentSaving(false);
+                            }}
+                            disabled={paymentSaving}
+                            className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                        >
+                            {paymentSaving ? 'กำลังบันทึก...' : '💾 บันทึก'}
+                        </button>
+                    </div>
+                    <div className="space-y-4">
+                        {/* ค่าสินค้า */}
                         <label className="flex items-center gap-3 cursor-pointer group">
                             <input
                                 type="checkbox"
-                                checked={shippingPaid}
-                                onChange={(e) => setShippingPaid(e.target.checked)}
+                                checked={goodsPaid}
+                                onChange={(e) => setGoodsPaid(e.target.checked)}
                                 className="w-5 h-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
                             />
-                            <span className="text-sm font-medium text-gray-700 group-hover:text-emerald-600 transition-colors">จ่ายค่ารถบรรทุกสินค้าแล้ว</span>
-                            {shippingPaid && <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">✓ จ่ายแล้ว</span>}
+                            <div className="flex-1">
+                                <span className="text-sm font-medium text-gray-700 group-hover:text-emerald-600 transition-colors">จ่ายค่าสินค้าแล้ว</span>
+                                <p className="text-xs text-gray-400">มูลค่า {formatCurrency(isPending ? total : Number(gr.totalAmount))}</p>
+                            </div>
+                            {goodsPaid && <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">✓ จ่ายแล้ว</span>}
                         </label>
-                        <div className="mt-3 ml-8">
-                            <label className="text-xs text-gray-500 mb-1 block">ยอดค่ารถบรรทุก (บาท)</label>
-                            <input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={shippingCost}
-                                onChange={(e) => setShippingCost(e.target.value)}
-                                onFocus={(e) => e.target.select()}
-                                className="w-48 px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
-                                placeholder="0.00"
-                            />
+
+                        {/* ค่ารถบรรทุก */}
+                        <div className="border-t border-gray-100 pt-4">
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <input
+                                    type="checkbox"
+                                    checked={shippingPaid}
+                                    onChange={(e) => setShippingPaid(e.target.checked)}
+                                    className="w-5 h-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                                />
+                                <span className="text-sm font-medium text-gray-700 group-hover:text-emerald-600 transition-colors">จ่ายค่ารถบรรทุกสินค้าแล้ว</span>
+                                {shippingPaid && <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">✓ จ่ายแล้ว</span>}
+                            </label>
+                            <div className="mt-3 ml-8">
+                                <label className="text-xs text-gray-500 mb-1 block">ยอดค่ารถบรรทุก (บาท)</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={shippingCost}
+                                    onChange={(e) => setShippingCost(e.target.value)}
+                                    onFocus={(e) => e.target.select()}
+                                    className="w-48 px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                                    placeholder="0.00"
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Actions */}
             {isPending && (
@@ -651,22 +665,24 @@ export default function GoodsReceiveDetailPage() {
                     </button>
 
                     {/* Approve / Reject buttons */}
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => setShowReject(true)}
-                            disabled={actionLoading !== ''}
-                            className="flex-1 py-2.5 rounded-xl border-2 border-red-200 text-red-600 font-medium text-sm hover:bg-red-50 disabled:opacity-50"
-                        >
-                            {actionLoading === 'reject' ? 'กำลังดำเนินการ...' : '❌ ปฏิเสธ'}
-                        </button>
-                        <button
-                            onClick={() => setShowApprove(true)}
-                            disabled={actionLoading !== ''}
-                            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200 disabled:opacity-50"
-                        >
-                            {actionLoading === 'approve' ? 'กำลังดำเนินการ...' : '✅ อนุมัติรับสินค้า'}
-                        </button>
-                    </div>
+                    {user?.role === 'ADMIN' && (
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowReject(true)}
+                                disabled={actionLoading !== ''}
+                                className="flex-1 py-2.5 rounded-xl border-2 border-red-200 text-red-600 font-medium text-sm hover:bg-red-50 disabled:opacity-50"
+                            >
+                                {actionLoading === 'reject' ? 'กำลังดำเนินการ...' : '❌ ปฏิเสธ'}
+                            </button>
+                            <button
+                                onClick={() => setShowApprove(true)}
+                                disabled={actionLoading !== ''}
+                                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200 disabled:opacity-50"
+                            >
+                                {actionLoading === 'approve' ? 'กำลังดำเนินการ...' : '✅ อนุมัติรับสินค้า'}
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 

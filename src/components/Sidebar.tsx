@@ -72,11 +72,6 @@ export default function Sidebar({ onCollapsedChange }: { onCollapsedChange?: (co
     const filteredMenuGroups = MENU_GROUPS.map(group => ({
         ...group,
         items: group.items.filter(item => {
-            if (user?.role === 'STAFF') {
-                if (item.href === '/goods-receive' || item.href === '/owner-dashboard' || item.href === '/reports') {
-                    return false;
-                }
-            }
             // null = all access (admin)
             if (user?.allowedMenus === null) return true;
             return user?.allowedMenus?.includes(item.href);

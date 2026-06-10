@@ -14,9 +14,12 @@ interface Props { searchParams: Promise<{ page?: string; status?: string; from?:
 
 export default async function GoodsReceivePage({ searchParams }: Props) {
     const user = await getServerUser();
-    if (!user || user.role === 'STAFF') {
+    const hasAccess = user && (user.role === 'ADMIN' || user.allowedMenus?.includes('/goods-receive'));
+    if (!hasAccess) {
         redirect('/');
     }
+
+    const isAdmin = user?.role === 'ADMIN';
 
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
@@ -117,16 +120,16 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เลข PO</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้ขาย</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">รายการ</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">มูลค่า</th>
+                            {isAdmin && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">มูลค่า</th>}
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สถานะ</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">ค่าสินค้า</th>
-                            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">ค่ารถ</th>
+                            {isAdmin && <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">ค่าสินค้า</th>}
+                            {isAdmin && <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">ค่ารถ</th>}
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">วันที่</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {records.length === 0 ? (
-                            <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
+                            <tr><td colSpan={isAdmin ? 9 : 6} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
                         ) : (
                             records.map(gr => (
                                 <tr key={gr.id} className="hover:bg-gray-50">
@@ -134,10 +137,10 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                                     <td className="px-4 py-3 text-sm text-gray-600">{gr.poNumber || '-'}</td>
                                     <td className="px-4 py-3 text-sm text-gray-800">{gr.vendor.name}</td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{gr._count.items} รายการ</td>
-                                    <td className="px-4 py-3 text-sm font-semibold text-gray-800">{formatCurrency(Number(gr.totalAmount))}</td>
+                                    {isAdmin && <td className="px-4 py-3 text-sm font-semibold text-gray-800">{formatCurrency(Number(gr.totalAmount))}</td>}
                                     <td className="px-4 py-3"><StatusBadge status={gr.status} /></td>
-                                    <td className="px-4 py-3 text-center text-sm">{gr.goodsPaid ? <span className="text-emerald-500" title="จ่ายแล้ว">✅</span> : <span className="text-gray-300" title="ยังไม่จ่าย">⬜</span>}</td>
-                                    <td className="px-4 py-3 text-center text-sm">{gr.shippingPaid ? <span className="text-emerald-500" title={`จ่ายแล้ว ฿${Number(gr.shippingCost).toLocaleString()}`}>✅</span> : <span className="text-gray-300" title="ยังไม่จ่าย">⬜</span>}</td>
+                                    {isAdmin && <td className="px-4 py-3 text-center text-sm">{gr.goodsPaid ? <span className="text-emerald-500" title="จ่ายแล้ว">✅</span> : <span className="text-gray-300" title="ยังไม่จ่าย">⬜</span>}</td>}
+                                    {isAdmin && <td className="px-4 py-3 text-center text-sm">{gr.shippingPaid ? <span className="text-emerald-500" title={`จ่ายแล้ว ฿${Number(gr.shippingCost).toLocaleString()}`}>✅</span> : <span className="text-gray-300" title="ยังไม่จ่าย">⬜</span>}</td>}
                                     <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(gr.createdAt)}</td>
                                 </tr>
                             ))
@@ -166,13 +169,15 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                             {gr.poNumber && <p className="text-xs text-gray-500 mb-1">PO: {gr.poNumber}</p>}
                             <div className="flex items-center justify-between text-xs text-gray-500">
                                 <span>{gr._count.items} รายการ · {gr.createdBy.name}</span>
-                                <span className="font-semibold text-gray-800 text-sm">{formatCurrency(Number(gr.totalAmount))}</span>
+                                {isAdmin && <span className="font-semibold text-gray-800 text-sm">{formatCurrency(Number(gr.totalAmount))}</span>}
                             </div>
                             {gr.notes && <p className="text-xs text-gray-400 mt-1">📝 {gr.notes}</p>}
-                            <div className="flex items-center gap-3 mt-2 text-xs">
-                                <span className={gr.goodsPaid ? 'text-emerald-600' : 'text-gray-400'}>ค่าสินค้า: {gr.goodsPaid ? '✅' : '⬜'}</span>
-                                <span className={gr.shippingPaid ? 'text-emerald-600' : 'text-gray-400'}>ค่ารถ: {gr.shippingPaid ? '✅' : '⬜'}</span>
-                            </div>
+                            {isAdmin && (
+                                <div className="flex items-center gap-3 mt-2 text-xs">
+                                    <span className={gr.goodsPaid ? 'text-emerald-600' : 'text-gray-400'}>ค่าสินค้า: {gr.goodsPaid ? '✅' : '⬜'}</span>
+                                    <span className={gr.shippingPaid ? 'text-emerald-600' : 'text-gray-400'}>ค่ารถ: {gr.shippingPaid ? '✅' : '⬜'}</span>
+                                </div>
+                            )}
                             <p className="text-xs text-gray-400 mt-1">{formatDateTime(gr.createdAt)}</p>
                         </Link>
                     ))

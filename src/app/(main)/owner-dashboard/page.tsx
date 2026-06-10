@@ -65,13 +65,18 @@ export default function OwnerDashboardPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (user && user.role === 'STAFF') {
-            router.push('/');
+        if (user) {
+            const hasAccess = user.role === 'ADMIN' || user.allowedMenus?.includes('/owner-dashboard');
+            if (!hasAccess) {
+                router.push('/');
+            }
         }
     }, [user, router]);
 
     const fetchData = useCallback(async (from: string, to: string) => {
-        if (!user || user.role === 'STAFF') return;
+        if (!user) return;
+        const hasAccess = user.role === 'ADMIN' || user.allowedMenus?.includes('/owner-dashboard');
+        if (!hasAccess) return;
         setLoading(true);
         try {
             const res = await fetch(`/api/owner-dashboard?from=${from}&to=${to}`);
@@ -127,7 +132,8 @@ export default function OwnerDashboardPage() {
             </div>
         );
     }
-    if (user.role === 'STAFF') return null;
+    const hasAccess = user.role === 'ADMIN' || user.allowedMenus?.includes('/owner-dashboard');
+    if (!hasAccess) return null;
 
     return (
         <div className="animate-fade-in">
@@ -177,7 +183,7 @@ export default function OwnerDashboardPage() {
             ) : data ? (
                 <>
                     {/* Summary Cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+                    <div className={`grid grid-cols-2 ${user.role === 'ADMIN' ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-3'} gap-4 mb-6`}>
                         {/* Total Sales */}
                         <div className="rounded-2xl p-4 text-white shadow-lg bg-gradient-to-br from-teal-400 to-teal-600 relative overflow-hidden">
                             <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">💰</div>
@@ -188,12 +194,14 @@ export default function OwnerDashboardPage() {
                             </p>
                         </div>
                         {/* Net Profit */}
-                        <div className="rounded-2xl p-4 text-white shadow-lg bg-gradient-to-br from-indigo-400 to-purple-600 relative overflow-hidden">
-                            <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">📊</div>
-                            <p className="text-xs text-white/80 font-medium">กำไรสุทธิ</p>
-                            <p className="text-2xl font-bold mt-1">{formatCurrency(data.summary.netProfit)}</p>
-                            <p className="text-xs mt-2 text-white/70">↪ หักต้นทุน {formatCurrency(data.summary.totalCOGS)} + ค่าใช้จ่าย {formatCurrency(data.summary.expensesOnly)}</p>
-                        </div>
+                        {user.role === 'ADMIN' && (
+                            <div className="rounded-2xl p-4 text-white shadow-lg bg-gradient-to-br from-indigo-400 to-purple-600 relative overflow-hidden">
+                                <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">📊</div>
+                                <p className="text-xs text-white/80 font-medium">กำไรสุทธิ</p>
+                                <p className="text-2xl font-bold mt-1">{formatCurrency(data.summary.netProfit)}</p>
+                                <p className="text-xs mt-2 text-white/70">↪ หักต้นทุน {formatCurrency(data.summary.totalCOGS)} + ค่าใช้จ่าย {formatCurrency(data.summary.expensesOnly)}</p>
+                            </div>
+                        )}
                         {/* Items Sold */}
                         <div className="rounded-2xl p-4 text-white shadow-lg bg-gradient-to-br from-cyan-400 to-blue-500 relative overflow-hidden">
                             <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">🛒</div>
@@ -209,16 +217,18 @@ export default function OwnerDashboardPage() {
                             <p className="text-xs mt-2 text-white/70">↪ รวม {data.summary.totalBills} บิล</p>
                         </div>
                         {/* Total Expenses */}
-                        <div className="rounded-2xl p-4 text-white shadow-lg bg-gradient-to-br from-rose-400 to-pink-600 relative overflow-hidden">
-                            <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">💸</div>
-                            <p className="text-xs text-white/80 font-medium">ค่าใช้จ่ายรวม <span className="opacity-70">(COGS+Expenses)</span></p>
-                            <p className="text-2xl font-bold mt-1">{formatCurrency(data.summary.totalExpenses)}</p>
-                            <p className="text-xs mt-2 text-white/70">↪ {expensePercent.toFixed(1)}% ของยอดขาย</p>
-                        </div>
+                        {user.role === 'ADMIN' && (
+                            <div className="rounded-2xl p-4 text-white shadow-lg bg-gradient-to-br from-rose-400 to-pink-600 relative overflow-hidden">
+                                <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-lg">💸</div>
+                                <p className="text-xs text-white/80 font-medium">ค่าใช้จ่ายรวม <span className="opacity-70">(COGS+Expenses)</span></p>
+                                <p className="text-2xl font-bold mt-1">{formatCurrency(data.summary.totalExpenses)}</p>
+                                <p className="text-xs mt-2 text-white/70">↪ {expensePercent.toFixed(1)}% ของยอดขาย</p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Charts Row */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                    <div className={`grid grid-cols-1 ${user.role === 'ADMIN' ? 'lg:grid-cols-2' : ''} gap-4 mb-6`}>
                         {/* Daily Sales Bar Chart */}
                         <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-5">
                             <h2 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">📊 ยอดขายรายวัน</h2>
@@ -251,34 +261,36 @@ export default function OwnerDashboardPage() {
                         </div>
 
                         {/* Expense by Category */}
-                        <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-5">
-                            <h2 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">💸 ค่าใช้จ่ายตามประเภท</h2>
-                            {Object.keys(data.expenseByCategory).length === 0 ? (
-                                <p className="text-center text-gray-400 py-8">ไม่มีข้อมูลค่าใช้จ่าย</p>
-                            ) : (
-                                <div className="space-y-3">
-                                    {Object.entries(data.expenseByCategory)
-                                        .sort(([, a], [, b]) => b - a)
-                                        .map(([cat, amount]) => {
-                                            const pct = data.summary.totalExpenses > 0 ? (amount / data.summary.totalExpenses * 100) : 0;
-                                            const colors = ['from-violet-500 to-purple-600', 'from-blue-500 to-cyan-500', 'from-amber-500 to-orange-500', 'from-rose-500 to-pink-500', 'from-teal-500 to-emerald-500', 'from-indigo-500 to-blue-500'];
-                                            const colorIdx = Object.keys(data.expenseByCategory).indexOf(cat) % colors.length;
-                                            return (
-                                                <div key={cat}>
-                                                    <div className="flex justify-between text-sm mb-1">
-                                                        <span className="text-gray-700 font-medium">{cat}</span>
-                                                        <span className="text-gray-500">{formatCurrency(amount)} ({pct.toFixed(0)}%)</span>
+                        {user.role === 'ADMIN' && (
+                            <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-5">
+                                <h2 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">💸 ค่าใช้จ่ายตามประเภท</h2>
+                                {Object.keys(data.expenseByCategory).length === 0 ? (
+                                    <p className="text-center text-gray-400 py-8">ไม่มีข้อมูลค่าใช้จ่าย</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {Object.entries(data.expenseByCategory)
+                                            .sort(([, a], [, b]) => b - a)
+                                            .map(([cat, amount]) => {
+                                                const pct = data.summary.totalExpenses > 0 ? (amount / data.summary.totalExpenses * 100) : 0;
+                                                const colors = ['from-violet-500 to-purple-600', 'from-blue-500 to-cyan-500', 'from-amber-500 to-orange-500', 'from-rose-500 to-pink-500', 'from-teal-500 to-emerald-500', 'from-indigo-500 to-blue-500'];
+                                                const colorIdx = Object.keys(data.expenseByCategory).indexOf(cat) % colors.length;
+                                                return (
+                                                    <div key={cat}>
+                                                        <div className="flex justify-between text-sm mb-1">
+                                                            <span className="text-gray-700 font-medium">{cat}</span>
+                                                            <span className="text-gray-500">{formatCurrency(amount)} ({pct.toFixed(0)}%)</span>
+                                                        </div>
+                                                        <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                                                            <div className={`h-full rounded-full bg-gradient-to-r ${colors[colorIdx]} transition-all`}
+                                                                style={{ width: `${pct}%` }} />
+                                                        </div>
                                                     </div>
-                                                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                                                        <div className={`h-full rounded-full bg-gradient-to-r ${colors[colorIdx]} transition-all`}
-                                                            style={{ width: `${pct}%` }} />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                </div>
-                            )}
-                        </div>
+                                                );
+                                            })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Bottom Row */}

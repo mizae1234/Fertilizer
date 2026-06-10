@@ -149,8 +149,11 @@ export default function ReportsPage() {
     const [dateTo, setDateTo] = useState('');
 
     useEffect(() => {
-        if (user && user.role === 'STAFF') {
-            router.push('/');
+        if (user) {
+            const hasAccess = user.role === 'ADMIN' || user.allowedMenus?.includes('/reports');
+            if (!hasAccess) {
+                router.push('/');
+            }
         }
     }, [user, router]);
 
@@ -162,7 +165,8 @@ export default function ReportsPage() {
         );
     }
 
-    if (user.role === 'STAFF') return null;
+    const hasAccess = user.role === 'ADMIN' || user.allowedMenus?.includes('/reports');
+    if (!hasAccess) return null;
 
     return (
         <div className="space-y-4">
@@ -171,7 +175,7 @@ export default function ReportsPage() {
                 {[
                     { key: 'sales' as const, label: '💰 ยอดขาย' },
                     { key: 'inventory' as const, label: '📦 สต๊อก' },
-                    { key: 'financial' as const, label: '🏦 การเงิน' },
+                    ...(user.role === 'ADMIN' ? [{ key: 'financial' as const, label: '🏦 การเงิน' }] : []),
                 ].map(tab => (
                     <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                         className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab.key ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
@@ -180,7 +184,7 @@ export default function ReportsPage() {
             </div>
             {activeTab === 'sales' && <SalesTab dateFrom={dateFrom} dateTo={dateTo} />}
             {activeTab === 'inventory' && <InventoryTab dateFrom={dateFrom} dateTo={dateTo} />}
-            {activeTab === 'financial' && <FinancialTab dateFrom={dateFrom} dateTo={dateTo} />}
+            {activeTab === 'financial' && user.role === 'ADMIN' && <FinancialTab dateFrom={dateFrom} dateTo={dateTo} />}
         </div>
     );
 }

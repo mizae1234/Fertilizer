@@ -115,8 +115,11 @@ export default function NewGoodsReceivePage() {
     const user = useUser();
 
     useEffect(() => {
-        if (user && user.role === 'STAFF') {
-            router.push('/');
+        if (user) {
+            const hasAccess = user.role === 'ADMIN' || user.allowedMenus?.includes('/goods-receive');
+            if (!hasAccess) {
+                router.push('/');
+            }
         }
     }, [user, router]);
 
@@ -365,19 +368,21 @@ export default function NewGoodsReceivePage() {
                                                     required
                                                 />
                                             </div>
-                                            <div className="w-28 shrink-0">
-                                                <label className="block text-xs text-gray-500 mb-1">ต้นทุน/หน่วย</label>
-                                                <input
-                                                    type="number"
-                                                    value={item.unitCost}
-                                                    onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
-                                                    onFocus={(e) => e.target.select()}
-                                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
-                                                    min="0"
-                                                    step="0.01"
-                                                    required
-                                                />
-                                            </div>
+                                            {user?.role === 'ADMIN' && (
+                                                <div className="w-28 shrink-0">
+                                                    <label className="block text-xs text-gray-500 mb-1">ต้นทุน/หน่วย</label>
+                                                    <input
+                                                        type="number"
+                                                        value={item.unitCost}
+                                                        onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
+                                                        onFocus={(e) => e.target.select()}
+                                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
+                                                        min="0"
+                                                        step="0.01"
+                                                        required
+                                                    />
+                                                </div>
+                                            )}
                                             <div className="w-36 shrink-0">
                                                 <label className="block text-xs text-gray-500 mb-1">เข้าคลัง</label>
                                                 <select
@@ -440,19 +445,21 @@ export default function NewGoodsReceivePage() {
                                                         required
                                                     />
                                                 </div>
-                                                <div>
-                                                    <label className="block text-xs text-gray-500 mb-1">ต้นทุน/หน่วย</label>
-                                                    <input
-                                                        type="number"
-                                                        value={item.unitCost}
-                                                        onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
-                                                        onFocus={(e) => e.target.select()}
-                                                        className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-white"
-                                                        min="0"
-                                                        step="0.01"
-                                                        required
-                                                    />
-                                                </div>
+                                                {user?.role === 'ADMIN' && (
+                                                    <div>
+                                                        <label className="block text-xs text-gray-500 mb-1">ต้นทุน/หน่วย</label>
+                                                        <input
+                                                            type="number"
+                                                            value={item.unitCost}
+                                                            onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
+                                                            onFocus={(e) => e.target.select()}
+                                                            className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-white"
+                                                            min="0"
+                                                            step="0.01"
+                                                            required
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <label className="text-xs text-gray-400 shrink-0">เข้าคลัง:</label>
@@ -489,7 +496,7 @@ export default function NewGoodsReceivePage() {
                                         </div>
 
                                         {/* Item subtotal (both) */}
-                                        {item.quantity > 0 && item.unitCost > 0 && (
+                                        {user?.role === 'ADMIN' && item.quantity > 0 && item.unitCost > 0 && (
                                             <div className="mt-2 pt-2 border-t border-gray-200/50 text-right">
                                                 <span className="text-xs text-gray-400">รวม: </span>
                                                 <span className="text-sm font-semibold text-gray-700">
@@ -510,7 +517,7 @@ export default function NewGoodsReceivePage() {
                     )}
 
                     {/* Total */}
-                    {items.length > 0 && (
+                    {user?.role === 'ADMIN' && items.length > 0 && (
                         <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
                             <div className="text-right">
                                 <p className="text-sm text-gray-500">มูลค่ารวม</p>
