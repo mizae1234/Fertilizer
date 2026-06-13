@@ -593,13 +593,15 @@ export default function ProductDetailPage() {
                             description: infoForm.description || null,
                             brand: infoForm.brand || null,
                             packaging: infoForm.packaging || null,
-                            cost: costVal,
-                            costMethod: costType === 'avg' ? 'AVG' : costType === 'last' ? 'LAST' : 'MANUAL',
                             price: parseFloat(sellingPriceValue) || 0,
                             unit: unitValue || product.unit,
                             pointsPerUnit: parseInt(pointsValue) || 0,
                             minStock: infoForm.minStock,
                         };
+                        if (user?.role === 'ADMIN') {
+                            updateData.cost = costVal;
+                            updateData.costMethod = costType === 'avg' ? 'AVG' : costType === 'last' ? 'LAST' : 'MANUAL';
+                        }
                         if (infoForm.productGroupId) {
                             updateData.productGroupId = infoForm.productGroupId;
                         } else {

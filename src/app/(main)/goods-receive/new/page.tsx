@@ -236,7 +236,6 @@ export default function NewGoodsReceivePage() {
             </div>
         );
     }
-    if (user.role === 'STAFF') return null;
 
     return (
         <div className="animate-fade-in max-w-4xl mx-auto">

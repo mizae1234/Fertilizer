@@ -20,7 +20,7 @@ export async function GET(request: Request) {
         include: {
             customerGroup: { select: { name: true, id: true } },
         },
-        take: 50,
+        take: 2000,
         orderBy: { name: 'asc' },
     });
 

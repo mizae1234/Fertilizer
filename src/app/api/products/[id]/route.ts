@@ -165,6 +165,10 @@ export async function PATCH(
         'name', 'description', 'unit', 'cost', 'costMethod', 'price', 'brand',
         'packaging', 'productGroupId', 'pointsPerUnit', 'minStock', 'isActive', 'code', 'imageUrl'
     ];
+    const user = await getServerUser();
+    const isStaff = user?.role === 'STAFF';
+    const userId = user?.userId || null;
+
     const data: Record<string, any> = {};
     for (const key of allowedFields) {
         if (key in body) {
@@ -172,17 +176,10 @@ export async function PATCH(
         }
     }
 
-    // Extract userId from cookie for audit logging
-    let userId: string | null = null;
-    try {
-        const cookieHeader = request.headers.get('cookie') || '';
-        const tokenMatch = cookieHeader.split('; ').find(c => c.startsWith('token='));
-        if (tokenMatch) {
-            const token = tokenMatch.split('=')[1];
-            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-            userId = payload.userId || null;
-        }
-    } catch { /* ignore */ }
+    if (isStaff) {
+        delete data.cost;
+        delete data.costMethod;
+    }
 
     try {
         // Check for duplicate code if code is being updated
