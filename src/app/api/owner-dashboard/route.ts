@@ -4,7 +4,12 @@ import { getServerUser } from '@/lib/server-auth';
 
 export async function GET(request: Request) {
     const user = await getServerUser();
-    if (!user || user.role === 'STAFF') {
+    if (!user) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const hasAccess = user.role === 'ADMIN' || (Array.isArray(user.allowedMenus) && user.allowedMenus.includes('/owner-dashboard'));
+    if (!hasAccess) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -202,21 +207,23 @@ export async function GET(request: Request) {
         .sort((a, b) => b.totalStock - a.totalStock - (b.soldLast30 - a.soldLast30))
         .slice(0, 10);
 
+    const isStaff = user.role === 'STAFF';
+
     return NextResponse.json({
         summary: {
             totalSales,
             prevTotalSales,
-            netProfit,
-            totalExpenses,
-            totalCOGS,
-            expensesOnly,
+            netProfit: isStaff ? 0 : netProfit,
+            totalExpenses: isStaff ? 0 : totalExpenses,
+            totalCOGS: isStaff ? 0 : totalCOGS,
+            expensesOnly: isStaff ? 0 : expensesOnly,
             totalItemsSold,
             prevTotalItemsSold,
             totalBills,
             avgPerBill,
         },
         dailySales,
-        expenseByCategory,
+        expenseByCategory: isStaff ? {} : expenseByCategory,
         topProducts: topProductsList,
         deadStock,
     });

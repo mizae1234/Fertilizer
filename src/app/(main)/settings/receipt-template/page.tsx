@@ -447,7 +447,7 @@ export default function ReceiptTemplatePage() {
                                                     </tbody>
                                                 </table>
                                                 <div className="flex justify-between text-[8px] text-gray-400 mt-6 pt-4">
-                                                    {['ผู้รับของ', 'ผู้นำส่ง', 'ผู้รับเงิน', 'ผู้รับมอบอำนาจ'].map(l => (
+                                                    {['ผู้รับของ', 'ผู้นำส่ง', 'ผู้รับเงิน', 'ผู้อนุมัติ'].map(l => (
                                                         <div key={l} className="text-center">
                                                             <div className="font-medium text-gray-600 mb-4">{l}</div>
                                                             <div>..............................</div>

@@ -21,6 +21,7 @@ interface StockTransaction {
     id: string;
     type: string;
     quantity: number;
+    warehouseId: string;
     unitCost: number | string;
     actualCost?: number;
     sellingPrice?: number;
@@ -84,6 +85,7 @@ interface ProductDetail {
     stockTransactions: StockTransaction[];
     productLogs: ProductLog[];
     txSumAfterFilter?: number;
+    txSumAfterFilterPerWarehouse?: Record<string, number>;
     computedAvgCost?: number;
     computedLastCost?: number;
 }
@@ -937,13 +939,10 @@ export default function ProductDetailPage() {
                                     </button>
                                 </div>
                             </div>
-                            <div className="text-xs text-gray-400 mt-2">
-                                แสดง {product.stockTransactions.length} รายการ
-                            </div>
                             <div className="flex items-start gap-1.5 mt-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
                                 <span className="text-blue-500 mt-0.5">ℹ️</span>
                                 <p className="text-xs text-blue-700">
-                                    คอลัมน์ "คงเหลือ" คำนวณจาก stock รวมปัจจุบัน ({totalStock.toLocaleString()}) ย้อนกลับตามรายการ
+                                    คอลัมน์คงเหลือคำนวณจากสต็อกรวมปัจจุบัน ({totalStock.toLocaleString()}) และสต็อกแยกแต่ละคลัง ย้อนกลับตามรายการทำธุรกรรม
                                 </p>
                             </div>
                         </div>
@@ -962,7 +961,8 @@ export default function ProductDetailPage() {
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ประเภท</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
                                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">คงเหลือ</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">คงเหลือในคลัง</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">คงเหลือรวม</th>
                                                     {user?.role === 'ADMIN' && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>}
                                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ราคาขาย</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
@@ -972,20 +972,52 @@ export default function ProductDetailPage() {
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
                                                 {(() => {
-                                                    // Compute accurate starting balance:
-                                                    // If date filter is applied, subtract transactions after filter from current stock
+                                                    // Current stock per warehouse:
+                                                    const warehouseBalances: Record<string, number> = {};
+                                                    product.productStocks.forEach(ps => {
+                                                        warehouseBalances[ps.warehouse.id] = ps.quantity;
+                                                    });
+
+                                                    // Adjust for transactions after filter:
+                                                    if (product.txSumAfterFilterPerWarehouse) {
+                                                        Object.entries(product.txSumAfterFilterPerWarehouse).forEach(([whId, qty]) => {
+                                                            if (warehouseBalances[whId] !== undefined) {
+                                                                warehouseBalances[whId] -= qty;
+                                                            }
+                                                        });
+                                                    }
+
+                                                    // Compute accurate starting balance for total:
                                                     const startingBalance = totalStock - (product.txSumAfterFilter ?? 0);
                                                     let balance = startingBalance;
-                                                    const rows = product.stockTransactions.map(tx => {
-                                                        const currentBalance = balance;
-                                                        // Reverse the effect: newest tx first, so subtract its effect to get previous balance
+
+                                                    // Maps transaction ID to calculated balances
+                                                    const calculatedBalances: Record<string, { warehouseBalance: number; totalBalance: number }> = {};
+
+                                                    // Traverse from newest to oldest to build chronological balances
+                                                    product.stockTransactions.forEach(tx => {
+                                                        const currentTotalBalance = balance;
+                                                        const currentWarehouseBalance = warehouseBalances[tx.warehouseId] ?? 0;
+
+                                                        calculatedBalances[tx.id] = {
+                                                            warehouseBalance: currentWarehouseBalance,
+                                                            totalBalance: currentTotalBalance
+                                                        };
+
+                                                        // Reverse the effect: subtract this transaction's quantity
                                                         const isOut = tx.quantity < 0;
-                                                        balance = balance + (isOut ? Math.abs(tx.quantity) : -Math.abs(tx.quantity));
-                                                        return { tx, balance: currentBalance };
+                                                        const absQty = Math.abs(tx.quantity);
+
+                                                        balance = balance + (isOut ? absQty : -absQty);
+                                                        if (warehouseBalances[tx.warehouseId] !== undefined) {
+                                                            warehouseBalances[tx.warehouseId] = warehouseBalances[tx.warehouseId] + (isOut ? absQty : -absQty);
+                                                        }
                                                     });
-                                                    return rows.map(({ tx, balance: bal }) => {
+
+                                                    return product.stockTransactions.map(tx => {
                                                         const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
                                                         const isOut = tx.quantity < 0;
+                                                        const balances = calculatedBalances[tx.id] || { warehouseBalance: 0, totalBalance: 0 };
                                                         return (
                                                             <tr key={tx.id} className="hover:bg-gray-50">
                                                                 <td className="px-4 py-3 text-sm text-gray-600">{formatDateTime(tx.createdAt)}</td>
@@ -1002,7 +1034,10 @@ export default function ProductDetailPage() {
                                                                     </span>
                                                                 </td>
                                                                 <td className="px-4 py-3 text-sm text-right font-medium text-gray-700">
-                                                                    {bal.toLocaleString()}
+                                                                    {balances.warehouseBalance.toLocaleString()}
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm text-right font-medium text-gray-700">
+                                                                    {balances.totalBalance.toLocaleString()}
                                                                 </td>
                                                                 {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm text-gray-800 text-right">
                                                                     {(tx.type === 'SALE' || tx.type === 'SALE_CANCEL' || tx.type === 'SALE_RETURN')
@@ -1034,38 +1069,87 @@ export default function ProductDetailPage() {
 
                                     {/* Mobile Cards */}
                                     <div className="sm:hidden divide-y divide-gray-50">
-                                        {product.stockTransactions.map(tx => {
-                                            const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
-                                            const isOut = tx.quantity < 0;
-                                            return (
-                                                <div key={tx.id} className="p-4">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
-                                                            {info.icon} {info.label}
-                                                        </span>
-                                                        <span className={`text-sm font-bold ${isOut ? 'text-red-600' : 'text-emerald-600'}`}>
-                                                            {isOut ? '-' : '+'}
-                                                            {Math.abs(tx.quantity).toLocaleString()} {product.unit}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between text-xs text-gray-500">
-                                                        <span>{formatDateTime(tx.createdAt)}</span>
-                                                        <span>{tx.warehouse.name}</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                                        <span>
-                                                            {(tx.type === 'SALE' || tx.type === 'SALE_CANCEL' || tx.type === 'SALE_RETURN')
-                                                                ? <span className="text-blue-600 font-medium">ราคาขาย {formatCurrency(tx.sellingPrice ?? Number(tx.unitCost))}</span>
-                                                                : (user?.role === 'ADMIN' ? <>@ {formatCurrency(Number(tx.unitCost))}</> : null)}
-                                                        </span>
-                                                        {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
-                                                    </div>
-                                                    {tx.lotNo && <p className="text-xs text-purple-600 mt-1">📋 Lot: {tx.lotNo}</p>}
-                                                    {tx.notes && <p className="text-xs text-gray-400 mt-1">{tx.notes}</p>}
-                                                    {tx.user && <p className="text-xs text-blue-500 mt-1">👤 {tx.user.name}</p>}
-                                                </div>
-                                            );
-                                        })}
+                                        {(() => {
+                                             // Current stock per warehouse:
+                                             const warehouseBalances: Record<string, number> = {};
+                                             product.productStocks.forEach(ps => {
+                                                 warehouseBalances[ps.warehouse.id] = ps.quantity;
+                                             });
+
+                                             // Adjust for transactions after filter:
+                                             if (product.txSumAfterFilterPerWarehouse) {
+                                                 Object.entries(product.txSumAfterFilterPerWarehouse).forEach(([whId, qty]) => {
+                                                     if (warehouseBalances[whId] !== undefined) {
+                                                         warehouseBalances[whId] -= qty;
+                                                     }
+                                                 });
+                                             }
+
+                                             // Compute accurate starting balance for total:
+                                             const startingBalance = totalStock - (product.txSumAfterFilter ?? 0);
+                                             let balance = startingBalance;
+
+                                             // Maps transaction ID to calculated balances
+                                             const calculatedBalances: Record<string, { warehouseBalance: number; totalBalance: number }> = {};
+
+                                             // Traverse from newest to oldest to build chronological balances
+                                             product.stockTransactions.forEach(tx => {
+                                                 const currentTotalBalance = balance;
+                                                 const currentWarehouseBalance = warehouseBalances[tx.warehouseId] ?? 0;
+
+                                                 calculatedBalances[tx.id] = {
+                                                     warehouseBalance: currentWarehouseBalance,
+                                                     totalBalance: currentTotalBalance
+                                                 };
+
+                                                 // Reverse the effect
+                                                 const isOut = tx.quantity < 0;
+                                                 const absQty = Math.abs(tx.quantity);
+
+                                                 balance = balance + (isOut ? absQty : -absQty);
+                                                 if (warehouseBalances[tx.warehouseId] !== undefined) {
+                                                     warehouseBalances[tx.warehouseId] = warehouseBalances[tx.warehouseId] + (isOut ? absQty : -absQty);
+                                                 }
+                                             });
+
+                                             return product.stockTransactions.map(tx => {
+                                                 const info = txTypeLabels[tx.type] || { label: tx.type, color: 'text-gray-700 bg-gray-50', icon: '📋' };
+                                                 const isOut = tx.quantity < 0;
+                                                 const balances = calculatedBalances[tx.id] || { warehouseBalance: 0, totalBalance: 0 };
+                                                 return (
+                                                     <div key={tx.id} className="p-4">
+                                                         <div className="flex items-center justify-between mb-2">
+                                                             <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
+                                                                 {info.icon} {info.label}
+                                                             </span>
+                                                             <span className={`text-sm font-bold ${isOut ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                                 {isOut ? '-' : '+'}
+                                                                 {Math.abs(tx.quantity).toLocaleString()} {product.unit}
+                                                             </span>
+                                                         </div>
+                                                         <div className="flex justify-between text-xs text-gray-500">
+                                                             <span>{formatDateTime(tx.createdAt)}</span>
+                                                             <span>{tx.warehouse.name}</span>
+                                                         </div>
+                                                         <div className="flex justify-between text-xs text-gray-600 mt-1.5 font-medium">
+                                                             <span>คงเหลือในคลัง: <strong className="text-gray-800">{balances.warehouseBalance.toLocaleString()}</strong></span>
+                                                             <span>คงเหลือรวม: <strong className="text-gray-800">{balances.totalBalance.toLocaleString()}</strong></span>
+                                                         </div>
+                                                         <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                                             <span>
+                                                                 {(tx.type === 'SALE' || tx.type === 'SALE_CANCEL' || tx.type === 'SALE_RETURN')
+                                                                     ? <span className="text-blue-600 font-medium">ราคาขาย {formatCurrency(tx.sellingPrice ?? Number(tx.unitCost))}</span>
+                                                                     : (user?.role === 'ADMIN' ? <>@ {formatCurrency(Number(tx.unitCost))}</> : null)}
+                                                             </span>
+                                                             {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
+                                                         </div>
+                                                         {tx.lotNo && <p className="text-xs text-purple-600 mt-1">📋 Lot: {tx.lotNo}</p>}
+                                                         {tx.notes && <p className="text-xs text-gray-400 mt-1">{tx.notes}</p>}
+                                                         {tx.user && <p className="text-xs text-blue-500 mt-1">👤 {tx.user.name}</p>}
+                                                     </div>
+                                                 );
+                                             });
+                                         })()}
                                     </div>
                                 </>
                             )}

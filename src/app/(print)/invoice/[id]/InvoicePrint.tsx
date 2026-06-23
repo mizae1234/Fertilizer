@@ -345,7 +345,7 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                 {/* Signature Lines */}
                 <div style={{ marginTop: 'auto', paddingTop: 24 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 32 }}>
-                        {['ผู้รับของ', 'ผู้นำส่ง', 'ผู้รับเงิน', 'ผู้รับมอบอำนาจ'].map(label => (
+                        {['ผู้รับของ', 'ผู้นำส่ง', 'ผู้รับเงิน', 'ผู้อนุมัติ'].map(label => (
                             <div key={label} style={{ flex: 1, textAlign: 'center' }}>
                                 <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 40 }}>{label}</div>
                                 <div style={{ borderTop: '1px dashed #999', paddingTop: 6 }}>

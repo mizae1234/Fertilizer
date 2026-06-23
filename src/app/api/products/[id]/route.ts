@@ -61,6 +61,7 @@ export async function GET(
         // When date filter is applied, compute sum of transactions AFTER the filter
         // so the client can calculate accurate starting balance
         let txSumAfterFilter: number | null = null;
+        let txSumAfterFilterPerWarehouse: Record<string, number> = {};
         if (txFrom || txTo) {
             const afterWhere: Record<string, unknown> = { productId: id };
             if (txTo) {
@@ -70,11 +71,21 @@ export async function GET(
             }
             // If only txFrom is set (no txTo), we don't need afterSum since newest tx = current stock
             if (txTo) {
-                const afterAgg = await prisma.stockTransaction.aggregate({
-                    where: afterWhere,
-                    _sum: { quantity: true },
-                });
+                const [afterAgg, afterWarehouseAgg] = await Promise.all([
+                    prisma.stockTransaction.aggregate({
+                        where: afterWhere,
+                        _sum: { quantity: true },
+                    }),
+                    prisma.stockTransaction.groupBy({
+                        by: ['warehouseId'],
+                        where: afterWhere,
+                        _sum: { quantity: true },
+                    }),
+                ]);
                 txSumAfterFilter = afterAgg._sum.quantity ?? 0;
+                afterWarehouseAgg.forEach(item => {
+                    txSumAfterFilterPerWarehouse[item.warehouseId] = item._sum.quantity ?? 0;
+                });
             }
         }
 
@@ -93,6 +104,7 @@ export async function GET(
         const result = JSON.parse(JSON.stringify(product));
         if (txSumAfterFilter !== null) {
             result.txSumAfterFilter = txSumAfterFilter;
+            result.txSumAfterFilterPerWarehouse = txSumAfterFilterPerWarehouse;
         }
         result.computedAvgCost = computedAvgCost;
         result.computedLastCost = computedLastCost;

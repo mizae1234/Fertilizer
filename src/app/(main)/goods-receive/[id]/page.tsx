@@ -8,6 +8,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useUser } from '@/hooks/useUser';
+import PrintGoodsReceiveButton from './PrintGoodsReceiveButton';
 
 interface Vendor { id: string; name: string; phone: string | null; lineId: string | null }
 interface Product { id: string; name: string; code: string; unit: string }
@@ -290,12 +291,20 @@ export default function GoodsReceiveDetailPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{gr.grNumber}</h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{gr.grNumber}</h1>
+                        <StatusBadge status={gr.status} />
+                    </div>
                     <p className="text-xs sm:text-sm text-gray-500 mt-1">
                         สร้างโดย {gr.createdBy.name} • {formatDate(gr.createdAt)}
                     </p>
                 </div>
-                <StatusBadge status={gr.status} />
+                <div className="flex items-center gap-2">
+                    <PrintGoodsReceiveButton id={id} />
+                    <button onClick={() => router.push('/goods-receive')} className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+                        ← กลับ
+                    </button>
+                </div>
             </div>
 
             {/* Vendor & Header Info */}

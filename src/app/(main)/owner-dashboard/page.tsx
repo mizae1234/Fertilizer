@@ -84,14 +84,16 @@ export default function OwnerDashboardPage() {
             setData(d);
         } catch { /* ignore */ }
         setLoading(false);
-    }, []);
+    }, [user]);
 
     useEffect(() => {
-        const { from, to } = getPresetDates('30d');
-        setDateFrom(from);
-        setDateTo(to);
-        fetchData(from, to);
-    }, [fetchData]);
+        if (user) {
+            const { from, to } = getPresetDates('30d');
+            setDateFrom(from);
+            setDateTo(to);
+            fetchData(from, to);
+        }
+    }, [user, fetchData]);
 
     const handlePreset = (p: Preset) => {
         setPreset(p);
@@ -110,15 +112,15 @@ export default function OwnerDashboardPage() {
         }
     };
 
-    const salesChange = data && data.summary.prevTotalSales > 0
+    const salesChange = data && data.summary && data.summary.prevTotalSales > 0
         ? ((data.summary.totalSales - data.summary.prevTotalSales) / data.summary.prevTotalSales * 100)
         : 0;
 
-    const expensePercent = data && data.summary.totalSales > 0
+    const expensePercent = data && data.summary && data.summary.totalSales > 0
         ? (data.summary.totalExpenses / data.summary.totalSales * 100)
         : 0;
 
-    const maxDailySales = data ? Math.max(...data.dailySales.map(d => d.amount), 1) : 1;
+    const maxDailySales = data && data.dailySales ? Math.max(...data.dailySales.map(d => d.amount), 1) : 1;
 
     // Date display
     const monthNames = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
@@ -180,7 +182,11 @@ export default function OwnerDashboardPage() {
 
             {loading ? (
                 <div className="text-center py-20 text-gray-400">⏳ กำลังโหลดข้อมูล...</div>
-            ) : data ? (
+            ) : data && (data as any).error ? (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl text-center font-medium my-10">
+                    ⚠️ {(data as any).error}
+                </div>
+            ) : data && data.summary ? (
                 <>
                     {/* Summary Cards */}
                     <div className={`grid grid-cols-2 ${user.role === 'ADMIN' ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-3'} gap-4 mb-6`}>
