@@ -1,12 +1,4 @@
-import { PrismaClient } from '../src/generated/prisma/client';
-
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-} as any);
+import { prisma } from '../src/lib/prisma';
 
 async function main() {
   console.log('🔍 Fetching all ProductStocks with avgCost = 0...');

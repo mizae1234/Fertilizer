@@ -37,7 +37,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Copy Prisma schema + generated client (needed at runtime for @prisma/adapter-pg)
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src/generated ./src/generated
-COPY --from=builder /app/node_modules/@prisma/adapter-pg ./node_modules/@prisma/adapter-pg
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Create uploads directory with proper permissions
 RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
