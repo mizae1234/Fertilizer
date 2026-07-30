@@ -35,7 +35,7 @@ export async function GET(
                     orderBy: { createdAt: 'desc' },
                 },
                 debtPayments: {
-                    select: { id: true, amount: true, method: true, note: true, paidAt: true },
+                    select: { id: true, amount: true, method: true, note: true, bankAccountId: true, paidAt: true },
                     orderBy: { paidAt: 'desc' },
                 },
                 debtInterests: {

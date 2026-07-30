@@ -26,7 +26,7 @@ interface SaleEditLogData {
 }
 
 interface DebtPaymentData {
-    id: string; amount: string; method: string; note: string | null; paidAt: string;
+    id: string; amount: string; method: string; note: string | null; bankAccountId?: string | null; paidAt: string;
 }
 
 interface SaleDetail {
@@ -35,7 +35,7 @@ interface SaleDetail {
     customerId: string | null;
     notes: string | null;
     paymentMethod: string | null;
-    payments: { method: string; amount: number }[] | null;
+    payments: { method: string; amount: number; bankAccountId?: string | null }[] | null;
     creditDueDate: string | null;
     customer: { name: string; phone: string } | null;
     createdBy: { name: string };
@@ -105,6 +105,7 @@ export default function SaleDetailPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
+    const [bankAccounts, setBankAccounts] = useState<any[]>([]);
 
     // Modals
     const [showDelete, setShowDelete] = useState(false);
@@ -128,6 +129,13 @@ export default function SaleDetailPage() {
     }, [id]);
 
     useEffect(() => { fetchSale(); }, [fetchSale]);
+
+    useEffect(() => {
+        fetch('/api/bank-accounts')
+            .then(res => res.json())
+            .then(data => setBankAccounts(data))
+            .catch(() => {});
+    }, []);
 
     // Live search customers from API when typing in edit mode
     const customerSearchTimer = useRef<NodeJS.Timeout | null>(null);
@@ -701,7 +709,7 @@ export default function SaleDetailPage() {
                     'CASH': '💵 เงินสด', 'TRANSFER': '🏦 โอน', 'CREDIT': '📋 เครดิต',
                     'SPLIT': '🔀 จ่ายหลายช่องทาง', 'CREDIT_CARD': '💳 บัตรเครดิต',
                 };
-                const payments = (sale.payments && Array.isArray(sale.payments) ? sale.payments : []) as { method: string; amount: number }[];
+                const payments = (sale.payments && Array.isArray(sale.payments) ? sale.payments : []) as { method: string; amount: number; bankAccountId?: string | null }[];
                 const hasCredit = sale.paymentMethod === 'CREDIT' || sale.paymentMethod === 'SPLIT';
                 const totalInterest = (sale.debtInterests || []).reduce((s, di) => s + Number(di.amount), 0);
                 const grandTotal = Number(sale.totalAmount) + totalInterest;
@@ -774,16 +782,20 @@ export default function SaleDetailPage() {
                             <div className="border-t border-gray-100 pt-3 mb-3">
                                 <p className="text-xs font-medium text-gray-500 mb-2">รายละเอียดการชำระ (ตอนขาย)</p>
                                 <div className="space-y-1.5">
-                                    {payments.map((p, i) => (
-                                        <div key={i} className="flex justify-between items-center text-sm">
-                                            <span className="text-gray-600">
-                                                {paymentMethodLabels[p.method] || p.method}
-                                            </span>
-                                            <span className={`font-medium ${p.method === 'CREDIT' ? 'text-orange-600' : 'text-gray-800'}`}>
-                                                {formatCurrency(Number(p.amount))}
-                                            </span>
-                                        </div>
-                                    ))}
+                                    {payments.map((p, i) => {
+                                        const bank = p.bankAccountId ? bankAccounts.find((a: any) => a.id === p.bankAccountId) : null;
+                                        return (
+                                            <div key={i} className="flex justify-between items-center text-sm">
+                                                <span className="text-gray-600">
+                                                    {paymentMethodLabels[p.method] || p.method}
+                                                    {bank && <span className="text-xs text-gray-400 ml-1.5">({bank.bankName} - {bank.accountNumber})</span>}
+                                                </span>
+                                                <span className={`font-medium ${p.method === 'CREDIT' ? 'text-orange-600' : 'text-gray-800'}`}>
+                                                    {formatCurrency(Number(p.amount))}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
@@ -793,20 +805,24 @@ export default function SaleDetailPage() {
                             <div className="border-t border-gray-100 pt-3">
                                 <p className="text-xs font-medium text-gray-500 mb-2">ประวัติชำระหนี้</p>
                                 <div className="space-y-2">
-                                    {sale.debtPayments.map(dp => (
-                                        <div key={dp.id} className="flex justify-between items-center text-sm bg-emerald-50 rounded-lg px-3 py-2">
-                                            <div>
-                                                <span className="text-gray-700 font-medium">
-                                                    {paymentMethodLabels[dp.method] || dp.method}
-                                                </span>
-                                                <span className="text-xs text-gray-400 ml-2">
-                                                    {new Date(dp.paidAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                </span>
-                                                {dp.note && <span className="text-xs text-gray-400 ml-2">({dp.note})</span>}
+                                    {sale.debtPayments.map(dp => {
+                                        const bank = dp.bankAccountId ? bankAccounts.find((a: any) => a.id === dp.bankAccountId) : null;
+                                        return (
+                                            <div key={dp.id} className="flex justify-between items-center text-sm bg-emerald-50 rounded-lg px-3 py-2">
+                                                <div>
+                                                    <span className="text-gray-700 font-medium">
+                                                        {paymentMethodLabels[dp.method] || dp.method}
+                                                        {bank && <span className="text-xs text-gray-500 ml-1.5">({bank.bankName} - {bank.accountNumber})</span>}
+                                                    </span>
+                                                    <span className="text-xs text-gray-400 ml-2">
+                                                        {new Date(dp.paidAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                    </span>
+                                                    {dp.note && <span className="text-xs text-gray-400 ml-2">({dp.note})</span>}
+                                                </div>
+                                                <span className="font-semibold text-emerald-600">+{formatCurrency(Number(dp.amount))}</span>
                                             </div>
-                                            <span className="font-semibold text-emerald-600">+{formatCurrency(Number(dp.amount))}</span>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}

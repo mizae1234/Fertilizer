@@ -28,7 +28,7 @@ interface SaleData {
     totalInterest: number;
     isPaidOff: boolean;
     currentDueDate: string | null;
-    debtPayments: { id: string; amount: number; method: string; dueDate: string | null; note: string | null; paidAt: string }[];
+    debtPayments: { id: string; amount: number; method: string; dueDate: string | null; note: string | null; paidAt: string; bankAccountId?: string | null }[];
     debtInterests: { id: string; percentage: number; baseAmount: number; amount: number; note: string | null; createdAt: string }[];
 }
 
@@ -189,6 +189,7 @@ function DebtPaymentModal({ total, loading, onConfirm, onClose }: {
                     <button type="button" onClick={() => onConfirm(lines.map(l => ({
                         method: l.method, amount: l.amount,
                         ...(l.method === 'CREDIT' && l.dueDate ? { dueDate: l.dueDate } : {}),
+                        ...(l.method === 'TRANSFER' && l.bankAccountId ? { bankAccountId: l.bankAccountId } : {}),
                     })))}
                         disabled={!isValid || loading}
                         className="w-full py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold text-sm hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all">
@@ -210,6 +211,13 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
     const [interestDays, setInterestDays] = useState('0');
     const [interestNote, setInterestNote] = useState('');
     const [alert, setAlert] = useState({ open: false, message: '', type: 'success' as 'success' | 'error' | 'warning', title: '' });
+    const [bankAccounts, setBankAccounts] = useState<BankAccountInfo[]>([]);
+
+    useEffect(() => {
+        fetch('/api/bank-accounts').then(r => r.json()).then((data: BankAccountInfo[]) => {
+            setBankAccounts(data);
+        }).catch(() => { });
+    }, []);
 
     const pct = parseFloat(interestPct) || 0;
     const months = parseFloat(interestMonths) || 0;
@@ -248,7 +256,7 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
         } finally { setLoading(false); }
     };
 
-    const handlePayDebt = async (payments: { method: string; amount: number; dueDate?: string }[]) => {
+    const handlePayDebt = async (payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string }[]) => {
         setLoading(true);
         try {
             const result = await payDebt(sale.id, payments);
@@ -263,6 +271,12 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
         } catch (err) {
             setAlert({ open: true, message: (err as Error).message, type: 'error', title: 'เกิดข้อผิดพลาด' });
         } finally { setLoading(false); }
+    };
+
+    const getBankName = (dp: any) => {
+        if (!dp.bankAccountId) return null;
+        const acc = bankAccounts.find((a: BankAccountInfo) => a.id === dp.bankAccountId);
+        return acc ? `โอนเข้า: ${acc.bankName} - ${acc.accountNumber}` : 'เงินโอน';
     };
 
     return (
@@ -361,7 +375,11 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
                             <div key={dp.id} className="px-4 py-3 flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-gray-700">
-                                        {dp.method === 'CASH' ? '💵 เงินสด' : dp.method === 'TRANSFER' ? '🏦 เงินโอน' : '📋 เครดิต'}
+                                        {dp.method === 'CASH'
+                                            ? '💵 เงินสด'
+                                            : dp.method === 'TRANSFER'
+                                                ? `🏦 ${getBankName(dp) || 'เงินโอน'}`
+                                                : '📋 เครดิต'}
                                         {dp.method === 'CREDIT' && dp.dueDate && <span className="text-orange-500 ml-1">(กำหนดใหม่: {formatDate(dp.dueDate)})</span>}
                                     </p>
                                     <p className="text-[11px] text-gray-400">{dp.note || formatDate(dp.paidAt)}</p>

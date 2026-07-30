@@ -13,7 +13,7 @@ echo ""
 
 for HOST in "${SITES[@]}"; do
     echo "📦 Deploying to $HOST ..."
-    ssh root@$HOST "cd /home/web/Fertilizer && git fetch origin && git reset --hard origin/main && docker compose down && docker compose up -d --build" &
+    ssh root@$HOST "cd /home/web/Fertilizer && git fetch origin && git reset --hard origin/main && docker compose down && docker compose up -d --build && docker compose exec -T web npx prisma db push" &
 done
 
 echo ""

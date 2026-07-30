@@ -71,7 +71,7 @@ const PAYMENT_METHODS = [
 
 function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, allowCredit = true }: {
     total: number; loading: boolean;
-    onConfirm: (payments: { method: string; amount: number; dueDate?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number) => void;
+    onConfirm: (payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number) => void;
     onClose: () => void;
     defaultPrintType?: 'bill' | 'invoice' | 'none';
     allowCredit?: boolean;
@@ -138,6 +138,7 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
             method: l.method,
             amount: l.amount,
             ...(l.method === 'CREDIT' && l.dueDate ? { dueDate: l.dueDate } : {}),
+            ...(l.method === 'TRANSFER' && l.bankAccountId ? { bankAccountId: l.bankAccountId } : {}),
         }));
         const cashVal = typeof cashReceived === 'number' && cashReceived > 0 ? cashReceived : undefined;
         onConfirm(payments, printType, cashVal);

@@ -4,6 +4,17 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
+import Link from 'next/link';
+import * as XLSX from 'xlsx';
+import { formatCurrency, formatDate } from '@/lib/utils';
+
+// ==================== EXCEL EXPORT UTIL ====================
+function exportToExcel(data: Record<string, unknown>[], filename: string) {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Report');
+    XLSX.writeFile(wb, `${filename}.xlsx`);
+}
 
 interface BankAccount {
     id: string;
@@ -42,6 +53,48 @@ export default function BankAccountsPage() {
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [uploadError, setUploadError] = useState('');
     const fileRef = useRef<HTMLInputElement>(null);
+
+    // Transfers modal states
+    const [selectedAccountForTransfers, setSelectedAccountForTransfers] = useState<BankAccount | null>(null);
+    const [transfers, setTransfers] = useState<any[]>([]);
+    const [transfersLoading, setTransfersLoading] = useState(false);
+    const [transfersSearch, setTransfersSearch] = useState('');
+    const [transfersTypeFilter, setTransfersTypeFilter] = useState<'ALL' | 'POS' | 'PAY_DEBT'>('ALL');
+
+    const handleViewTransfers = async (acc: BankAccount) => {
+        setSelectedAccountForTransfers(acc);
+        setTransfersLoading(true);
+        setTransfers([]);
+        setTransfersSearch('');
+        setTransfersTypeFilter('ALL');
+        try {
+            const res = await fetch(`/api/bank-accounts/${acc.id}/transfers`);
+            const data = await res.json();
+            setTransfers(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setTransfersLoading(false);
+        }
+    };
+
+    const handleExportTransfers = () => {
+        if (!selectedAccountForTransfers || transfers.length === 0) return;
+        const q = transfersSearch.toLowerCase().trim();
+        const filtered = transfers.filter(t => {
+            const matchesSearch = t.reference.toLowerCase().includes(q) || t.customerName.toLowerCase().includes(q);
+            const matchesType = transfersTypeFilter === 'ALL' || t.type === transfersTypeFilter;
+            return matchesSearch && matchesType;
+        });
+
+        exportToExcel(filtered.map(t => ({
+            'วันที่-เวลา': formatDate(t.date) + ' ' + new Date(t.date).toLocaleTimeString('th-TH'),
+            'เลขที่อ้างอิง': t.reference,
+            'ประเภท': t.type === 'POS' ? 'ขายหน้าร้าน POS' : 'รับชำระหนี้',
+            'ชื่อลูกค้า': t.customerName,
+            'ยอดเงินโอน': t.amount
+        })), `ยอดเงินโอนเข้า_${selectedAccountForTransfers.bankName}_${selectedAccountForTransfers.accountNumber}`);
+    };
 
     const loadAccounts = useCallback(async () => {
         setLoading(true);
@@ -270,6 +323,10 @@ export default function BankAccountsPage() {
                                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${acc.isActive ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'}`}>
                                         {acc.isActive ? '⏸️ ปิด' : '▶️ เปิด'}
                                     </button>
+                                    <button onClick={() => handleViewTransfers(acc)}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">
+                                        💸 รายการโอนเข้า
+                                    </button>
                                     <button onClick={() => handleEdit(acc)}
                                         className="px-3 py-1.5 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors">
                                         ✏️ แก้ไข
@@ -289,6 +346,147 @@ export default function BankAccountsPage() {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Transfers Modal */}
+            {selectedAccountForTransfers && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-scale-in flex flex-col max-h-[85vh]">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white flex justify-between items-center">
+                            <div>
+                                <h3 className="font-bold text-lg">💸 รายการเงินโอนเข้าบัญชี</h3>
+                                <p className="text-xs text-purple-100 mt-0.5">{selectedAccountForTransfers.accountName} · {selectedAccountForTransfers.bankName} · {selectedAccountForTransfers.accountNumber}</p>
+                            </div>
+                            <button onClick={() => setSelectedAccountForTransfers(null)} className="text-white/80 hover:text-white text-2xl font-semibold leading-none">&times;</button>
+                        </div>
+
+                        {/* Controls & Summary */}
+                        <div className="p-6 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
+                            <div className="flex flex-1 gap-2 flex-wrap sm:flex-nowrap">
+                                <input
+                                    type="text"
+                                    value={transfersSearch}
+                                    onChange={e => setTransfersSearch(e.target.value)}
+                                    placeholder="🔍 ค้นหาเลขที่บิล / ชื่อลูกค้า..."
+                                    className="flex-1 min-w-[200px] px-3.5 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400"
+                                />
+                                <select
+                                    value={transfersTypeFilter}
+                                    onChange={e => setTransfersTypeFilter(e.target.value as any)}
+                                    className="px-3.5 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400 bg-white"
+                                >
+                                    <option value="ALL">ทั้งหมด</option>
+                                    <option value="POS">ขายหน้าร้าน POS</option>
+                                    <option value="PAY_DEBT">ชำระหนี้ย้อนหลัง</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-4 flex-shrink-0">
+                                <div className="text-right">
+                                    <p className="text-xs text-gray-400">ยอดโอนรวมที่แสดง</p>
+                                    <p className="text-lg font-bold text-purple-600">
+                                        {formatCurrency(
+                                            transfers
+                                                .filter(t => {
+                                                    const matchesSearch = t.reference.toLowerCase().includes(transfersSearch.toLowerCase().trim()) || t.customerName.toLowerCase().includes(transfersSearch.toLowerCase().trim());
+                                                    const matchesType = transfersTypeFilter === 'ALL' || t.type === transfersTypeFilter;
+                                                    return matchesSearch && matchesType;
+                                                })
+                                                .reduce((sum, t) => sum + t.amount, 0)
+                                        )}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={handleExportTransfers}
+                                    disabled={transfers.length === 0}
+                                    className="px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 font-bold text-xs rounded-xl transition-all shadow-sm"
+                                >
+                                    📥 Export Excel
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* List Area */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {transfersLoading ? (
+                                <div className="py-12"><LoadingSpinner /></div>
+                            ) : transfers.length === 0 ? (
+                                <p className="text-gray-400 text-sm text-center py-12">ไม่พบรายการเงินโอนเข้า</p>
+                            ) : (() => {
+                                const q = transfersSearch.toLowerCase().trim();
+                                const filtered = transfers.filter(t => {
+                                    const matchesSearch = t.reference.toLowerCase().includes(q) || t.customerName.toLowerCase().includes(q);
+                                    const matchesType = transfersTypeFilter === 'ALL' || t.type === transfersTypeFilter;
+                                    return matchesSearch && matchesType;
+                                });
+
+                                if (filtered.length === 0) {
+                                    return <p className="text-gray-400 text-sm text-center py-12">ไม่พบข้อมูลที่ตรงกับเงื่อนไขค้นหา</p>;
+                                }
+
+                                return (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
+                                                    <th className="text-left py-2 px-3 font-medium">วันที่-เวลา</th>
+                                                    <th className="text-left py-2 px-3 font-medium">เลขที่อ้างอิง</th>
+                                                    <th className="text-left py-2 px-3 font-medium">ประเภท</th>
+                                                    <th className="text-left py-2 px-3 font-medium">ชื่อลูกค้า</th>
+                                                    <th className="text-right py-2 px-3 font-medium">ยอดเงินโอน</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50">
+                                                {filtered.map((t) => (
+                                                    <tr key={t.id} className="hover:bg-gray-50">
+                                                        <td className="py-3 px-3 text-xs text-gray-500">
+                                                            {new Date(t.date).toLocaleString('th-TH', {
+                                                                day: 'numeric',
+                                                                month: 'short',
+                                                                year: 'numeric',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit'
+                                                            })}
+                                                        </td>
+                                                        <td className="py-3 px-3 font-medium">
+                                                            <Link
+                                                                href={`/sales/${t.id.split('-pos-')[0]}`}
+                                                                className="text-purple-600 hover:text-purple-800 underline"
+                                                            >
+                                                                {t.reference}
+                                                            </Link>
+                                                        </td>
+                                                        <td className="py-3 px-3 text-xs">
+                                                            <span className={`px-2 py-0.5 rounded-full font-medium ${t.type === 'POS' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                {t.type === 'POS' ? 'ขายหน้าร้าน POS' : 'รับชำระหนี้'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 px-3 text-gray-700">
+                                                            {t.customerName}
+                                                        </td>
+                                                        <td className="py-3 px-3 text-right font-semibold text-emerald-600">
+                                                            {formatCurrency(t.amount)}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+                            <button
+                                onClick={() => setSelectedAccountForTransfers(null)}
+                                className="px-4 py-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 font-medium text-sm rounded-xl transition-all"
+                            >
+                                ปิด
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

@@ -165,7 +165,7 @@ export async function deleteInterest(interestId: string, saleId: string) {
 
 export async function payDebt(
     saleId: string,
-    payments: { method: string; amount: number; dueDate?: string }[]
+    payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string }[]
 ) {
     const isPaidOff = await prisma.$transaction(async (tx) => {
         // Validate inside transaction to prevent race conditions
@@ -190,6 +190,7 @@ export async function payDebt(
                     amount: p.amount,
                     method: p.method,
                     dueDate: p.dueDate ? new Date(p.dueDate) : null,
+                    bankAccountId: p.method === 'TRANSFER' && p.bankAccountId ? p.bankAccountId : null,
                     note: p.method === 'CREDIT' && p.dueDate
                         ? `เลื่อนกำหนดชำระไปวันที่ ${p.dueDate}`
                         : null,
