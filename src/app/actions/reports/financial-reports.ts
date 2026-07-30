@@ -237,6 +237,7 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
             unitCost: true,
             sale: {
                 select: {
+                    id: true,
                     saleReturns: {
                         select: { items: { select: { saleItemId: true, quantity: true } } },
                     },
@@ -247,10 +248,14 @@ export async function getPnLReport(dateFrom?: string, dateTo?: string) {
 
     // Build return map
     const retMap = new Map<string, number>();
+    const processedSaleIds = new Set<string>();
     for (const si of saleItems) {
-        for (const sr of si.sale.saleReturns) {
-            for (const ri of sr.items) {
-                retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + ri.quantity);
+        if (si.sale && !processedSaleIds.has(si.sale.id)) {
+            processedSaleIds.add(si.sale.id);
+            for (const sr of si.sale.saleReturns) {
+                for (const ri of sr.items) {
+                    retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + ri.quantity);
+                }
             }
         }
     }
