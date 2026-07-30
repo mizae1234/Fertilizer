@@ -815,7 +815,7 @@ export default function SaleDetailPage() {
                                                         {bank && <span className="text-xs text-gray-500 ml-1.5">({bank.bankName} - {bank.accountNumber})</span>}
                                                     </span>
                                                     <span className="text-xs text-gray-400 ml-2">
-                                                        {new Date(dp.paidAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        {dp.paidAt ? formatDateTime(dp.paidAt) : '-'}
                                                     </span>
                                                     {dp.note && <span className="text-xs text-gray-400 ml-2">({dp.note})</span>}
                                                 </div>

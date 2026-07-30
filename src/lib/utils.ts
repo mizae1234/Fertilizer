@@ -13,7 +13,8 @@ export function formatNumber(num: number | string): string {
     return new Intl.NumberFormat('th-TH').format(n);
 }
 
-export function formatDate(date: Date | string): string {
+export function formatDate(date: Date | string | null | undefined): string {
+    if (!date) return '-';
     const d = typeof date === 'string' ? new Date(date) : date;
     return d.toLocaleDateString('th-TH', {
         year: 'numeric',
@@ -23,7 +24,8 @@ export function formatDate(date: Date | string): string {
     });
 }
 
-export function formatDateTime(date: Date | string): string {
+export function formatDateTime(date: Date | string | null | undefined): string {
+    if (!date) return '-';
     const d = typeof date === 'string' ? new Date(date) : date;
     return d.toLocaleDateString('th-TH', {
         year: 'numeric',

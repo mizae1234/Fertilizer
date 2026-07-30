@@ -5,7 +5,8 @@ import { addInterest, payDebt, deleteInterest } from '@/app/actions/debt';
 import { useRouter } from 'next/navigation';
 
 const formatCurrency = (n: number) => '฿' + n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const formatDate = (d: string | Date) => {
+const formatDate = (d: string | Date | null | undefined) => {
+    if (!d) return '-';
     const date = new Date(d);
     return date.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
