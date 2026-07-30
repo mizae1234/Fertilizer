@@ -111,6 +111,17 @@ export async function createSaleFromPOS(data: {
                     const item = data.items[idx];
                     const stockToDeduct = item.quantity * (item.conversionRate || 1);
                     
+                    const destStock = await tx.productStock.findUnique({
+                        where: {
+                            productId_warehouseId: {
+                                productId: item.productId,
+                                warehouseId: item.warehouseId,
+                            },
+                        },
+                    });
+                    const currentAvgCost = destStock ? Number(destStock.avgCost) : 0;
+                    const costToUse = productCosts[idx];
+
                     await tx.productStock.upsert({
                         where: {
                             productId_warehouseId: {
@@ -120,11 +131,13 @@ export async function createSaleFromPOS(data: {
                         },
                         update: {
                             quantity: { decrement: stockToDeduct },
+                            ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
                         },
                         create: {
                             productId: item.productId,
                             warehouseId: item.warehouseId,
                             quantity: -stockToDeduct,
+                            avgCost: costToUse,
                         },
                     });
 

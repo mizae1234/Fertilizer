@@ -85,6 +85,17 @@ export async function createSaleReturn(data: {
                     const rate = saleItem ? Number(saleItem.conversionRate ?? 1) : 1;
                     const baseQtyToRestore = item.quantity * rate;
 
+                    const costToUse = saleItem ? Number(saleItem.unitCost) : Number(item.unitPrice);
+                    const destStock = await tx.productStock.findUnique({
+                        where: {
+                            productId_warehouseId: {
+                                productId: item.productId,
+                                warehouseId: item.warehouseId,
+                            },
+                        },
+                    });
+                    const currentAvgCost = destStock ? Number(destStock.avgCost) : 0;
+
                     await tx.productStock.upsert({
                         where: {
                             productId_warehouseId: {
@@ -92,11 +103,15 @@ export async function createSaleReturn(data: {
                                 warehouseId: item.warehouseId,
                             },
                         },
-                        update: { quantity: { increment: baseQtyToRestore } },
+                        update: { 
+                            quantity: { increment: baseQtyToRestore },
+                            ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
+                        },
                         create: {
                             productId: item.productId,
                             warehouseId: item.warehouseId,
                             quantity: baseQtyToRestore,
+                            avgCost: costToUse,
                         },
                     });
 

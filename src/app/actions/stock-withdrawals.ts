@@ -48,6 +48,17 @@ export async function createStockWithdrawal(data: {
 
         // Deduct stock + create stock transactions
         await Promise.all(data.items.map(async (item) => {
+            const costToUse = item.unitCost;
+            const destStock = await tx.productStock.findUnique({
+                where: {
+                    productId_warehouseId: {
+                        productId: item.productId,
+                        warehouseId: item.warehouseId,
+                    },
+                },
+            });
+            const currentAvgCost = destStock ? Number(destStock.avgCost) : 0;
+
             await tx.productStock.upsert({
                 where: {
                     productId_warehouseId: {
@@ -55,11 +66,15 @@ export async function createStockWithdrawal(data: {
                         warehouseId: item.warehouseId,
                     },
                 },
-                update: { quantity: { decrement: item.quantity } },
+                update: { 
+                    quantity: { decrement: item.quantity },
+                    ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
+                },
                 create: {
                     productId: item.productId,
                     warehouseId: item.warehouseId,
                     quantity: -item.quantity,
+                    avgCost: costToUse,
                 },
             });
 

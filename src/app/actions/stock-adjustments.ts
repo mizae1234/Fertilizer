@@ -74,12 +74,21 @@ export async function createStockAdjustment(data: {
 
             const noteText = [item.reason, data.note].filter(Boolean).join(' — ');
 
+            const product = await tx.product.findUnique({
+                where: { id: item.productId },
+                select: { cost: true },
+            });
+            const defaultCost = product ? Number(product.cost) : 0;
+
             if (data.adjustmentType === 'decrease') {
                 // Decrease mode — deduct stock (allow negative)
                 if (stock) {
                     await tx.productStock.update({
                         where: { id: stock.id },
-                        data: { quantity: { decrement: item.quantity } },
+                        data: { 
+                            quantity: { decrement: item.quantity },
+                            ...(Number(stock.avgCost) === 0 ? { avgCost: defaultCost } : {})
+                        },
                     });
                 } else {
                     await tx.productStock.create({
@@ -87,6 +96,7 @@ export async function createStockAdjustment(data: {
                             productId: item.productId,
                             warehouseId: item.warehouseId,
                             quantity: -item.quantity,
+                            avgCost: defaultCost,
                         },
                     });
                 }
@@ -97,7 +107,7 @@ export async function createStockAdjustment(data: {
                         warehouseId: item.warehouseId,
                         type: 'ADJUSTMENT',
                         quantity: -item.quantity,
-                        unitCost: stock ? Number(stock.avgCost) : 0,
+                        unitCost: stock ? Number(stock.avgCost) : defaultCost,
                         reference: adjNumber,
                         userId: data.userId,
                         notes: noteText,
@@ -108,7 +118,10 @@ export async function createStockAdjustment(data: {
                 if (stock) {
                     await tx.productStock.update({
                         where: { id: stock.id },
-                        data: { quantity: { increment: item.quantity } },
+                        data: { 
+                            quantity: { increment: item.quantity },
+                            ...(Number(stock.avgCost) === 0 ? { avgCost: defaultCost } : {})
+                        },
                     });
                 } else {
                     await tx.productStock.create({
@@ -116,6 +129,7 @@ export async function createStockAdjustment(data: {
                             productId: item.productId,
                             warehouseId: item.warehouseId,
                             quantity: item.quantity,
+                            avgCost: defaultCost,
                         },
                     });
                 }
@@ -126,7 +140,7 @@ export async function createStockAdjustment(data: {
                         warehouseId: item.warehouseId,
                         type: 'ADJUSTMENT',
                         quantity: item.quantity,
-                        unitCost: stock ? Number(stock.avgCost) : 0,
+                        unitCost: stock ? Number(stock.avgCost) : defaultCost,
                         reference: adjNumber,
                         userId: data.userId,
                         notes: noteText,

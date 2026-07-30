@@ -245,13 +245,23 @@ export async function updateSale(id: string, data: {
         if (existing.status === 'APPROVED') {
             for (const item of existing.items) {
                 const stockToRestore = item.quantity * Number(item.conversionRate || 1);
+                const costToUse = Number(item.unitCost);
+                const destStock = await tx.productStock.findUnique({
+                    where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
+                });
+                const currentAvgCost = destStock ? Number(destStock.avgCost) : 0;
+
                 await tx.productStock.upsert({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
-                    update: { quantity: { increment: stockToRestore } },
+                    update: { 
+                        quantity: { increment: stockToRestore },
+                        ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
+                    },
                     create: {
                         productId: item.productId,
                         warehouseId: item.warehouseId,
                         quantity: stockToRestore,
+                        avgCost: costToUse,
                     },
                 });
             }
@@ -305,15 +315,26 @@ export async function updateSale(id: string, data: {
 
         // If APPROVED, deduct new stock
         if (existing.status === 'APPROVED') {
-            for (const item of data.items) {
+            for (let idx = 0; idx < data.items.length; idx++) {
+                const item = data.items[idx];
                 const stockToDeduct = item.quantity * (item.conversionRate || 1);
+                const costToUse = productCosts[idx];
+                const destStock = await tx.productStock.findUnique({
+                    where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
+                });
+                const currentAvgCost = destStock ? Number(destStock.avgCost) : 0;
+
                 await tx.productStock.upsert({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
-                    update: { quantity: { decrement: stockToDeduct } },
+                    update: { 
+                        quantity: { decrement: stockToDeduct },
+                        ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
+                    },
                     create: {
                         productId: item.productId,
                         warehouseId: item.warehouseId,
                         quantity: -stockToDeduct,
+                        avgCost: costToUse,
                     },
                 });
                 await tx.stockTransaction.create({
@@ -414,13 +435,23 @@ export async function cancelSale(id: string, userId?: string) {
                 // Fallback to item.quantity if no stock transaction found
                 const baseQtyToRestore = matchingTx ? Math.abs(matchingTx.quantity) : item.quantity * Number(item.conversionRate || 1);
 
+                const costToUse = Number(item.unitCost);
+                const destStock = await tx.productStock.findUnique({
+                    where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
+                });
+                const currentAvgCost = destStock ? Number(destStock.avgCost) : 0;
+
                 await tx.productStock.upsert({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
-                    update: { quantity: { increment: baseQtyToRestore } },
+                    update: { 
+                        quantity: { increment: baseQtyToRestore },
+                        ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
+                    },
                     create: {
                         productId: item.productId,
                         warehouseId: item.warehouseId,
                         quantity: baseQtyToRestore,
+                        avgCost: costToUse,
                     },
                 });
 

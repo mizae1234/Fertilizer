@@ -105,6 +105,20 @@ export async function approveTransfer(id: string) {
 
         // Process all items in parallel
         await Promise.all(transfer.items.map(async (item) => {
+            // Get source stock to retrieve its avgCost or product cost fallback
+            const sourceStock = await tx.productStock.findUnique({
+                where: {
+                    productId_warehouseId: {
+                        productId: item.productId,
+                        warehouseId: transfer.fromWarehouseId,
+                    },
+                },
+                include: { product: { select: { cost: true } } }
+            });
+            const currentAvgCost = sourceStock ? Number(sourceStock.avgCost) : 0;
+            const fallbackCost = sourceStock?.product?.cost ? Number(sourceStock.product.cost) : 0;
+            const costToUse = currentAvgCost > 0 ? currentAvgCost : fallbackCost;
+
             // Deduct from source warehouse
             await tx.productStock.upsert({
                 where: {
@@ -118,10 +132,21 @@ export async function approveTransfer(id: string) {
                     productId: item.productId,
                     warehouseId: transfer.fromWarehouseId,
                     quantity: -item.quantity,
+                    avgCost: costToUse,
                 },
             });
 
             // Add to destination warehouse
+            const destStock = await tx.productStock.findUnique({
+                where: {
+                    productId_warehouseId: {
+                        productId: item.productId,
+                        warehouseId: transfer.toWarehouseId,
+                    },
+                },
+            });
+            const destAvgCost = destStock ? Number(destStock.avgCost) : 0;
+
             await tx.productStock.upsert({
                 where: {
                     productId_warehouseId: {
@@ -129,11 +154,15 @@ export async function approveTransfer(id: string) {
                         warehouseId: transfer.toWarehouseId,
                     },
                 },
-                update: { quantity: { increment: item.quantity } },
+                update: { 
+                    quantity: { increment: item.quantity },
+                    ...(destAvgCost === 0 ? { avgCost: costToUse } : {})
+                },
                 create: {
                     productId: item.productId,
                     warehouseId: transfer.toWarehouseId,
                     quantity: item.quantity,
+                    avgCost: costToUse,
                 },
             });
 
