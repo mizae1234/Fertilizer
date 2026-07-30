@@ -19,12 +19,14 @@ export async function GET(request: Request) {
                         OR: [
                             { name: { contains: search, mode: 'insensitive' } },
                             { code: { contains: search, mode: 'insensitive' } },
+                            { description: { contains: search, mode: 'insensitive' } },
                         ],
                     }
                     : {}),
             },
             select: {
                 id: true, code: true, name: true, price: true, cost: true, unit: true,
+                description: true,
                 imageUrl: true, pointsPerUnit: true, minStock: true,
                 productStocks: warehouseId
                     ? { where: { warehouseId }, select: { warehouseId: true, quantity: true } }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface SaleData {
     id: string;
@@ -93,6 +93,8 @@ function numberToThaiText(num: number): string {
 }
 
 export default function InvoicePrint({ sale, template }: { sale: SaleData; template: TemplateData | null }) {
+    const [title, setTitle] = useState('ใบส่งของ / ใบเสร็จรับเงิน');
+
     // Auto print
     useEffect(() => {
         // small delay to let styles load
@@ -116,6 +118,13 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                     body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                     @page { size: A4; margin: 15mm; }
                     .no-print { display: none !important; }
+                    .no-border-print {
+                        border: none !important;
+                        padding: 0 !important;
+                        background: transparent !important;
+                        width: auto !important;
+                        text-align: right !important;
+                    }
                 }
                 @media screen {
                     body { background: #666; }
@@ -160,7 +169,23 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                     {/* Right: Bill No */}
                     <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: 12, color: '#888' }}># {sale.saleNumber}</div>
-                        <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>ใบส่งของ / ใบเสร็จรับเงิน</div>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            style={{
+                                fontSize: 18,
+                                fontWeight: 700,
+                                marginTop: 4,
+                                textAlign: 'right',
+                                border: '1px dashed #ccc',
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                                width: '220px',
+                                outline: 'none',
+                            }}
+                            className="no-border-print"
+                        />
                     </div>
                 </div>
 

@@ -11,6 +11,7 @@ import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import Pagination from '@/components/Pagination';
+import * as XLSX from 'xlsx';
 
 
 
@@ -74,6 +75,27 @@ export default function ExpensesPage() {
         }
     };
 
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const handleExport = () => {
+        if (expenses.length === 0) return;
+        const rows = expenses.map(exp => ({
+            'เลขที่รายจ่าย': exp.expenseNumber,
+            'หมวดหมู่': exp.category,
+            'รายละเอียด': exp.description || '-',
+            'อ้างอิง': exp.reference || '-',
+            'จำนวนเงิน': Number(exp.amount),
+            'วันที่': formatDate(exp.expenseDate),
+            'ผู้ทำรายการ': exp.createdBy.name
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
+        XLSX.writeFile(wb, `รายงานรายจ่าย_${dateFrom || 'all'}_${dateTo || 'all'}.xlsx`);
+    };
+
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         setPage(1);
@@ -85,9 +107,23 @@ export default function ExpensesPage() {
                 title="💸 บันทึกรายจ่าย"
                 subtitle="จัดการค่าใช้จ่ายในกิจการ"
                 actions={
-                    <Link href="/expenses/new" className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200 transition-all">
-                        <span className="text-lg">+</span> เพิ่มรายจ่าย
-                    </Link>
+                    <div className="flex gap-2 no-print">
+                        <button
+                            onClick={handlePrint}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-700 font-medium text-sm hover:bg-gray-50 shadow-sm transition-all"
+                        >
+                            🖨️ พิมพ์รายการ
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-700 font-medium text-sm hover:bg-gray-50 shadow-sm transition-all"
+                        >
+                            📥 Export Excel
+                        </button>
+                        <Link href="/expenses/new" className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200 transition-all">
+                            <span className="text-lg">+</span> เพิ่มรายจ่าย
+                        </Link>
+                    </div>
                 }
             />
 
@@ -101,7 +137,7 @@ export default function ExpensesPage() {
             </div>
 
             {/* Search & Filter */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4 no-print">
                 <form onSubmit={handleSearch} className="space-y-3">
                     <div className="flex flex-col sm:flex-row gap-3">
                         <input
@@ -171,7 +207,7 @@ export default function ExpensesPage() {
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">รายละเอียด</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวนเงิน</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">วันที่</th>
-                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500">จัดการ</th>
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 no-print">จัดการ</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -196,7 +232,7 @@ export default function ExpensesPage() {
                                             <p className="text-sm text-gray-600">{formatDate(exp.expenseDate)}</p>
                                             <p className="text-xs text-gray-400">โดย {exp.createdBy.name}</p>
                                         </td>
-                                        <td className="px-4 py-3 text-center">
+                                        <td className="px-4 py-3 text-center no-print">
                                             <button
                                                 onClick={() => setDeleteId(exp.id)}
                                                 className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors"
@@ -227,7 +263,7 @@ export default function ExpensesPage() {
                                         <span>{formatDate(exp.expenseDate)} · {exp.createdBy.name}</span>
                                         <button
                                             onClick={() => setDeleteId(exp.id)}
-                                            className="text-red-500 hover:text-red-700 px-2 py-1 rounded-lg"
+                                            className="text-red-500 hover:text-red-700 px-2 py-1 rounded-lg no-print"
                                         >
                                             ลบ
                                         </button>
@@ -241,7 +277,9 @@ export default function ExpensesPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+                <div className="no-print">
+                    <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+                </div>
             )}
 
             {/* Modals */}

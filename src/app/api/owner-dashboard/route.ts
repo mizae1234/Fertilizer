@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const prevTo = new Date(dateFrom.getTime() - 1);
 
     // Batch 1: All independent queries in parallel
-    const [sales, prevSales, saleItems, prevSaleItems, expenses, allProducts, recentSaleItems] = await Promise.all([
+    const [sales, prevSales, saleItems, prevSaleItems, expenses, allProducts, recentSaleItems, withdrawals] = await Promise.all([
         // 1. Sales summary (current period)
         prisma.sale.findMany({
             where: {
@@ -104,6 +104,15 @@ export async function GET(request: Request) {
                 sale: { select: { saleReturns: { select: { items: { select: { saleItemId: true, quantity: true } } } } } } 
             },
         }),
+        // 6. Withdrawals
+        prisma.stockWithdrawal.findMany({
+            where: {
+                createdAt: { gte: dateFrom, lte: dateTo },
+                status: 'APPROVED',
+                deletedAt: null,
+            },
+            select: { totalAmount: true },
+        }),
     ]);
 
     // Helper to calculate net quantity
@@ -145,7 +154,8 @@ export async function GET(request: Request) {
     const avgPerBill = totalBills > 0 ? totalSales / totalBills : 0;
     const prevTotalSales = prevSales.reduce((s, sale) => s + Number(sale.totalAmount), 0);
     const expensesOnly = expenses.reduce((s, e) => s + Number(e.amount), 0);
-    const totalExpenses = totalCOGS + expensesOnly;
+    const withdrawalCost = withdrawals.reduce((s, w) => s + Number(w.totalAmount), 0);
+    const totalExpenses = totalCOGS + expensesOnly + withdrawalCost;
     const netProfit = totalSales - totalExpenses;
 
     // Expense by category
@@ -217,6 +227,7 @@ export async function GET(request: Request) {
             totalExpenses: isStaff ? 0 : totalExpenses,
             totalCOGS: isStaff ? 0 : totalCOGS,
             expensesOnly: isStaff ? 0 : expensesOnly,
+            withdrawalCost: isStaff ? 0 : withdrawalCost,
             totalItemsSold,
             prevTotalItemsSold,
             totalBills,

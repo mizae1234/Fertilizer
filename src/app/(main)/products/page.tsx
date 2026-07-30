@@ -40,6 +40,7 @@ export default async function ProductsPage({ searchParams }: Props) {
                     { name: { contains: search, mode: 'insensitive' as const } },
                     { code: { contains: search, mode: 'insensitive' as const } },
                     { brand: { contains: search, mode: 'insensitive' as const } },
+                    { description: { contains: search, mode: 'insensitive' as const } },
                 ],
             }
             : {}),

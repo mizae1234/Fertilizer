@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { getSalesOverview, getSalesDetail, getTopProducts, getCustomerReport } from '@/app/actions/reports';
 import { getInventoryReport, getStockDetailReport, getCashFlowReport, getPnLReport, getPnLDetail } from '@/app/actions/reports';
+import { getStockWithdrawals } from '@/app/actions/stock-withdrawals';
 import * as XLSX from 'xlsx';
 
 // ==================== EXCEL EXPORT UTIL ====================
@@ -668,26 +669,30 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
 
 // ==================== INVENTORY TAB ====================
 function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
-    const [section, setSection] = useState<'overview' | 'detail'>('overview');
+    const [section, setSection] = useState<'overview' | 'detail' | 'withdrawals'>('overview');
     const [data, setData] = useState<Awaited<ReturnType<typeof getInventoryReport>> | null>(null);
     const [detailData, setDetailData] = useState<Awaited<ReturnType<typeof getStockDetailReport>> | null>(null);
+    const [withdrawalsData, setWithdrawalsData] = useState<{ records: any[]; totalPages: number; total: number } | null>(null);
     const [loading, setLoading] = useState(true);
     const [drillDown, setDrillDown] = useState(false);
     const [detailSearch, setDetailSearch] = useState('');
     const [detailPage, setDetailPage] = useState(1);
     const DETAIL_PAGE_SIZE = 15;
+    const [withdrawalPage, setWithdrawalPage] = useState(1);
 
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
             if (section === 'overview') {
                 const d = await getInventoryReport(); setData(JSON.parse(JSON.stringify(d)));
-            } else {
+            } else if (section === 'detail') {
                 const d = await getStockDetailReport(dateFrom, dateTo); setDetailData(JSON.parse(JSON.stringify(d)));
+            } else if (section === 'withdrawals') {
+                const d = await getStockWithdrawals(withdrawalPage, dateFrom, dateTo); setWithdrawalsData(JSON.parse(JSON.stringify(d)));
             }
         } catch (e) { console.error(e); }
         setLoading(false);
-    }, [section, dateFrom, dateTo]);
+    }, [section, dateFrom, dateTo, withdrawalPage]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
@@ -710,6 +715,18 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
         })), 'รายงานสินค้า_กำไร');
     };
 
+    const handleExportWithdrawals = () => {
+        if (!withdrawalsData) return;
+        exportToExcel(withdrawalsData.records.map(r => ({
+            'เลขที่ใบเบิก': r.withdrawalNumber,
+            'ผู้เบิก': r.requesterName,
+            'วันที่': formatDate(r.createdAt),
+            'ยอดรวมต้นทุน': Number(r.totalAmount),
+            'ผู้บันทึก': r.createdBy.name,
+            'หมายเหตุ': r.notes || ''
+        })), `รายงานการเบิก_${dateFrom || 'all'}_${dateTo || 'all'}`);
+    };
+
     if (loading) return <LoadingSpinner />;
 
     return (
@@ -719,6 +736,7 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                     {[
                         { key: 'overview' as const, label: '📦 ภาพรวมสต๊อก' },
                         { key: 'detail' as const, label: '📊 สินค้า / กำไร' },
+                        { key: 'withdrawals' as const, label: '📤 รายการเบิกสินค้า' },
                     ].map(s => (
                         <button key={s.key} onClick={() => setSection(s.key)}
                             className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${section === s.key ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
@@ -733,6 +751,7 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                         </>
                     )}
                     {section === 'detail' && <ExportButton onClick={handleExportDetail} label="Export กำไร" />}
+                    {section === 'withdrawals' && <ExportButton onClick={handleExportWithdrawals} label="Export การเบิก" />}
                 </div>
             </div>
 
@@ -883,6 +902,62 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                     </>
                 );
             })()}
+
+            {section === 'withdrawals' && withdrawalsData && (
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-4">
+                    <div className="flex justify-between items-center text-sm text-gray-500">
+                        <span>รายการใบเบิกทั้งหมด: {withdrawalsData.total} รายการ</span>
+                        <span className="font-semibold text-gray-800">มูลค่ารวมต้นทุน: {formatCurrency(withdrawalsData.records.reduce((s, r) => s + Number(r.totalAmount), 0))}</span>
+                    </div>
+                    {withdrawalsData.records.length === 0 ? (
+                        <p className="text-gray-400 text-sm text-center py-8">ไม่พบรายการเบิกสินค้าในช่วงเวลานี้</p>
+                    ) : (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
+                                            <th className="text-left py-2 px-3 font-medium">วันที่</th>
+                                            <th className="text-left py-2 px-3 font-medium">เลขที่ใบเบิก</th>
+                                            <th className="text-left py-2 px-3 font-medium">ผู้ขอเบิก / ผู้เบิก</th>
+                                            <th className="text-left py-2 px-3 font-medium">ผู้บันทึก</th>
+                                            <th className="text-right py-2 px-3 font-medium">จำนวนรายการ</th>
+                                            <th className="text-right py-2 px-3 font-medium">มูลค่าต้นทุนรวม</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {withdrawalsData.records.map((r, idx) => (
+                                            <tr key={idx} className="hover:bg-gray-50">
+                                                <td className="py-2.5 px-3 text-xs text-gray-500">
+                                                    {new Date(r.createdAt).toLocaleString('th-TH')}
+                                                </td>
+                                                <td className="py-2.5 px-3 font-medium text-emerald-600">
+                                                    {r.withdrawalNumber}
+                                                </td>
+                                                <td className="py-2.5 px-3 text-gray-700">
+                                                    {r.requesterName}
+                                                </td>
+                                                <td className="py-2.5 px-3 text-xs text-gray-500">
+                                                    {r.createdBy?.name || '-'}
+                                                </td>
+                                                <td className="py-2.5 px-3 text-right text-gray-600">
+                                                    {r._count?.items || 0} รายการ
+                                                </td>
+                                                <td className="py-2.5 px-3 text-right font-semibold text-red-600">
+                                                    {formatCurrency(Number(r.totalAmount))}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {withdrawalsData.totalPages > 1 && (
+                                <Pagination page={withdrawalPage} totalPages={withdrawalsData.totalPages} onPageChange={setWithdrawalPage} />
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
@@ -951,6 +1026,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
             { 'รายการ': 'กำไรขั้นต้น', 'จำนวน': pnlData.grossProfit },
             ...pnlData.expenseByCategory.map(e => ({ 'รายการ': `ค่าใช้จ่าย: ${e.category}`, 'จำนวน': -e.amount })),
             { 'รายการ': 'ค่าใช้จ่ายรวม', 'จำนวน': -pnlData.expenses },
+            { 'รายการ': 'ต้นทุนสินค้าที่เบิก', 'จำนวน': -pnlData.withdrawalCost },
             { 'รายการ': 'กำไรสุทธิ', 'จำนวน': pnlData.netProfit },
             ...(pnlData.factoryReturnCost > 0 ? [{ 'รายการ': 'มูลค่าส่งเคลมโรงงาน (ไม่นำมาคิดกำไร/ขาดทุน)', 'จำนวน': pnlData.factoryReturnCost }] : []),
         ];
@@ -1040,6 +1116,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                 <Row label="ต้นทุนขาย (COGS)" value={`-${formatCurrency(pnlData.cogs)}`} color="text-red-600" />
                                 <Row label="กำไรขั้นต้น" value={formatCurrency(pnlData.grossProfit)} bold sub={`${pnlData.grossMargin.toFixed(1)}%`} />
                                 <Row label="ค่าใช้จ่าย" value={`-${formatCurrency(pnlData.expenses)}`} color="text-red-600" />
+                                <Row label="ต้นทุนสินค้าที่เบิก" value={`-${formatCurrency(pnlData.withdrawalCost)}`} color="text-red-600" />
                                 <div className={`flex justify-between items-center py-2 px-2 rounded-lg ${pnlData.netProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
                                     <span className="text-sm font-bold text-gray-800">กำไรสุทธิ</span>
                                     <span className={`text-sm font-bold ${pnlData.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(pnlData.netProfit)}</span>

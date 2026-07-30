@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
             { name: { contains: search, mode: 'insensitive' as const } },
             { code: { contains: search, mode: 'insensitive' as const } },
             { brand: { contains: search, mode: 'insensitive' as const } },
+            { description: { contains: search, mode: 'insensitive' as const } },
         ];
     }
     if (warehouse) {

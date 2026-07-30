@@ -11,6 +11,7 @@ interface ProductUnitInfo {
 }
 interface Product {
     id: string; code: string; name: string; unit: string; price: string;
+    description?: string | null;
     pointsPerUnit: number;
     imageUrl?: string | null;
     productStocks: { warehouseId: string; quantity: number }[];
@@ -1092,7 +1093,9 @@ export default function POSPage() {
                                                             )}
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
-                                                                <p className="text-xs text-gray-400">{p.code} · {p.unit}</p>
+                                                                <p className="text-xs text-gray-400 truncate">
+                                                                    {p.code} · {p.unit}{p.description ? ` · ${p.description}` : ''}
+                                                                </p>
                                                             </div>
                                                             <div className="text-right shrink-0">
                                                                 <p className="text-sm font-bold text-emerald-600">{formatCurrency(price)}</p>
@@ -1190,7 +1193,9 @@ export default function POSPage() {
                                                         )}
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
-                                                            <p className="text-[10px] text-gray-400">{p.code} · {p.unit} · คงเหลือ {stock}</p>
+                                                            <p className="text-[10px] text-gray-400 truncate">
+                                                                {p.code} · {p.unit} · คงเหลือ {stock}{p.description ? ` · ${p.description}` : ''}
+                                                            </p>
                                                         </div>
                                                         <p className="text-sm font-bold text-emerald-600 shrink-0">{formatCurrency(price)}</p>
                                                         {inCart && <span className="bg-emerald-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center shrink-0">{inCart.quantity}</span>}

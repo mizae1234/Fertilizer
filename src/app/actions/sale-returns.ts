@@ -81,6 +81,10 @@ export async function createSaleReturn(data: {
 
                 // Restore stock + create StockTransaction for each item
                 await Promise.all(data.items.map(async (item) => {
+                    const saleItem = sale.items.find(si => si.id === item.saleItemId);
+                    const rate = saleItem ? Number(saleItem.conversionRate ?? 1) : 1;
+                    const baseQtyToRestore = item.quantity * rate;
+
                     await tx.productStock.upsert({
                         where: {
                             productId_warehouseId: {
@@ -88,11 +92,11 @@ export async function createSaleReturn(data: {
                                 warehouseId: item.warehouseId,
                             },
                         },
-                        update: { quantity: { increment: item.quantity } },
+                        update: { quantity: { increment: baseQtyToRestore } },
                         create: {
                             productId: item.productId,
                             warehouseId: item.warehouseId,
-                            quantity: item.quantity,
+                            quantity: baseQtyToRestore,
                         },
                     });
 
@@ -101,11 +105,11 @@ export async function createSaleReturn(data: {
                             productId: item.productId,
                             warehouseId: item.warehouseId,
                             type: 'SALE_RETURN',
-                            quantity: item.quantity,
+                            quantity: baseQtyToRestore,
                             unitCost: item.unitPrice,
                             reference: returnNumber,
                             userId: data.userId,
-                            notes: `คืนสินค้า ${returnNumber} (จากบิล ${sale.saleNumber})`,
+                            notes: `คืนสินค้า ${returnNumber} (จากบิล ${sale.saleNumber})${rate > 1 ? ` (${item.quantity}×${rate} = ${baseQtyToRestore} base unit)` : ''}`,
                         },
                     });
                 }));

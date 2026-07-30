@@ -13,6 +13,7 @@ export async function getProducts(page = 1, search = '') {
                     { name: { contains: search, mode: 'insensitive' as const } },
                     { code: { contains: search, mode: 'insensitive' as const } },
                     { brand: { contains: search, mode: 'insensitive' as const } },
+                    { description: { contains: search, mode: 'insensitive' as const } },
                 ],
             }
             : {}),
