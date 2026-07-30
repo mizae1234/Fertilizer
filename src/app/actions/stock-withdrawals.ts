@@ -21,10 +21,25 @@ export async function createStockWithdrawal(data: {
     if (!data.items.length) throw new Error('กรุณาเพิ่มรายการสินค้า');
     if (!data.userId) throw new Error('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่');
 
-    const totalAmount = data.items.reduce((sum, item) => item.quantity * item.unitCost + sum, 0);
     const withdrawalNumber = await generateNumber('WD');
 
     const result = await prisma.$transaction(async (tx) => {
+        // Fetch actual product costs from the database
+        const productCosts = await Promise.all(
+            data.items.map(async (item) => {
+                const product = await tx.product.findUnique({
+                    where: { id: item.productId },
+                    select: { cost: true },
+                });
+                return product ? Number(product.cost) : 0;
+            })
+        );
+
+        const totalAmount = data.items.reduce((sum, item, idx) => {
+            const cost = productCosts[idx];
+            return sum + item.quantity * cost;
+        }, 0);
+
         const withdrawal = await tx.stockWithdrawal.create({
             data: {
                 withdrawalNumber,
@@ -35,20 +50,23 @@ export async function createStockWithdrawal(data: {
                 withdrawerName: data.withdrawerName || null,
                 createdById: data.userId,
                 items: {
-                    create: data.items.map(item => ({
-                        productId: item.productId,
-                        warehouseId: item.warehouseId,
-                        quantity: item.quantity,
-                        unitCost: item.unitCost,
-                        totalCost: item.quantity * item.unitCost,
-                    })),
+                    create: data.items.map((item, idx) => {
+                        const cost = productCosts[idx];
+                        return {
+                            productId: item.productId,
+                            warehouseId: item.warehouseId,
+                            quantity: item.quantity,
+                            unitCost: cost,
+                            totalCost: item.quantity * cost,
+                        };
+                    }),
                 },
             },
         });
 
         // Deduct stock + create stock transactions
-        await Promise.all(data.items.map(async (item) => {
-            const costToUse = item.unitCost;
+        await Promise.all(data.items.map(async (item, idx) => {
+            const costToUse = productCosts[idx];
             const destStock = await tx.productStock.findUnique({
                 where: {
                     productId_warehouseId: {
@@ -84,7 +102,7 @@ export async function createStockWithdrawal(data: {
                     warehouseId: item.warehouseId,
                     type: 'WITHDRAWAL',
                     quantity: -item.quantity,
-                    unitCost: item.unitCost,
+                    unitCost: costToUse,
                     reference: withdrawalNumber,
                     userId: data.userId,
                     notes: `เบิกสินค้า ${withdrawalNumber}`,
