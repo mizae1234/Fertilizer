@@ -127,7 +127,7 @@ export async function getStockWithdrawals(page = 1, from = '', to = '') {
         if (to) (where.createdAt as Record<string, unknown>).lte = new Date(to + 'T23:59:59');
     }
 
-    const [records, total] = await Promise.all([
+    const [records, total, totalCostAgg] = await Promise.all([
         prisma.stockWithdrawal.findMany({
             where,
             include: {
@@ -139,9 +139,18 @@ export async function getStockWithdrawals(page = 1, from = '', to = '') {
             orderBy: { createdAt: 'desc' },
         }),
         prisma.stockWithdrawal.count({ where }),
+        prisma.stockWithdrawal.aggregate({
+            where: { ...where, status: 'APPROVED' },
+            _sum: { totalAmount: true },
+        }),
     ]);
 
-    return { records, totalPages: Math.ceil(total / perPage), total };
+    return { 
+        records, 
+        totalPages: Math.ceil(total / perPage), 
+        total,
+        totalCost: Number(totalCostAgg._sum.totalAmount || 0),
+    };
 }
 
 export async function getStockWithdrawalDetail(id: string) {
@@ -207,4 +216,5 @@ export async function cancelStockWithdrawal(id: string) {
 
     revalidatePath('/stock-withdrawals');
     revalidatePath(`/stock-withdrawals/${id}`);
+    revalidatePath('/reports');
 }

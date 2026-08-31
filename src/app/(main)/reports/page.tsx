@@ -5,6 +5,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { getSalesOverview, getSalesDetail, getTopProducts, getCustomerReport } from '@/app/actions/reports';
 import { getInventoryReport, getStockDetailReport, getCashFlowReport, getPnLReport, getPnLDetail } from '@/app/actions/reports';
 import { getStockWithdrawals } from '@/app/actions/stock-withdrawals';
+import StatusBadge from '@/components/StatusBadge';
 import * as XLSX from 'xlsx';
 
 // ==================== EXCEL EXPORT UTIL ====================
@@ -672,7 +673,7 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
     const [section, setSection] = useState<'overview' | 'detail' | 'withdrawals'>('overview');
     const [data, setData] = useState<Awaited<ReturnType<typeof getInventoryReport>> | null>(null);
     const [detailData, setDetailData] = useState<Awaited<ReturnType<typeof getStockDetailReport>> | null>(null);
-    const [withdrawalsData, setWithdrawalsData] = useState<{ records: any[]; totalPages: number; total: number } | null>(null);
+    const [withdrawalsData, setWithdrawalsData] = useState<{ records: any[]; totalPages: number; total: number; totalCost?: number } | null>(null);
     const [loading, setLoading] = useState(true);
     const [drillDown, setDrillDown] = useState(false);
     const [detailSearch, setDetailSearch] = useState('');
@@ -721,8 +722,9 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
             'เลขที่ใบเบิก': r.withdrawalNumber,
             'ผู้เบิก': r.requesterName,
             'วันที่': formatDate(r.createdAt),
+            'สถานะ': r.status === 'CANCELLED' ? 'ยกเลิก' : 'อนุมัติแล้ว',
             'ยอดรวมต้นทุน': Number(r.totalAmount),
-            'ผู้บันทึก': r.createdBy.name,
+            'ผู้บันทึก': r.createdBy?.name || '-',
             'หมายเหตุ': r.notes || ''
         })), `รายงานการเบิก_${dateFrom || 'all'}_${dateTo || 'all'}`);
     };
@@ -907,7 +909,7 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-4">
                     <div className="flex justify-between items-center text-sm text-gray-500">
                         <span>รายการใบเบิกทั้งหมด: {withdrawalsData.total} รายการ</span>
-                        <span className="font-semibold text-gray-800">มูลค่ารวมต้นทุน: {formatCurrency(withdrawalsData.records.reduce((s, r) => s + Number(r.totalAmount), 0))}</span>
+                        <span className="font-semibold text-gray-800">มูลค่ารวมต้นทุน (มีผลจริง): {formatCurrency(withdrawalsData.totalCost ?? withdrawalsData.records.reduce((s, r) => s + (r.status === 'CANCELLED' ? 0 : Number(r.totalAmount)), 0))}</span>
                     </div>
                     {withdrawalsData.records.length === 0 ? (
                         <p className="text-gray-400 text-sm text-center py-8">ไม่พบรายการเบิกสินค้าในช่วงเวลานี้</p>
@@ -921,33 +923,40 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                             <th className="text-left py-2 px-3 font-medium">เลขที่ใบเบิก</th>
                                             <th className="text-left py-2 px-3 font-medium">ผู้ขอเบิก / ผู้เบิก</th>
                                             <th className="text-left py-2 px-3 font-medium">ผู้บันทึก</th>
+                                            <th className="text-center py-2 px-3 font-medium">สถานะ</th>
                                             <th className="text-right py-2 px-3 font-medium">จำนวนรายการ</th>
                                             <th className="text-right py-2 px-3 font-medium">มูลค่าต้นทุนรวม</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-                                        {withdrawalsData.records.map((r, idx) => (
-                                            <tr key={idx} className="hover:bg-gray-50">
-                                                <td className="py-2.5 px-3 text-xs text-gray-500">
-                                                    {new Date(r.createdAt).toLocaleString('th-TH')}
-                                                </td>
-                                                <td className="py-2.5 px-3 font-medium text-emerald-600">
-                                                    {r.withdrawalNumber}
-                                                </td>
-                                                <td className="py-2.5 px-3 text-gray-700">
-                                                    {r.requesterName}
-                                                </td>
-                                                <td className="py-2.5 px-3 text-xs text-gray-500">
-                                                    {r.createdBy?.name || '-'}
-                                                </td>
-                                                <td className="py-2.5 px-3 text-right text-gray-600">
-                                                    {r._count?.items || 0} รายการ
-                                                </td>
-                                                <td className="py-2.5 px-3 text-right font-semibold text-red-600">
-                                                    {formatCurrency(Number(r.totalAmount))}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {withdrawalsData.records.map((r, idx) => {
+                                            const isCancelled = r.status === 'CANCELLED';
+                                            return (
+                                                <tr key={idx} className={`hover:bg-gray-50 ${isCancelled ? 'bg-gray-50/50 opacity-70' : ''}`}>
+                                                    <td className="py-2.5 px-3 text-xs text-gray-500">
+                                                        {new Date(r.createdAt).toLocaleString('th-TH')}
+                                                    </td>
+                                                    <td className="py-2.5 px-3 font-medium text-emerald-600">
+                                                        {r.withdrawalNumber}
+                                                    </td>
+                                                    <td className="py-2.5 px-3 text-gray-700">
+                                                        {r.requesterName}
+                                                    </td>
+                                                    <td className="py-2.5 px-3 text-xs text-gray-500">
+                                                        {r.createdBy?.name || '-'}
+                                                    </td>
+                                                    <td className="py-2.5 px-3 text-center">
+                                                        <StatusBadge status={r.status} />
+                                                    </td>
+                                                    <td className="py-2.5 px-3 text-right text-gray-600">
+                                                        {r._count?.items || 0} รายการ
+                                                    </td>
+                                                    <td className={`py-2.5 px-3 text-right font-semibold ${isCancelled ? 'line-through text-gray-400' : 'text-red-600'}`}>
+                                                        {formatCurrency(Number(r.totalAmount))}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
