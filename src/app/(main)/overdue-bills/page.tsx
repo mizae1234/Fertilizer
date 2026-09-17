@@ -70,7 +70,24 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
             paymentMethod: true, creditDueDate: true, payments: true, createdAt: true,
             customer: { select: { name: true } },
             createdBy: { select: { name: true } },
-            _count: { select: { items: true } },
+            items: {
+                select: {
+                    id: true,
+                    quantity: true,
+                    unitName: true,
+                    product: { select: { name: true, unit: true } },
+                },
+            },
+            saleReturns: {
+                select: {
+                    items: {
+                        select: {
+                            saleItemId: true,
+                            quantity: true,
+                        },
+                    },
+                },
+            },
             debtPayments: { select: { amount: true, method: true } },
             debtInterests: { select: { amount: true } },
         },
@@ -218,8 +235,35 @@ export default async function OverdueBillsPage({ searchParams }: Props) {
                                             <Link href={`/overdue-bills/${sale.id}`} className="text-sm font-medium text-emerald-600 hover:underline">{sale.saleNumber}</Link>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-800">{sale.customer?.name || 'ลูกค้าทั่วไป'}</td>
-                                        <td className="px-4 py-3 text-sm text-gray-600">
-                                            {sale._count.items} รายการ
+                                        <td className="px-4 py-3">
+                                            <div className="space-y-0.5">
+                                                {(() => {
+                                                    const retMap = new Map<string, number>();
+                                                    for (const sr of sale.saleReturns) {
+                                                        for (const ri of sr.items) {
+                                                            retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + ri.quantity);
+                                                        }
+                                                    }
+                                                    const remaining = sale.items
+                                                        .map(item => ({ ...item, qty: item.quantity - (retMap.get(item.id) || 0) }))
+                                                        .filter(item => item.qty > 0);
+
+                                                    if (remaining.length === 0) {
+                                                        return <span className="text-xs text-orange-500 font-medium">คืนสินค้าทั้งหมด</span>;
+                                                    }
+
+                                                    return (<>
+                                                        {remaining.slice(0, 2).map((item, i) => (
+                                                            <p key={i} className="text-xs text-gray-600">
+                                                                {item.product.name} x{item.qty} {item.unitName || item.product.unit}
+                                                            </p>
+                                                        ))}
+                                                        {remaining.length > 2 && (
+                                                            <p className="text-xs text-gray-400">+{remaining.length - 2} รายการ</p>
+                                                        )}
+                                                    </>);
+                                                })()}
+                                            </div>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(sale.totalAmount))}</td>
                                         <td className="px-4 py-3 text-sm text-right">

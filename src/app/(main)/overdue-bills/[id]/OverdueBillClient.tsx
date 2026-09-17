@@ -22,6 +22,7 @@ interface BankAccountInfo { id: string; bankName: string; accountNumber: string;
 interface SaleData {
     id: string;
     saleNumber: string;
+    status?: string;
     customerName: string;
     remaining: number;
     grandTotal: number;
@@ -283,7 +284,7 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
     return (
         <>
             {/* Interest Section */}
-            {!sale.isPaidOff && (
+            {!sale.isPaidOff && sale.status !== 'CANCELLED' && (
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-6 overflow-hidden">
                     <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                         <h2 className="text-sm font-semibold text-gray-700">📊 เพิ่มดอกเบี้ย</h2>
@@ -395,7 +396,7 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
             )}
 
             {/* Pay Debt Button */}
-            {!sale.isPaidOff && (
+            {!sale.isPaidOff && sale.status !== 'CANCELLED' && (
                 <div className="sticky bottom-4">
                     <button onClick={() => setShowPayment(true)}
                         className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.99]">

@@ -1002,12 +1002,29 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                 try {
                     const res = await fetch(`/api/sales/${bill.saleId}`);
                     const data = await res.json();
-                    return (data.items || []).map((it: { product: { name: string; code: string; unit: string }; quantity: number; unitPrice: number; totalPrice: number }) => ({
-                        customer: bill.customer, saleNumber: bill.saleNumber,
-                        dueDate: bill.dueDate, createdAt: bill.createdAt,
-                        productName: it.product.name, productCode: it.product.code, unit: it.product.unit,
-                        quantity: it.quantity, unitPrice: Number(it.unitPrice), total: Number(it.totalPrice),
-                    }));
+                    const retMap = new Map<string, number>();
+                    if (data.saleReturns && Array.isArray(data.saleReturns)) {
+                        for (const sr of data.saleReturns) {
+                            if (sr.items && Array.isArray(sr.items)) {
+                                for (const ri of sr.items) {
+                                    retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + Number(ri.quantity));
+                                }
+                            }
+                        }
+                    }
+                    return (data.items || [])
+                        .map((it: { id: string; product: { name: string; code: string; unit: string }; quantity: number; unitPrice: number; totalPrice: number }) => {
+                            const returnedQty = retMap.get(it.id) || 0;
+                            const remainingQty = Math.max(0, it.quantity - returnedQty);
+                            const unitPrice = Number(it.unitPrice);
+                            return {
+                                customer: bill.customer, saleNumber: bill.saleNumber,
+                                dueDate: bill.dueDate, createdAt: bill.createdAt,
+                                productName: it.product.name, productCode: it.product.code, unit: it.product.unit,
+                                quantity: remainingQty, unitPrice, total: remainingQty * unitPrice,
+                            };
+                        })
+                        .filter((it: { quantity: number }) => it.quantity > 0);
                 } catch { return []; }
             }));
             setArDetailRows(results.flat());

@@ -15,13 +15,55 @@ export async function getDebtDetail(saleId: string) {
                     warehouse: { select: { name: true } },
                 },
             },
+            saleReturns: {
+                include: {
+                    createdBy: { select: { name: true } },
+                    items: {
+                        include: {
+                            product: { select: { name: true, code: true, unit: true } },
+                            warehouse: { select: { name: true } },
+                        },
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+            },
             debtPayments: { orderBy: { paidAt: 'desc' } },
             debtInterests: { orderBy: { createdAt: 'desc' } },
         },
     });
     if (!sale) return null;
 
-    return computeDebtTotals(sale);
+    // Build return map for each saleItemId
+    const returnedMap = new Map<string, number>();
+    for (const sr of sale.saleReturns || []) {
+        for (const ri of sr.items) {
+            returnedMap.set(ri.saleItemId, (returnedMap.get(ri.saleItemId) || 0) + ri.quantity);
+        }
+    }
+
+    const items = sale.items.map(item => {
+        const returnedQty = returnedMap.get(item.id) || 0;
+        const remainingQty = Math.max(0, item.quantity - returnedQty);
+        const unitPrice = Number(item.unitPrice);
+        return {
+            ...item,
+            quantity: remainingQty,
+            totalPrice: remainingQty * unitPrice,
+            returnedQty,
+            remainingQty,
+            originalQuantity: item.quantity,
+            originalTotalPrice: Number(item.totalPrice),
+            isFullyReturned: remainingQty <= 0,
+            isPartiallyReturned: returnedQty > 0 && remainingQty > 0,
+        };
+    });
+
+    const totals = computeDebtTotals(sale);
+    return {
+        ...totals,
+        items,
+        saleReturns: sale.saleReturns,
+    };
 }
 
 // Lightweight version — only fetches amounts, no items/relations
@@ -29,7 +71,7 @@ async function getDebtSummary(saleId: string) {
     const [sale, debtPayments, debtInterests] = await Promise.all([
         prisma.sale.findUnique({
             where: { id: saleId },
-            select: { id: true, totalAmount: true, payments: true, paymentMethod: true, creditDueDate: true },
+            select: { id: true, status: true, totalAmount: true, payments: true, paymentMethod: true, creditDueDate: true },
         }),
         prisma.debtPayment.findMany({ where: { saleId } }),
         prisma.debtInterest.findMany({ where: { saleId } }),
@@ -43,9 +85,11 @@ function computeDebtTotals<T extends {
     totalAmount: unknown;
     payments: unknown;
     creditDueDate: Date | null;
+    status?: string;
     debtPayments: { method: string; amount: unknown; dueDate: Date | null; paidAt: Date }[];
     debtInterests: { amount: unknown }[];
 }>(sale: T) {
+    const isCancelled = sale.status === 'CANCELLED';
     const totalBill = Number(sale.totalAmount);
     const totalInterest = sale.debtInterests.reduce((s, di) => s + Number(di.amount), 0);
     const grandTotal = totalBill + totalInterest;
@@ -66,7 +110,7 @@ function computeDebtTotals<T extends {
         .reduce((s, dp) => s + Number(dp.amount), 0);
 
     const totalPaid = initialPaid + debtPaid;
-    const remaining = grandTotal - totalPaid;
+    const remaining = isCancelled ? 0 : Math.max(0, grandTotal - totalPaid);
 
     // Check current due date (latest credit payment or original)
     const latestCreditPayment = sale.debtPayments
@@ -82,9 +126,9 @@ function computeDebtTotals<T extends {
         initialPaid,
         debtPaid,
         totalPaid,
-        remaining: remaining > 0 ? remaining : 0,
+        remaining: isCancelled ? 0 : (remaining > 0 ? remaining : 0),
         currentDueDate,
-        isPaidOff: remaining <= 0.01,
+        isPaidOff: isCancelled || remaining <= 0.01,
     };
 }
 
@@ -97,6 +141,7 @@ export async function addInterest(
 ) {
     const detail = await getDebtSummary(saleId);
     if (!detail) throw new Error('ไม่พบบิล');
+    if (detail.status === 'CANCELLED') throw new Error('บิลนี้ถูกยกเลิกแล้ว ไม่สามารถเพิ่มดอกเบี้ยได้');
 
     const baseAmount = detail.remaining;
     if (baseAmount <= 0) throw new Error('ไม่มียอดค้างชำระ');
@@ -172,12 +217,13 @@ export async function payDebt(
         const [sale, debtPayments, debtInterests] = await Promise.all([
             tx.sale.findUnique({
                 where: { id: saleId },
-                select: { id: true, totalAmount: true, payments: true, paymentMethod: true, creditDueDate: true },
+                select: { id: true, status: true, totalAmount: true, payments: true, paymentMethod: true, creditDueDate: true },
             }),
             tx.debtPayment.findMany({ where: { saleId } }),
             tx.debtInterest.findMany({ where: { saleId } }),
         ]);
         if (!sale) throw new Error('ไม่พบบิล');
+        if (sale.status === 'CANCELLED') throw new Error('บิลนี้ถูกยกเลิกแล้ว ไม่สามารถชำระหนี้ได้');
 
         const detail = computeDebtTotals({ ...sale, debtPayments, debtInterests });
         if (detail.isPaidOff) throw new Error('บิลนี้ชำระครบแล้ว');

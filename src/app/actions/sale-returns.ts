@@ -156,11 +156,37 @@ export async function createSaleReturn(data: {
                     return sum + Math.round((ri.quantity / saleItem.quantity) * Number(saleItem.points));
                 }, 0);
 
+                const newTotalAmount = Math.max(0, Number(sale.totalAmount) - totalAmount);
+
+                // Check remaining debt balance after this return
+                const [debtPayments, debtInterests] = await Promise.all([
+                    tx.debtPayment.findMany({ where: { saleId: data.saleId } }),
+                    tx.debtInterest.findMany({ where: { saleId: data.saleId } }),
+                ]);
+                const totalInterest = debtInterests.reduce((s, di) => s + Number(di.amount), 0);
+                const grandTotal = newTotalAmount + totalInterest;
+
+                let initialNonCredit = 0;
+                if (sale.payments && Array.isArray(sale.payments)) {
+                    for (const p of sale.payments as { method: string; amount: number }[]) {
+                        if (p.method !== 'CREDIT') initialNonCredit += Number(p.amount);
+                    }
+                }
+                const debtPaid = debtPayments
+                    .filter(dp => dp.method !== 'CREDIT')
+                    .reduce((s, dp) => s + Number(dp.amount), 0);
+                const totalPaid = initialNonCredit + debtPaid;
+                const remaining = grandTotal - totalPaid;
+                const isPaidOff = remaining <= 0.01;
+
                 await tx.sale.update({
                     where: { id: data.saleId },
                     data: {
-                        totalAmount: { decrement: totalAmount },
+                        totalAmount: newTotalAmount,
                         totalPoints: { decrement: returnPoints },
+                        ...(isPaidOff && (sale.paymentMethod === 'CREDIT' || sale.paymentMethod === 'SPLIT')
+                            ? { paymentMethod: 'PAID' }
+                            : {}),
                     },
                 });
 
@@ -176,6 +202,10 @@ export async function createSaleReturn(data: {
             });
 
             revalidatePath('/sales');
+            revalidatePath('/overdue-bills');
+            revalidatePath(`/overdue-bills/${data.saleId}`);
+            revalidatePath(`/sales/${data.saleId}`);
+            revalidatePath('/reports');
             return { id: saleReturn.id, returnNumber: saleReturn.returnNumber };
         } catch (e: any) {
             if (e.message?.includes('Unique constraint') && attempt < 2) {

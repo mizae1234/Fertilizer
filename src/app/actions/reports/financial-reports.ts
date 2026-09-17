@@ -137,10 +137,10 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
         const paidAmount = initialPaid + debtPaid;
         const remaining = grandTotal - paidAmount;
 
-        if (remaining > 0) creditOutstanding += remaining;
+        if (remaining > 0.01) creditOutstanding += remaining;
 
         // Skip fully paid bills for AR section
-        if (remaining <= 0) continue;
+        if (remaining <= 0.01) continue;
 
         // Aging based on remaining amount
         if (!s.creditDueDate || new Date(s.creditDueDate) > now) {

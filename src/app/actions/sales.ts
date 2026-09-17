@@ -492,4 +492,9 @@ export async function cancelSale(id: string, userId?: string) {
     });
 
     revalidatePath('/sales');
+    revalidatePath(`/sales/${id}`);
+    revalidatePath('/overdue-bills');
+    revalidatePath(`/overdue-bills/${id}`);
+    revalidatePath('/reports');
+    revalidatePath('/products');
 }
