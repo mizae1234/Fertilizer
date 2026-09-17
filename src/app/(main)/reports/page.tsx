@@ -225,12 +225,12 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
             if (dateTo) params.set('to', dateTo);
             const res = await fetch(`/api/customers/${customerId}?${params.toString()}`);
             const data = await res.json();
-            const rows = (data.sales || []).flatMap((sale: { saleNumber: string; createdAt: string; items: { quantity: number; unitPrice: number; totalPrice: number; product: { name: string; code: string }; warehouse: { name: string } }[] }) =>
-                sale.items.map((it: { quantity: number; unitPrice: number; totalPrice: number; product: { name: string; code: string }; warehouse: { name: string } }) => ({
+            const rows = (data.sales || []).flatMap((sale: { saleNumber: string; createdAt: string; items: { id?: string; quantity: number; unitPrice: number; totalPrice: number; product: { name: string; code: string; unit?: string }; warehouse: { name: string } }[] }) =>
+                (sale.items || []).map((it: { id?: string; quantity: number; unitPrice: number; totalPrice: number; product: { name: string; code: string; unit?: string }; warehouse: { name: string } }) => ({
                     saleNumber: sale.saleNumber, createdAt: sale.createdAt,
                     productName: it.product.name, productCode: it.product.code,
-                    quantity: it.quantity, unit: '', unitPrice: Number(it.unitPrice), total: Number(it.totalPrice),
-                    warehouse: it.warehouse.name,
+                    quantity: it.quantity, unit: it.product.unit || '', unitPrice: Number(it.unitPrice), total: Number(it.totalPrice),
+                    warehouse: it.warehouse?.name || '-',
                 }))
             );
             setCustomerItems(rows);
@@ -530,7 +530,7 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                                                                                                                     <td className="py-1.5 text-blue-600 font-medium">{item.saleNumber}</td>
                                                                                                                     <td className="py-1.5 text-gray-700 font-medium">{item.productName}</td>
                                                                                                                     <td className="py-1.5 text-gray-400">{item.productCode}</td>
-                                                                                                                    <td className="py-1.5 text-right text-gray-700">{item.quantity}</td>
+                                                                                                                    <td className="py-1.5 text-right text-gray-700">{item.quantity} {item.unit}</td>
                                                                                                                     <td className="py-1.5 text-right text-gray-500">{formatCurrency(item.unitPrice)}</td>
                                                                                                                     <td className="py-1.5 text-right font-medium text-gray-800">{formatCurrency(item.total)}</td>
                                                                                                                     <td className="py-1.5 text-gray-400">{item.warehouse}</td>
@@ -1464,6 +1464,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                                             {filteredByCustomer.map(cust => {
                                                                 const custRemaining = cust.items.reduce((s, i) => s + i.remainingAmount, 0);
                                                                 const custPaid = cust.items.reduce((s, i) => s + i.paidAmount, 0);
+                                                                const custTotal = cust.items.reduce((s, i) => s + i.amount, 0);
                                                                 return (
                                                                     <React.Fragment key={cust.customer}>
                                                                         {cust.items.map((item, j) => {
@@ -1485,7 +1486,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                                                         })}
                                                                         <tr className="bg-gray-50 border-b-2 border-gray-200">
                                                                             <td colSpan={2} className="py-1.5 px-3 text-xs text-gray-500 font-medium">รวม {cust.customer} ({cust.items.length} บิล)</td>
-                                                                            <td className="py-1.5 px-3 text-right text-sm text-gray-500"></td>
+                                                                            <td className="py-1.5 px-3 text-right text-sm text-gray-700 font-semibold">{formatCurrency(custTotal)}</td>
                                                                             <td className="py-1.5 px-3 text-right text-sm font-bold text-emerald-600">{formatCurrency(custPaid)}</td>
                                                                             <td className="py-1.5 px-3 text-right text-sm font-bold text-orange-600">{formatCurrency(custRemaining)}</td>
                                                                             <td colSpan={2}></td>

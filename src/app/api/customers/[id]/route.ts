@@ -30,7 +30,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 ...(hasDateFilter ? { where: { createdAt: dateFilter, status: 'APPROVED', deletedAt: null } } : { where: { status: 'APPROVED', deletedAt: null } }),
                 include: {
                     items: {
-                        select: { quantity: true, unitPrice: true, totalPrice: true, product: { select: { name: true, code: true } }, warehouse: { select: { name: true } } },
+                        select: { id: true, quantity: true, unitPrice: true, totalPrice: true, product: { select: { name: true, code: true, unit: true } }, warehouse: { select: { name: true } } },
+                    },
+                    saleReturns: {
+                        select: {
+                            items: {
+                                select: { saleItemId: true, quantity: true }
+                            }
+                        }
                     },
                 },
             },
@@ -38,5 +45,38 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return NextResponse.json(customer);
+
+    const sales = customer.sales.map(sale => {
+        const retMap = new Map<string, number>();
+        for (const sr of sale.saleReturns || []) {
+            for (const ri of sr.items || []) {
+                retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + ri.quantity);
+            }
+        }
+        const adjustedItems = sale.items
+            .map(it => {
+                const returned = retMap.get(it.id) || 0;
+                const remaining = Math.max(0, it.quantity - returned);
+                const unitPrice = Number(it.unitPrice);
+                return {
+                    ...it,
+                    originalQuantity: it.quantity,
+                    returnedQuantity: returned,
+                    quantity: remaining,
+                    unitPrice,
+                    totalPrice: remaining * unitPrice,
+                };
+            })
+            .filter(it => it.quantity > 0);
+
+        return {
+            ...sale,
+            items: adjustedItems,
+        };
+    });
+
+    return NextResponse.json({
+        ...customer,
+        sales,
+    });
 }
