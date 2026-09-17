@@ -204,6 +204,7 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
     const [detailPage, setDetailPage] = useState(1);
     const [customerSearch, setCustomerSearch] = useState('');
     const [customerPage, setCustomerPage] = useState(1);
+    const [productSearchInCust, setProductSearchInCust] = useState('');
     const [productSearch, setProductSearch] = useState('');
     const [productPage, setProductPage] = useState(1);
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -216,8 +217,25 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
     const toggleCustomerDetail = async (customerId: string) => {
         if (selectedCustomerId === customerId) { setSelectedCustomerId(null); return; }
         setSelectedCustomerId(customerId);
-        setCustomerItemSearch('');
+        setCustomerItemSearch(productSearchInCust || '');
         setCustomerItemPage(1);
+
+        const existingCust = customerData?.find(c => c.id === customerId);
+        if (existingCust && existingCust.items && existingCust.items.length > 0) {
+            setCustomerItems(existingCust.items.map(it => ({
+                saleNumber: it.saleNumber,
+                createdAt: it.createdAt,
+                productName: it.productName,
+                productCode: it.productCode,
+                quantity: it.quantity,
+                unit: it.unit,
+                unitPrice: it.unitPrice,
+                total: it.totalPrice,
+                warehouse: it.warehouse,
+            })));
+            return;
+        }
+
         setLoadingCustomerItems(true);
         try {
             const params = new URLSearchParams();
@@ -269,9 +287,118 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
     const handleExportCustomers = () => {
         if (!customerData) return;
         const cq = customerSearch.toLowerCase().trim();
-        const filtered = cq ? customerData.filter(c => c.name.toLowerCase().includes(cq) || c.group.toLowerCase().includes(cq)) : customerData;
-        exportToExcel(filtered.map(c => ({ 'ชื่อลูกค้า': c.name, 'กลุ่ม': c.group, 'โทร': c.phone, 'จำนวนบิล': c.orderCount, 'ยอดซื้อรวม': c.totalAmount })),
-            `รายงานลูกค้า_${dateFrom || 'all'}_${dateTo || 'all'}`);
+        const pq = productSearchInCust.toLowerCase().trim();
+
+        const rows: Record<string, unknown>[] = [];
+        for (const c of customerData) {
+            const matchCust = !cq ||
+                c.name.toLowerCase().includes(cq) ||
+                c.group.toLowerCase().includes(cq) ||
+                (c.phone && c.phone.includes(cq));
+            if (!matchCust) continue;
+
+            const items = c.items || [];
+            const matchingItems = items.filter(item => {
+                if (!pq) return true;
+                return item.productName.toLowerCase().includes(pq) ||
+                       item.productCode.toLowerCase().includes(pq);
+            });
+
+            if (matchingItems.length === 0) {
+                // If no product filter was entered and customer has summary amounts, export 1 summary row
+                if (!pq && (c.totalAmount > 0 || c.orderCount > 0)) {
+                    rows.push({
+                        'ชื่อลูกค้า': c.name,
+                        'กลุ่มลูกค้า': c.group,
+                        'เบอร์โทร': c.phone || '-',
+                        'เลขที่บิล': '-',
+                        'วันที่ขาย': '-',
+                        'รหัสสินค้า': '-',
+                        'ชื่อสินค้า': '-',
+                        'จำนวน': 0,
+                        'หน่วย': '-',
+                        'ราคา/หน่วย': 0,
+                        'ยอดรวม': c.totalAmount,
+                        'คลังสินค้า': '-',
+                    });
+                }
+                continue;
+            }
+
+            for (const item of matchingItems) {
+                rows.push({
+                    'ชื่อลูกค้า': c.name,
+                    'กลุ่มลูกค้า': c.group,
+                    'เบอร์โทร': c.phone || '-',
+                    'เลขที่บิล': item.saleNumber,
+                    'วันที่ขาย': item.createdAt ? new Date(item.createdAt).toLocaleDateString('th-TH') : '-',
+                    'รหัสสินค้า': item.productCode,
+                    'ชื่อสินค้า': item.productName,
+                    'จำนวน': item.quantity,
+                    'หน่วย': item.unit || '-',
+                    'ราคา/หน่วย': item.unitPrice,
+                    'ยอดรวม': item.totalPrice,
+                    'คลังสินค้า': item.warehouse,
+                });
+            }
+        }
+
+        if (rows.length === 0) {
+            alert('ไม่พบข้อมูลตามเงื่อนไขที่ค้นหา');
+            return;
+        }
+
+        let filenameSuffix = '';
+        if (cq) filenameSuffix += `_ลูกค้า-${cq}`;
+        if (pq) filenameSuffix += `_สินค้า-${pq}`;
+        exportToExcel(rows, `รายงานยอดขายตามลูกค้า_${dateFrom || 'all'}_${dateTo || 'all'}${filenameSuffix}`);
+    };
+
+    const handleExportSingleCustomer = (c: NonNullable<typeof customerData>[number]) => {
+        const sq = customerItemSearch.toLowerCase().trim();
+        const sourceItems = customerItems.length > 0 ? customerItems : (c.items || []).map(it => ({
+            saleNumber: it.saleNumber,
+            createdAt: it.createdAt,
+            productName: it.productName,
+            productCode: it.productCode,
+            quantity: it.quantity,
+            unit: it.unit,
+            unitPrice: it.unitPrice,
+            total: it.totalPrice,
+            warehouse: it.warehouse,
+        }));
+
+        const itemsToExport = sq
+            ? sourceItems.filter(i =>
+                i.productName.toLowerCase().includes(sq) ||
+                i.productCode.toLowerCase().includes(sq) ||
+                i.saleNumber.toLowerCase().includes(sq)
+              )
+            : sourceItems;
+
+        if (itemsToExport.length === 0) {
+            alert('ไม่พบรายการสินค้า');
+            return;
+        }
+
+        const rows = itemsToExport.map(item => ({
+            'ชื่อลูกค้า': c.name,
+            'กลุ่มลูกค้า': c.group,
+            'เบอร์โทร': c.phone || '-',
+            'เลขที่บิล': item.saleNumber,
+            'วันที่ขาย': item.createdAt ? new Date(item.createdAt).toLocaleDateString('th-TH') : '-',
+            'รหัสสินค้า': item.productCode,
+            'ชื่อสินค้า': item.productName,
+            'จำนวน': item.quantity,
+            'หน่วย': item.unit || '-',
+            'ราคา/หน่วย': item.unitPrice,
+            'ยอดรวม': item.total,
+            'คลังสินค้า': item.warehouse,
+        }));
+
+        let filenameSuffix = '';
+        if (sq) filenameSuffix += `_ค้นหา-${sq}`;
+        exportToExcel(rows, `ยอดขายลูกค้า_${c.name}_${dateFrom || 'all'}_${dateTo || 'all'}${filenameSuffix}`);
     };
     const handleExportDetail = () => {
         if (!detailData) return;
@@ -451,20 +578,48 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                     {
                         section === 'customers' && customerData && (() => {
                             const cq = customerSearch.toLowerCase().trim();
-                            const filteredCustomers = cq ? customerData.filter(c => c.name.toLowerCase().includes(cq) || c.group.toLowerCase().includes(cq)) : customerData;
+                            const pq = productSearchInCust.toLowerCase().trim();
+                            const filteredCustomers = customerData.filter(c => {
+                                const matchCust = !cq ||
+                                    c.name.toLowerCase().includes(cq) ||
+                                    c.group.toLowerCase().includes(cq) ||
+                                    (c.phone && c.phone.includes(cq));
+                                const matchProd = !pq ||
+                                    (c.items || []).some(i =>
+                                        i.productName.toLowerCase().includes(pq) ||
+                                        i.productCode.toLowerCase().includes(pq)
+                                    );
+                                return matchCust && matchProd;
+                            });
                             const custTotalPages = Math.ceil(filteredCustomers.length / PAGE_SIZE);
                             const custPageData = filteredCustomers.slice((customerPage - 1) * PAGE_SIZE, customerPage * PAGE_SIZE);
                             return (
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3 flex-wrap">
-                                        <div className="flex-1 min-w-[200px]">
+                                        <div className="flex-1 min-w-[180px]">
                                             <input type="text" value={customerSearch}
                                                 onChange={e => { setCustomerSearch(e.target.value); setCustomerPage(1); }}
-                                                placeholder="🔍 ค้นหาลูกค้า..."
+                                                placeholder="🔍 ค้นหาลูกค้า (ชื่อ/เบอร์/กลุ่ม)..."
                                                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400" />
                                         </div>
+                                        <div className="flex-1 min-w-[180px]">
+                                            <input type="text" value={productSearchInCust}
+                                                onChange={e => { setProductSearchInCust(e.target.value); setCustomerPage(1); }}
+                                                placeholder="🔍 กรองตามสินค้า (ชื่อ/รหัส)..."
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400" />
+                                        </div>
+                                        {(customerSearch || productSearchInCust) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setCustomerSearch(''); setProductSearchInCust(''); setCustomerPage(1); }}
+                                                className="px-2.5 py-2 text-xs text-gray-500 hover:text-red-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shrink-0"
+                                                title="ล้างตัวกรอง"
+                                            >
+                                                ✕ ล้างค้นหา
+                                            </button>
+                                        )}
                                         <p className="text-sm text-gray-500 shrink-0">{filteredCustomers.length} ราย</p>
-                                        <ExportButton onClick={handleExportCustomers} />
+                                        <ExportButton onClick={handleExportCustomers} label="Export Excel" />
                                     </div>
                                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
                                         {filteredCustomers.length === 0 ? <p className="text-gray-400 text-sm text-center py-4">ไม่พบข้อมูล</p> : (
@@ -475,6 +630,11 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                                                 </tr></thead><tbody>
                                                         {custPageData.map(c => {
                                                             const isSelected = selectedCustomerId === c.id;
+                                                            const matchingItems = pq
+                                                                ? (c.items || []).filter(i => i.productName.toLowerCase().includes(pq) || i.productCode.toLowerCase().includes(pq))
+                                                                : (c.items || []);
+                                                            const matchingTotal = matchingItems.reduce((s, it) => s + it.totalPrice, 0);
+
                                                             return (
                                                                 <React.Fragment key={c.id}>
                                                                     <tr className={`border-b border-gray-50 cursor-pointer transition-colors ${isSelected ? 'bg-emerald-50' : 'hover:bg-gray-50'}`}
@@ -482,11 +642,26 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                                                                         <td className="py-2">
                                                                             <div className="flex items-center gap-1.5">
                                                                                 <span className="text-gray-400 text-xs">{isSelected ? '▾' : '▸'}</span>
-                                                                                <div><p className="text-sm font-medium text-gray-800">{c.name}</p><p className="text-xs text-gray-400">{c.group}</p></div>
+                                                                                <div>
+                                                                                    <p className="text-sm font-medium text-gray-800">{c.name}</p>
+                                                                                    <p className="text-xs text-gray-400">{c.group}{c.phone ? ` • ${c.phone}` : ''}</p>
+                                                                                    {pq && (
+                                                                                        <p className="text-[11px] text-emerald-600 font-medium">
+                                                                                            ตรงกับสินค้า: {matchingItems.length} รายการ
+                                                                                        </p>
+                                                                                    )}
+                                                                                </div>
                                                                             </div>
                                                                         </td>
                                                                         <td className="py-2 text-right text-sm text-gray-600">{c.orderCount}</td>
-                                                                        <td className="py-2 text-right text-sm font-semibold text-emerald-600">{formatCurrency(c.totalAmount)}</td>
+                                                                        <td className="py-2 text-right text-sm">
+                                                                            <span className="font-semibold text-emerald-600">
+                                                                                {formatCurrency(pq ? matchingTotal : c.totalAmount)}
+                                                                            </span>
+                                                                            {pq && (
+                                                                                <p className="text-[10px] text-gray-400">จากยอดรวม {formatCurrency(c.totalAmount)}</p>
+                                                                            )}
+                                                                        </td>
                                                                     </tr>
                                                                     {isSelected && (
                                                                         <tr><td colSpan={3} className="p-0">
@@ -509,6 +684,17 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                                                                                                     placeholder="🔍 ค้นหาสินค้า / เลขที่บิล..."
                                                                                                     className="flex-1 px-2.5 py-1.5 border border-emerald-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400/30 bg-white" />
                                                                                                 <span className="text-xs text-gray-500 shrink-0">{filteredItems.length} รายการ</span>
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        handleExportSingleCustomer(c);
+                                                                                                    }}
+                                                                                                    className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700 transition-all shrink-0 flex items-center gap-1 shadow-sm"
+                                                                                                    title="ส่งออกเฉพาะลูกค้านี้เป็น Excel"
+                                                                                                >
+                                                                                                    📥 Export ลูกค้านี้
+                                                                                                </button>
                                                                                             </div>
                                                                                             {filteredItems.length === 0 ? (
                                                                                                 <p className="text-xs text-gray-400 text-center py-2">ไม่พบสินค้าที่ค้นหา</p>

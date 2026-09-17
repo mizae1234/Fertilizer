@@ -282,7 +282,29 @@ export async function getCustomerReport(dateFrom?: string, dateTo?: string) {
             customerGroup: { select: { name: true } },
             sales: {
                 where: saleWhere,
-                select: { totalAmount: true },
+                select: {
+                    id: true,
+                    saleNumber: true,
+                    totalAmount: true,
+                    createdAt: true,
+                    items: {
+                        select: {
+                            id: true,
+                            quantity: true,
+                            unitPrice: true,
+                            totalPrice: true,
+                            product: { select: { name: true, code: true, unit: true } },
+                            warehouse: { select: { name: true } },
+                        },
+                    },
+                    saleReturns: {
+                        select: {
+                            totalAmount: true,
+                            items: { select: { saleItemId: true, quantity: true } },
+                        },
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
             },
         },
         orderBy: { name: 'asc' },
@@ -290,18 +312,60 @@ export async function getCustomerReport(dateFrom?: string, dateTo?: string) {
 
     return customers
         .map(c => {
-            const totalAmount = c.sales.reduce((sum, s) => sum + Number(s.totalAmount), 0);
+            const processedSales = c.sales.map(s => {
+                const retMap = new Map<string, number>();
+                for (const sr of s.saleReturns || []) {
+                    for (const ri of sr.items || []) {
+                        retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + ri.quantity);
+                    }
+                }
+                const items = s.items
+                    .map(it => {
+                        const returned = retMap.get(it.id) || 0;
+                        const remaining = Math.max(0, it.quantity - returned);
+                        const unitPrice = Number(it.unitPrice);
+                        return {
+                            id: it.id,
+                            saleNumber: s.saleNumber,
+                            createdAt: s.createdAt.toISOString(),
+                            productName: it.product.name,
+                            productCode: it.product.code,
+                            unit: it.product.unit || '',
+                            warehouse: it.warehouse.name,
+                            quantity: remaining,
+                            unitPrice,
+                            totalPrice: remaining * unitPrice,
+                        };
+                    })
+                    .filter(it => it.quantity > 0);
+
+                const totalReturn = (s.saleReturns || []).reduce((sum, sr) => sum + Number(sr.totalAmount || 0), 0);
+                const adjustedSaleTotal = Math.max(0, Number(s.totalAmount) - totalReturn);
+
+                return {
+                    id: s.id,
+                    saleNumber: s.saleNumber,
+                    createdAt: s.createdAt.toISOString(),
+                    totalAmount: adjustedSaleTotal,
+                    items,
+                };
+            }).filter(s => s.items.length > 0 || s.totalAmount > 0);
+
+            const allItems = processedSales.flatMap(s => s.items);
+            const totalAmount = processedSales.reduce((sum, s) => sum + s.totalAmount, 0);
+
             return {
                 id: c.id,
                 name: c.name,
                 phone: c.phone,
                 group: c.customerGroup?.name || '-',
                 totalPoints: c.totalPoints,
-                orderCount: c.sales.length,
+                orderCount: processedSales.length,
                 totalAmount,
-                avgAmount: c.sales.length > 0 ? totalAmount / c.sales.length : 0,
+                avgAmount: processedSales.length > 0 ? totalAmount / processedSales.length : 0,
+                items: allItems,
             };
         })
-        .filter(c => c.orderCount > 0)
+        .filter(c => c.orderCount > 0 || c.totalAmount > 0)
         .sort((a, b) => b.totalAmount - a.totalAmount);
 }

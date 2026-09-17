@@ -14,6 +14,7 @@ interface ReturnItem {
     warehouseId: string;
     quantity: number; unitCost: number;
     availableStock: number;
+    productStocks?: { warehouseId: string; quantity: number }[];
 }
 
 export default function NewFactoryReturnPage() {
@@ -80,6 +81,7 @@ export default function NewFactoryReturnPage() {
             quantity: 1,
             unitCost: Number(product.cost), // ใช้ต้นทุน ณ ตอนนั้น (ไม่แสดงบนหน้าจอ)
             availableStock: stock?.quantity || 0,
+            productStocks: product.productStocks || [],
         }]);
         setShowProductPicker(false);
         setProductSearch('');
@@ -90,6 +92,20 @@ export default function NewFactoryReturnPage() {
         setItems(items.map((item, i) => {
             if (i !== idx) return item;
             const updated = { ...item, [field]: value };
+            if (field === 'warehouseId') {
+                const stock = item.productStocks?.find(ps => ps.warehouseId === value);
+                updated.availableStock = stock?.quantity || 0;
+                if (!item.productStocks || item.productStocks.length === 0) {
+                    fetch(`/api/products/${item.productId}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            const ps = data.productStocks || [];
+                            const s = ps.find((s: any) => s.warehouseId === value);
+                            setItems(curr => curr.map((c, ci) => ci === idx ? { ...c, productStocks: ps, availableStock: s?.quantity || 0 } : c));
+                        })
+                        .catch(() => {});
+                }
+            }
             return updated;
         }));
     };
@@ -257,7 +273,7 @@ export default function NewFactoryReturnPage() {
                                                     className="px-2 py-1 rounded border border-gray-200 text-sm outline-none focus:ring-1 focus:ring-orange-500">
                                                     {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                                                 </select>
-                                                <p className="text-[10px] text-gray-400 mt-0.5">คงเหลือ: {item.availableStock}</p>
+                                                <p className={`text-[10px] mt-0.5 ${item.availableStock <= 0 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>คงเหลือ: {item.availableStock}</p>
                                             </td>
                                             <td className="px-3 py-2">
                                                 <input type="number" min={1} value={item.quantity} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
@@ -292,7 +308,7 @@ export default function NewFactoryReturnPage() {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-gray-400">จำนวน (คงเหลือ: {item.availableStock})</label>
+                                            <label className={`text-[10px] ${item.availableStock <= 0 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>จำนวน (คงเหลือ: {item.availableStock})</label>
                                             <input type="number" min={1} value={item.quantity} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
                                                 className="w-full px-2 py-1 rounded border border-gray-200 text-xs text-right outline-none" />
                                         </div>
