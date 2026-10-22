@@ -233,3 +233,93 @@ export async function getSaleReturns(saleId: string) {
         orderBy: { createdAt: 'desc' },
     });
 }
+
+export async function getSaleReturnReport({
+    page = 1,
+    perPage = 15,
+    dateFrom = '',
+    dateTo = '',
+    search = '',
+}: {
+    page?: number;
+    perPage?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    search?: string;
+} = {}) {
+    const where: any = {};
+
+    if (dateFrom || dateTo) {
+        where.createdAt = {};
+        if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+        if (dateTo) where.createdAt.lte = new Date(dateTo + 'T23:59:59.999');
+    }
+
+    if (search && search.trim()) {
+        const q = search.trim();
+        where.OR = [
+            { returnNumber: { contains: q, mode: 'insensitive' } },
+            { reason: { contains: q, mode: 'insensitive' } },
+            { sale: { saleNumber: { contains: q, mode: 'insensitive' } } },
+            { sale: { customer: { name: { contains: q, mode: 'insensitive' } } } },
+            { items: { some: { product: { name: { contains: q, mode: 'insensitive' } } } } },
+            { items: { some: { product: { code: { contains: q, mode: 'insensitive' } } } } },
+        ];
+    }
+
+    const [records, total, agg, itemAgg] = await Promise.all([
+        prisma.saleReturn.findMany({
+            where,
+            include: {
+                createdBy: { select: { id: true, name: true } },
+                sale: {
+                    select: {
+                        id: true,
+                        saleNumber: true,
+                        customer: { select: { id: true, name: true, phone: true } },
+                    },
+                },
+                items: {
+                    include: {
+                        product: { select: { id: true, name: true, code: true, unit: true } },
+                        warehouse: { select: { id: true, name: true } },
+                    },
+                },
+            },
+            skip: (page - 1) * perPage,
+            take: perPage,
+            orderBy: { createdAt: 'desc' },
+        }),
+        prisma.saleReturn.count({ where }),
+        prisma.saleReturn.aggregate({
+            where,
+            _sum: { totalAmount: true },
+        }),
+        prisma.saleReturnItem.aggregate({
+            where: {
+                saleReturn: where,
+            },
+            _sum: {
+                quantity: true,
+            },
+        }),
+    ]);
+
+    const serializedRecords = records.map(r => ({
+        ...r,
+        totalAmount: Number(r.totalAmount),
+        items: r.items.map(i => ({
+            ...i,
+            unitPrice: Number(i.unitPrice),
+            totalPrice: Number(i.totalPrice),
+        })),
+    }));
+
+    return {
+        records: serializedRecords,
+        total,
+        totalPages: Math.ceil(total / perPage) || 1,
+        totalAmount: Number(agg._sum.totalAmount || 0),
+        totalQty: Number(itemAgg._sum.quantity || 0),
+    };
+}

@@ -4,3 +4,4 @@
 export { getSalesOverview, getSalesDetail, getTopProducts, getCustomerReport } from './sales-reports';
 export { getStockDetailReport, getInventoryReport } from './stock-reports';
 export { getCashFlowReport, getPnLReport, getPnLDetail } from './financial-reports';
+export { getSaleReturnReport } from '../sale-returns';

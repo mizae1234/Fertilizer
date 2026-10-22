@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { getSalesOverview, getSalesDetail, getTopProducts, getCustomerReport } from '@/app/actions/reports';
-import { getInventoryReport, getStockDetailReport, getCashFlowReport, getPnLReport, getPnLDetail } from '@/app/actions/reports';
+import { getInventoryReport, getStockDetailReport, getCashFlowReport, getPnLReport, getPnLDetail, getSaleReturnReport } from '@/app/actions/reports';
 import { getStockWithdrawals } from '@/app/actions/stock-withdrawals';
 import StatusBadge from '@/components/StatusBadge';
 import * as XLSX from 'xlsx';
@@ -856,16 +856,21 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
 
 // ==================== INVENTORY TAB ====================
 function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
-    const [section, setSection] = useState<'overview' | 'detail' | 'withdrawals'>('overview');
+    const [section, setSection] = useState<'overview' | 'detail' | 'withdrawals' | 'returns'>('overview');
     const [data, setData] = useState<Awaited<ReturnType<typeof getInventoryReport>> | null>(null);
     const [detailData, setDetailData] = useState<Awaited<ReturnType<typeof getStockDetailReport>> | null>(null);
     const [withdrawalsData, setWithdrawalsData] = useState<{ records: any[]; totalPages: number; total: number; totalCost?: number } | null>(null);
+    const [returnsData, setReturnsData] = useState<Awaited<ReturnType<typeof getSaleReturnReport>> | null>(null);
     const [loading, setLoading] = useState(true);
     const [drillDown, setDrillDown] = useState(false);
     const [detailSearch, setDetailSearch] = useState('');
     const [detailPage, setDetailPage] = useState(1);
     const DETAIL_PAGE_SIZE = 15;
     const [withdrawalPage, setWithdrawalPage] = useState(1);
+    const [returnsPage, setReturnsPage] = useState(1);
+    const [returnsSearch, setReturnsSearch] = useState('');
+    const [returnsSearchInput, setReturnsSearchInput] = useState('');
+    const [expandedReturnId, setExpandedReturnId] = useState<string | null>(null);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -876,10 +881,13 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                 const d = await getStockDetailReport(dateFrom, dateTo); setDetailData(JSON.parse(JSON.stringify(d)));
             } else if (section === 'withdrawals') {
                 const d = await getStockWithdrawals(withdrawalPage, dateFrom, dateTo); setWithdrawalsData(JSON.parse(JSON.stringify(d)));
+            } else if (section === 'returns') {
+                const d = await getSaleReturnReport({ page: returnsPage, dateFrom, dateTo, search: returnsSearch });
+                setReturnsData(JSON.parse(JSON.stringify(d)));
             }
         } catch (e) { console.error(e); }
         setLoading(false);
-    }, [section, dateFrom, dateTo, withdrawalPage]);
+    }, [section, dateFrom, dateTo, withdrawalPage, returnsPage, returnsSearch]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
@@ -915,6 +923,21 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
         })), `รายงานการเบิก_${dateFrom || 'all'}_${dateTo || 'all'}`);
     };
 
+    const handleExportReturns = () => {
+        if (!returnsData) return;
+        exportToExcel(returnsData.records.map((r: any) => ({
+            'เลขที่ใบคืน': r.returnNumber,
+            'วันที่คืน': formatDate(r.createdAt),
+            'เลขอ้างอิงบิลขาย': r.sale?.saleNumber || '-',
+            'ลูกค้า': r.sale?.customer?.name || 'ลูกค้าทั่วไป',
+            'รายการสินค้า': r.items.map((i: any) => `${i.product.name} (${i.quantity} ${i.product.unit || 'ชิ้น'})`).join(', '),
+            'จำนวนชิ้นรวม': r.items.reduce((s: number, i: any) => s + i.quantity, 0),
+            'ยอดเงินคืน': Number(r.totalAmount),
+            'ผู้บันทึก': r.createdBy?.name || '-',
+            'เหตุผลการคืน': r.reason || '-'
+        })), `รายงานการคืนสินค้า_${dateFrom || 'all'}_${dateTo || 'all'}`);
+    };
+
     if (loading) return <LoadingSpinner />;
 
     return (
@@ -922,9 +945,10 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
             <div className="flex items-center justify-between">
                 <div className="flex gap-2">
                     {[
-                        { key: 'overview' as const, label: '📦 ภาพรวมสต๊อก' },
+                        { key: 'overview' as const, label: '📦 ภาพรวมสต็อก' },
                         { key: 'detail' as const, label: '📊 สินค้า / กำไร' },
                         { key: 'withdrawals' as const, label: '📤 รายการเบิกสินค้า' },
+                        { key: 'returns' as const, label: '🔄 รายการคืนสินค้า' },
                     ].map(s => (
                         <button key={s.key} onClick={() => setSection(s.key)}
                             className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${section === s.key ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
@@ -940,6 +964,7 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                     )}
                     {section === 'detail' && <ExportButton onClick={handleExportDetail} label="Export กำไร" />}
                     {section === 'withdrawals' && <ExportButton onClick={handleExportWithdrawals} label="Export การเบิก" />}
+                    {section === 'returns' && <ExportButton onClick={handleExportReturns} label="Export การคืนสินค้า" />}
                 </div>
             </div>
 
@@ -1148,6 +1173,199 @@ function InventoryTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                             </div>
                             {withdrawalsData.totalPages > 1 && (
                                 <Pagination page={withdrawalPage} totalPages={withdrawalsData.totalPages} onPageChange={setWithdrawalPage} />
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+
+            {section === 'returns' && returnsData && (
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-4">
+                    {/* Summary Header & Stats */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl p-4 text-white shadow-sm">
+                            <p className="text-amber-100 text-xs font-medium">รายการใบคืนทั้งหมด</p>
+                            <p className="text-2xl font-bold mt-1">{returnsData.total.toLocaleString()} <span className="text-sm font-normal text-amber-100">ใบ</span></p>
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                            <p className="text-gray-400 text-xs font-medium">จำนวนสินค้าคืนรวม</p>
+                            <p className="text-xl font-bold text-gray-800 mt-1">{returnsData.totalQty.toLocaleString()} <span className="text-sm font-normal text-gray-500">ชิ้น</span></p>
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                            <p className="text-gray-400 text-xs font-medium">มูลค่ารวมรับคืน</p>
+                            <p className="text-xl font-bold text-rose-600 mt-1">{formatCurrency(returnsData.totalAmount)}</p>
+                        </div>
+                    </div>
+
+                    {/* Search Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                        <div className="flex items-center gap-2 flex-1 max-w-md">
+                            <div className="relative flex-1">
+                                <input
+                                    type="text"
+                                    value={returnsSearchInput}
+                                    onChange={e => setReturnsSearchInput(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            setReturnsSearch(returnsSearchInput);
+                                            setReturnsPage(1);
+                                        }
+                                    }}
+                                    placeholder="🔍 ค้นหาเลขที่ใบคืน, เลขบิลขาย, ลูกค้า, สินค้า..."
+                                    className="w-full pl-3 pr-8 py-1.5 text-xs rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                />
+                                {returnsSearchInput && (
+                                    <button
+                                        onClick={() => {
+                                            setReturnsSearchInput('');
+                                            setReturnsSearch('');
+                                            setReturnsPage(1);
+                                        }}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setReturnsSearch(returnsSearchInput);
+                                    setReturnsPage(1);
+                                }}
+                                className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 transition-colors shrink-0"
+                            >
+                                ค้นหา
+                            </button>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                            พบ {returnsData.total} รายการ (หน้า {returnsPage}/{returnsData.totalPages})
+                        </span>
+                    </div>
+
+                    {/* Table */}
+                    {returnsData.records.length === 0 ? (
+                        <p className="text-gray-400 text-sm text-center py-8">ไม่พบรายการคืนสินค้าในช่วงเวลานี้</p>
+                    ) : (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
+                                            <th className="text-left py-2 px-3 font-medium">วันที่</th>
+                                            <th className="text-left py-2 px-3 font-medium">เลขที่ใบคืน</th>
+                                            <th className="text-left py-2 px-3 font-medium">เลขอ้างอิงบิลขาย</th>
+                                            <th className="text-left py-2 px-3 font-medium">ลูกค้า</th>
+                                            <th className="text-left py-2 px-3 font-medium">รายการสินค้าที่คืน</th>
+                                            <th className="text-right py-2 px-3 font-medium">จำนวนชิ้น</th>
+                                            <th className="text-right py-2 px-3 font-medium">ยอดเงินคืน</th>
+                                            <th className="text-left py-2 px-3 font-medium">ผู้บันทึก</th>
+                                            <th className="text-center py-2 px-3 font-medium">รายละเอียด</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {returnsData.records.map((r, idx) => {
+                                            const isExpanded = expandedReturnId === r.id;
+                                            const totalQty = r.items.reduce((s: number, i: any) => s + i.quantity, 0);
+                                            return (
+                                                <React.Fragment key={r.id || idx}>
+                                                    <tr className="hover:bg-amber-50/40 transition-colors">
+                                                        <td className="py-2.5 px-3 text-xs text-gray-500 whitespace-nowrap">
+                                                            {new Date(r.createdAt).toLocaleString('th-TH')}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 font-medium text-amber-700 whitespace-nowrap">
+                                                            {r.returnNumber}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 whitespace-nowrap">
+                                                            {r.sale ? (
+                                                                <a
+                                                                    href={`/sales/${r.sale.id}`}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="font-medium text-emerald-600 hover:text-emerald-800 hover:underline"
+                                                                    title="คลิกเพื่อดูบิลขาย"
+                                                                >
+                                                                    {r.sale.saleNumber} ↗
+                                                                </a>
+                                                            ) : (
+                                                                <span className="text-gray-400">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-gray-700">
+                                                            {r.sale?.customer?.name || <span className="text-gray-400">ลูกค้าทั่วไป</span>}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-xs text-gray-600 max-w-xs truncate" title={r.items.map((i: any) => `${i.product.name} (x${i.quantity})`).join(', ')}>
+                                                            {r.items.map((i: any) => `${i.product.name} (x${i.quantity})`).join(', ')}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-right text-gray-600 font-medium whitespace-nowrap">
+                                                            {totalQty.toLocaleString()}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-right font-bold text-rose-600 whitespace-nowrap">
+                                                            {formatCurrency(Number(r.totalAmount))}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-xs text-gray-500 whitespace-nowrap">
+                                                            {r.createdBy?.name || '-'}
+                                                        </td>
+                                                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                                            <button
+                                                                onClick={() => setExpandedReturnId(isExpanded ? null : r.id)}
+                                                                className="px-2 py-1 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 rounded border border-amber-200 transition-colors cursor-pointer"
+                                                            >
+                                                                {isExpanded ? '▲ ย่อ' : '▼ สินค้า'}
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                    {isExpanded && (
+                                                        <tr className="bg-amber-50/20">
+                                                            <td colSpan={9} className="p-3 pl-8">
+                                                                <div className="bg-white rounded-lg border border-amber-200/60 p-3 shadow-xs space-y-2">
+                                                                    <div className="flex items-center justify-between text-xs text-gray-500">
+                                                                        <span className="font-semibold text-gray-700">
+                                                                            📦 รายการสินค้าที่รับคืน (ใบคืน {r.returnNumber})
+                                                                        </span>
+                                                                        {r.reason && (
+                                                                            <span className="text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded">
+                                                                                เหตุผล: {r.reason}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <table className="w-full text-xs">
+                                                                        <thead>
+                                                                            <tr className="border-b border-gray-100 text-gray-400">
+                                                                                <th className="text-left py-1">รหัส</th>
+                                                                                <th className="text-left py-1">สินค้า</th>
+                                                                                <th className="text-left py-1">คลังที่รับคืน</th>
+                                                                                <th className="text-right py-1">จำนวน</th>
+                                                                                <th className="text-right py-1">ราคา/หน่วย</th>
+                                                                                <th className="text-right py-1">รวม</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-gray-50">
+                                                                            {r.items.map((item: any, iIdx: number) => (
+                                                                                <tr key={iIdx}>
+                                                                                    <td className="py-1 text-gray-400 font-mono">{item.product.code}</td>
+                                                                                    <td className="py-1 font-medium text-gray-700">{item.product.name}</td>
+                                                                                    <td className="py-1 text-gray-500">{item.warehouse?.name || '-'}</td>
+                                                                                    <td className="py-1 text-right font-semibold text-gray-800">
+                                                                                        {item.quantity} {item.product.unit || 'ชิ้น'}
+                                                                                    </td>
+                                                                                    <td className="py-1 text-right text-gray-500">{formatCurrency(Number(item.unitPrice))}</td>
+                                                                                    <td className="py-1 text-right font-semibold text-rose-600">{formatCurrency(Number(item.totalPrice))}</td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {returnsData.totalPages > 1 && (
+                                <Pagination page={returnsPage} totalPages={returnsData.totalPages} onPageChange={setReturnsPage} />
                             )}
                         </>
                     )}
