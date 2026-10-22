@@ -12,6 +12,7 @@ ssh root@$HOST "cd $APP_DIR && \
   git fetch origin && \
   git reset --hard origin/main && \
   docker compose up -d --build && \
+  docker network connect --alias skp2017-web fertilizer_default skp2017-web-1 2>/dev/null || true && \
   docker run --rm --env-file .env --add-host host.docker.internal:host-gateway -v \$(pwd):/app -w /app node:22-alpine sh -c 'npm install --no-audit --no-fund 2>/dev/null && npx prisma db push --accept-data-loss'"
 
 echo ""

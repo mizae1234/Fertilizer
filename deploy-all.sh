@@ -21,6 +21,7 @@ deploy_srv1422909() {
     # On srv1422909: deploy ptn95 then skp2017 sequentially to avoid CPU spike
     deploy_dir "srv1422909.hstgr.cloud" "/home/web/Fertilizer" "ptn95.tech"
     deploy_dir "srv1422909.hstgr.cloud" "/home/web/skp2017" "skp2017.tech"
+    ssh root@srv1422909.hstgr.cloud "docker network connect --alias skp2017-web fertilizer_default skp2017-web-1 2>/dev/null || true"
 }
 
 echo "🚀 Deploying to all 5 sites across 4 servers..."
