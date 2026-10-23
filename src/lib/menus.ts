@@ -13,6 +13,7 @@ export const MENU_GROUPS = [
         label: 'จัดการข้อมูล',
         items: [
             { name: 'สินค้า', href: '/products', icon: '📦' },
+            { name: 'พิมพ์บาร์โค้ด', href: '/products/barcodes', icon: '🏷️' },
             { name: 'ชุดสินค้า', href: '/bundles', icon: '🎁' },
             { name: 'คลังสินค้า', href: '/warehouses', icon: '🏭' },
             { name: 'ผู้ส่งสินค้า', href: '/vendors', icon: '🚚' },

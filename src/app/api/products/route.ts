@@ -8,22 +8,26 @@ export async function GET(request: Request) {
         const isStaff = user?.role === 'STAFF';
         const { searchParams } = new URL(request.url);
         const search = searchParams.get('search') || '';
+        const exactCode = searchParams.get('exactCode') || '';
         const warehouseId = searchParams.get('warehouseId') || '';
 
+        const where: any = {
+            deletedAt: null,
+            isActive: true,
+        };
+
+        if (exactCode) {
+            where.code = { equals: exactCode, mode: 'insensitive' };
+        } else if (search) {
+            where.OR = [
+                { name: { contains: search, mode: 'insensitive' } },
+                { code: { contains: search, mode: 'insensitive' } },
+                { description: { contains: search, mode: 'insensitive' } },
+            ];
+        }
+
         const products = await prisma.product.findMany({
-            where: {
-                deletedAt: null,
-                isActive: true,
-                ...(search
-                    ? {
-                        OR: [
-                            { name: { contains: search, mode: 'insensitive' } },
-                            { code: { contains: search, mode: 'insensitive' } },
-                            { description: { contains: search, mode: 'insensitive' } },
-                        ],
-                    }
-                    : {}),
-            },
+            where,
             select: {
                 id: true, code: true, name: true, price: true, cost: true, unit: true,
                 description: true,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { updateProductCost } from '@/app/actions/products';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 import AlertModal from '@/components/AlertModal';
@@ -407,28 +408,36 @@ export default function ProductDetailPage() {
 
             <div className="flex items-center justify-between mb-4">
                 <h1 className="text-xl font-bold text-gray-800">📦 {product.name}</h1>
-                <button
-                    onClick={async () => {
-                        try {
-                            const res = await fetch(`/api/products/${id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ isActive: !product.isActive }),
-                            });
-                            if (!res.ok) throw new Error('เกิดข้อผิดพลาด');
-                            await refreshProduct();
-                            showAlert(product.isActive ? 'ปิดใช้งานสินค้าแล้ว' : 'เปิดใช้งานสินค้าแล้ว', 'success', 'สำเร็จ');
-                        } catch (error) {
-                            showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
-                        }
-                    }}
-                    className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${product.isActive
-                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                        : 'bg-red-100 text-red-700 hover:bg-red-200'
-                        }`}
-                >
-                    {product.isActive ? '✅ เปิดใช้งาน' : '🚫 ปิดใช้งาน'}
-                </button>
+                <div className="flex items-center gap-2">
+                    <Link
+                        href={`/products/barcodes?productId=${product.id}`}
+                        className="shrink-0 px-3.5 py-2 rounded-xl text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors shadow-xs"
+                    >
+                        🏷️ พิมพ์บาร์โค้ด
+                    </Link>
+                    <button
+                        onClick={async () => {
+                            try {
+                                const res = await fetch(`/api/products/${id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ isActive: !product.isActive }),
+                                });
+                                if (!res.ok) throw new Error('เกิดข้อผิดพลาด');
+                                await refreshProduct();
+                                showAlert(product.isActive ? 'ปิดใช้งานสินค้าแล้ว' : 'เปิดใช้งานสินค้าแล้ว', 'success', 'สำเร็จ');
+                            } catch (error) {
+                                showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
+                            }
+                        }}
+                        className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${product.isActive
+                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                            : 'bg-red-100 text-red-700 hover:bg-red-200'
+                            }`}
+                    >
+                        {product.isActive ? '✅ เปิดใช้งาน' : '🚫 ปิดใช้งาน'}
+                    </button>
+                </div>
             </div>
 
             {/* Product Image */}

@@ -938,8 +938,84 @@ export default function POSPage() {
         ...filteredBundles.map(b => ({ type: 'bundle' as const, data: b }))]
         : [];
 
-    // Keyboard handler for search: Arrow keys + Enter
-    const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    const playBeep = () => {
+        try {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            gain.gain.setValueAtTime(0.12, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.08);
+        } catch { /* ignore */ }
+    };
+
+    // Keyboard handler for search: Arrow keys + Enter (Barcode Scanning & Direct Match)
+    const handleSearchKeyDown = async (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const term = search.trim();
+            if (!term) return;
+
+            // 1. If an item is highlighted in the dropdown
+            if (showSearchResults && highlightedIndex >= 0 && highlightedIndex < searchResults.length) {
+                const r = searchResults[highlightedIndex];
+                if (r.type === 'product') { addToCart(r.data as Product); }
+                else { addBundleToCart(r.data as BundleInfo); }
+                playBeep();
+                setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1);
+                return;
+            }
+
+            // 2. Exact match in currently loaded products by code (Barcode scan match)
+            const exactProduct = products.find(p => p.code.toLowerCase() === term.toLowerCase());
+            if (exactProduct) {
+                addToCart(exactProduct);
+                playBeep();
+                setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1);
+                return;
+            }
+
+            // 3. Exact match in bundles by code
+            const exactBundle = bundles.find(b => b.code.toLowerCase() === term.toLowerCase());
+            if (exactBundle) {
+                addBundleToCart(exactBundle);
+                playBeep();
+                setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1);
+                return;
+            }
+
+            // 4. If exactly 1 search result exists in dropdown
+            if (showSearchResults && searchResults.length === 1) {
+                const r = searchResults[0];
+                if (r.type === 'product') { addToCart(r.data as Product); }
+                else { addBundleToCart(r.data as BundleInfo); }
+                playBeep();
+                setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1);
+                return;
+            }
+
+            // 5. Query server immediately for exact code (in case product is not yet in client products state)
+            try {
+                const res = await fetch(`/api/products?exactCode=${encodeURIComponent(term)}&warehouseId=${defaultWarehouseId}`);
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    addToCart(data[0] as Product);
+                    playBeep();
+                    setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1);
+                    return;
+                }
+            } catch { /* ignore */ }
+
+            return;
+        }
+
         if (!showSearchResults || searchResults.length === 0) {
             // Global shortcuts when not in dropdown
             if (e.key === '+' && cart.length > 0) { e.preventDefault(); openPaymentModal(); return; }
@@ -954,12 +1030,6 @@ export default function POSPage() {
             e.preventDefault();
             const next = highlightedIndex <= 0 ? searchResults.length - 1 : highlightedIndex - 1;
             setHighlightedIndex(next);
-        } else if (e.key === 'Enter' && highlightedIndex >= 0 && highlightedIndex < searchResults.length) {
-            e.preventDefault();
-            const r = searchResults[highlightedIndex];
-            if (r.type === 'product') { addToCart(r.data as Product); }
-            else { addBundleToCart(r.data as BundleInfo); }
-            setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1);
         }
     };
 
@@ -1070,7 +1140,7 @@ export default function POSPage() {
                                         onChange={e => { setSearch(e.target.value); setShowSearchResults(true); setHighlightedIndex(-1); }}
                                         onFocus={() => { if (search) setShowSearchResults(true); }}
                                         onKeyDown={handleSearchKeyDown}
-                                        placeholder="🔍 ค้นหาสินค้า..."
+                                        placeholder="🔍 ค้นหาสินค้า หรือ ยิงบาร์โค้ด..."
                                         className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm bg-emerald-50/50"
                                     />
                                     {showSearchResults && searchResults.length > 0 && (
@@ -1170,7 +1240,7 @@ export default function POSPage() {
                                     onChange={e => { setSearch(e.target.value); setShowSearchResults(true); setHighlightedIndex(-1); }}
                                     onFocus={() => { if (search) setShowSearchResults(true); }}
                                     onKeyDown={handleSearchKeyDown}
-                                    placeholder="🔍 ค้นหาสินค้า..."
+                                    placeholder="🔍 ค้นหาสินค้า หรือ ยิงบาร์โค้ด..."
                                     className="w-full px-3 py-2 rounded-lg border border-emerald-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm bg-emerald-50/50"
                                 />
                                 {showSearchResults && searchResults.length > 0 && (

@@ -96,6 +96,9 @@ export default async function ProductsPage({ searchParams }: Props) {
                 subtitle={`จัดการสินค้าทั้งหมด (${total} รายการ)`}
                 actions={
                     <div className="flex gap-2">
+                        <Link href="/products/barcodes" className="px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 font-medium text-sm hover:bg-gray-50 shadow-xs flex items-center gap-1.5 transition-colors">
+                            🏷️ พิมพ์บาร์โค้ด
+                        </Link>
                         <ImportProductsButton />
                         <ExportProductsButton />
                         <Link href="/products/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-sm hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200">

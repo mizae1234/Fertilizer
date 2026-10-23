@@ -90,6 +90,19 @@ export default function Sidebar({ onCollapsedChange }: { onCollapsedChange?: (co
         ? [...filteredMenuGroups, adminMenuGroup]
         : filteredMenuGroups;
 
+    // Find the single best matching active menu item (longest matching href)
+    const allMenuItems = allMenuGroups.flatMap(g => g.items);
+    const activeItemHref = allMenuItems
+        .filter(item =>
+            item.href === '/'
+                ? pathname === '/'
+                : pathname === item.href || pathname.startsWith(item.href + '/')
+        )
+        .reduce<string | null>((longest, item) => {
+            if (!longest) return item.href;
+            return item.href.length > longest.length ? item.href : longest;
+        }, null);
+
     return (
         <>
             {/* Mobile Top Bar */}
@@ -175,9 +188,7 @@ export default function Sidebar({ onCollapsedChange }: { onCollapsedChange?: (co
                             )}
                             <div className="space-y-1">
                                 {group.items.map((item) => {
-                                    const isActive = item.href === '/'
-                                        ? pathname === '/'
-                                        : pathname === item.href || pathname.startsWith(item.href + '/');
+                                    const isActive = item.href === activeItemHref;
                                     return (
                                         <Link
                                             key={item.href}

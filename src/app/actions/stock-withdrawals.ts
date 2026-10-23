@@ -146,7 +146,10 @@ export async function getStockWithdrawals(page = 1, from = '', to = '') {
     ]);
 
     return { 
-        records, 
+        records: records.map(r => ({
+            ...r,
+            totalAmount: Number(r.totalAmount),
+        })), 
         totalPages: Math.ceil(total / perPage), 
         total,
         totalCost: Number(totalCostAgg._sum.totalAmount || 0),
