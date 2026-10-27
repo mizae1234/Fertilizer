@@ -28,6 +28,7 @@ export async function GET(
             include: {
                 productGroup: { select: { name: true } },
                 productStocks: {
+                    where: { warehouse: { deletedAt: null, isActive: true } },
                     include: { warehouse: { select: { id: true, name: true } } },
                     orderBy: [{ warehouse: { isMain: 'desc' } }, { warehouse: { name: 'asc' } }],
                 },

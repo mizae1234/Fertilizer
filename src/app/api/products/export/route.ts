@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
         ];
     }
     if (warehouse) {
-        where.productStocks = { some: { warehouseId: warehouse } };
+        where.productStocks = { some: { warehouseId: warehouse, warehouse: { deletedAt: null, isActive: true } } };
     }
     if (group) {
         where.productGroupId = group;
@@ -32,8 +32,11 @@ export async function GET(request: NextRequest) {
         include: {
             productGroup: { select: { name: true } },
             productStocks: {
+                where: {
+                    warehouse: { deletedAt: null, isActive: true },
+                    ...(warehouse ? { warehouseId: warehouse } : {}),
+                },
                 select: { quantity: true, warehouse: { select: { name: true } } },
-                ...(warehouse ? { where: { warehouseId: warehouse } } : {}),
                 orderBy: [{ warehouse: { isMain: 'desc' } }, { warehouse: { name: 'asc' } }],
             },
         },

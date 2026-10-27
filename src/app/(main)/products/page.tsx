@@ -28,7 +28,7 @@ export default async function ProductsPage({ searchParams }: Props) {
     const perPage = 10;
 
     const [warehouses, productGroups] = await Promise.all([
-        prisma.warehouse.findMany({ orderBy: { name: 'asc' } }),
+        prisma.warehouse.findMany({ where: { deletedAt: null, isActive: true }, orderBy: { name: 'asc' } }),
         prisma.productGroup.findMany({ orderBy: { name: 'asc' } }),
     ]);
 
@@ -45,7 +45,7 @@ export default async function ProductsPage({ searchParams }: Props) {
             }
             : {}),
         ...(warehouseFilter
-            ? { productStocks: { some: { warehouseId: warehouseFilter } } }
+            ? { productStocks: { some: { warehouseId: warehouseFilter, warehouse: { deletedAt: null, isActive: true } } } }
             : {}),
         ...(groupFilter
             ? { productGroupId: groupFilter }
@@ -63,8 +63,11 @@ export default async function ProductsPage({ searchParams }: Props) {
             include: {
                 productGroup: { select: { name: true } },
                 productStocks: {
+                    where: {
+                        warehouse: { deletedAt: null, isActive: true },
+                        ...(warehouseFilter ? { warehouseId: warehouseFilter } : {}),
+                    },
                     select: { warehouseId: true, quantity: true, warehouse: { select: { name: true } } },
-                    ...(warehouseFilter ? { where: { warehouseId: warehouseFilter } } : {}),
                     orderBy: [{ warehouse: { isMain: 'desc' } }, { warehouse: { name: 'asc' } }],
                 },
             },

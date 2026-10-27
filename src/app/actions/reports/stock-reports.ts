@@ -52,6 +52,9 @@ export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
 
     // Get current stock for all products
     const stocks = await prisma.productStock.findMany({
+        where: {
+            warehouse: { deletedAt: null, isActive: true },
+        },
         select: {
             productId: true,
             warehouseId: true,
@@ -139,6 +142,9 @@ export async function getInventoryReport() {
     }
     const [stocks, lowStockCount] = await Promise.all([
         prisma.productStock.findMany({
+            where: {
+                warehouse: { deletedAt: null, isActive: true },
+            },
             include: {
                 product: { select: { id: true, name: true, code: true, minStock: true, cost: true } },
                 warehouse: { select: { id: true, name: true } },

@@ -33,8 +33,8 @@ export async function GET(request: Request) {
                 description: true,
                 imageUrl: true, pointsPerUnit: true, minStock: true,
                 productStocks: warehouseId
-                    ? { where: { warehouseId }, select: { warehouseId: true, quantity: true } }
-                    : { select: { warehouseId: true, quantity: true } },
+                    ? { where: { warehouseId, warehouse: { deletedAt: null, isActive: true } }, select: { warehouseId: true, quantity: true } }
+                    : { where: { warehouse: { deletedAt: null, isActive: true } }, select: { warehouseId: true, quantity: true } },
                 productPrices: {
                     select: { price: true, productUnitId: true, customerGroup: { select: { name: true, id: true } } },
                 },

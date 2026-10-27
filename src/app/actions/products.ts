@@ -25,6 +25,7 @@ export async function getProducts(page = 1, search = '') {
             include: {
                 productGroup: { select: { name: true } },
                 productStocks: {
+                    where: { warehouse: { deletedAt: null, isActive: true } },
                     include: { warehouse: { select: { name: true } } },
                 },
                 productPrices: {

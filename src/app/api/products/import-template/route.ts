@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import * as XLSX from 'xlsx';
 
 export async function GET() {
-    const warehouses = await prisma.warehouse.findMany({ where: { isActive: true }, orderBy: { createdAt: 'asc' } });
+    const warehouses = await prisma.warehouse.findMany({ where: { deletedAt: null, isActive: true }, orderBy: { createdAt: 'asc' } });
 
     // Create template workbook
     const baseHeaders = [

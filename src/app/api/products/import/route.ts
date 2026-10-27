@@ -21,7 +21,7 @@ export async function POST(request: Request) {
         }
 
         // Get active warehouses
-        const warehouses = await prisma.warehouse.findMany({ where: { isActive: true }, orderBy: { createdAt: 'asc' } });
+        const warehouses = await prisma.warehouse.findMany({ where: { deletedAt: null, isActive: true }, orderBy: { createdAt: 'asc' } });
         if (warehouses.length === 0) {
             return NextResponse.json({ error: 'ไม่พบคลังสินค้า กรุณาสร้างคลังสินค้าก่อน' }, { status: 400 });
         }
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
         const groupMap = new Map(allGroups.map(g => [g.name.toLowerCase(), g.id]));
 
         // Get default warehouse (first active)
-        const defaultWarehouse = await prisma.warehouse.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' } });
+        const defaultWarehouse = await prisma.warehouse.findFirst({ where: { deletedAt: null, isActive: true }, orderBy: { createdAt: 'asc' } });
         if (!defaultWarehouse) {
             return NextResponse.json({ error: 'ไม่พบคลังสินค้า กรุณาสร้างคลังสินค้าก่อน' }, { status: 400 });
         }

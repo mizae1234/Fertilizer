@@ -21,6 +21,7 @@ export async function createWarehouse(data: { name: string; location?: string })
         },
     });
     revalidatePath('/warehouses');
+    revalidatePath('/products');
     return warehouse;
 }
 
@@ -34,15 +35,20 @@ export async function updateWarehouse(id: string, data: { name: string; location
         },
     });
     revalidatePath('/warehouses');
+    revalidatePath('/products');
     return warehouse;
 }
 
 export async function deleteWarehouse(id: string) {
     await prisma.warehouse.update({
         where: { id },
-        data: { deletedAt: new Date() },
+        data: {
+            deletedAt: new Date(),
+            isActive: false,
+        },
     });
     revalidatePath('/warehouses');
+    revalidatePath('/products');
 }
 
 export async function setMainWarehouse(id: string) {
@@ -51,4 +57,5 @@ export async function setMainWarehouse(id: string) {
         prisma.warehouse.update({ where: { id }, data: { isMain: true } }),
     ]);
     revalidatePath('/warehouses');
+    revalidatePath('/products');
 }
