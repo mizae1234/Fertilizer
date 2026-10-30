@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createTransfer } from '@/app/actions/transfers';
 import AlertModal from '@/components/AlertModal';
 
-interface Product { id: string; code: string; name: string; unit: string; }
+interface Product { id: string; code: string; name: string; unit: string; brand?: string | null; }
 interface Warehouse { id: string; name: string; }
 
 export default function NewTransferPage() {
@@ -114,13 +114,22 @@ export default function NewTransferPage() {
                                                 />
                                                 {activeSearchIdx === idx && (itemSearch[idx] || '') !== '' && (
                                                     <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                                                        {products
-                                                            .filter(p => {
-                                                                const q = (itemSearch[idx] || '').toLowerCase();
-                                                                return p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
-                                                            })
-                                                            .slice(0, 20)
-                                                            .map(p => (
+                                                        {(() => {
+                                                            const tokens = (itemSearch[idx] || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+                                                            const matches = products.filter(p => {
+                                                                if (tokens.length === 0) return true;
+                                                                const name = (p.name || '').toLowerCase();
+                                                                const code = (p.code || '').toLowerCase();
+                                                                const brand = (p.brand || '').toLowerCase();
+                                                                return tokens.every(t => {
+                                                                    const padded = /^\d+$/.test(t) ? t.padStart(5, '0') : t;
+                                                                    return name.includes(t) || code.includes(t) || code.includes(padded) || brand.includes(t);
+                                                                });
+                                                            });
+                                                            if (matches.length === 0) {
+                                                                return <p className="px-3 py-2 text-sm text-gray-400 text-center">ไม่พบสินค้า</p>;
+                                                            }
+                                                            return matches.slice(0, 30).map(p => (
                                                                 <button key={p.id} type="button"
                                                                     onClick={() => { updateItem(idx, 'productId', p.id); setActiveSearchIdx(null); setItemSearch(prev => ({ ...prev, [idx]: '' })); }}
                                                                     className="w-full text-left px-3 py-2 hover:bg-emerald-50 text-sm border-b border-gray-50 last:border-0">
@@ -128,13 +137,8 @@ export default function NewTransferPage() {
                                                                     <span className="text-gray-700">{p.name}</span>
                                                                     <span className="text-xs text-gray-400 ml-1">({p.unit})</span>
                                                                 </button>
-                                                            ))}
-                                                        {products.filter(p => {
-                                                            const q = (itemSearch[idx] || '').toLowerCase();
-                                                            return p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
-                                                        }).length === 0 && (
-                                                                <p className="px-3 py-2 text-sm text-gray-400 text-center">ไม่พบสินค้า</p>
-                                                            )}
+                                                            ));
+                                                        })()}
                                                     </div>
                                                 )}
                                             </>

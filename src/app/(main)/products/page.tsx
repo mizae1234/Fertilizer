@@ -32,16 +32,25 @@ export default async function ProductsPage({ searchParams }: Props) {
         prisma.productGroup.findMany({ orderBy: { name: 'asc' } }),
     ]);
 
+    const searchTokens = search.trim().split(/\s+/).filter(Boolean);
     const where = {
         deletedAt: null,
-        ...(search
+        ...(searchTokens.length > 0
             ? {
-                OR: [
-                    { name: { contains: search, mode: 'insensitive' as const } },
-                    { code: { contains: search, mode: 'insensitive' as const } },
-                    { brand: { contains: search, mode: 'insensitive' as const } },
-                    { description: { contains: search, mode: 'insensitive' as const } },
-                ],
+                AND: searchTokens.map(token => {
+                    const paddedToken = /^\d+$/.test(token) ? token.padStart(5, '0') : token;
+                    return {
+                        OR: [
+                            { name: { contains: token, mode: 'insensitive' as const } },
+                            { code: { contains: token, mode: 'insensitive' as const } },
+                            ...(paddedToken !== token ? [{ code: { contains: paddedToken, mode: 'insensitive' as const } }] : []),
+                            { brand: { contains: token, mode: 'insensitive' as const } },
+                            { packaging: { contains: token, mode: 'insensitive' as const } },
+                            { description: { contains: token, mode: 'insensitive' as const } },
+                            { productGroup: { name: { contains: token, mode: 'insensitive' as const } } },
+                        ],
+                    };
+                }),
             }
             : {}),
         ...(warehouseFilter

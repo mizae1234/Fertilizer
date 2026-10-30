@@ -12,13 +12,22 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = { deletedAt: null };
 
-    if (search) {
-        where.OR = [
-            { name: { contains: search, mode: 'insensitive' as const } },
-            { code: { contains: search, mode: 'insensitive' as const } },
-            { brand: { contains: search, mode: 'insensitive' as const } },
-            { description: { contains: search, mode: 'insensitive' as const } },
-        ];
+    const searchTokens = search.trim().split(/\s+/).filter(Boolean);
+    if (searchTokens.length > 0) {
+        where.AND = searchTokens.map(token => {
+            const paddedToken = /^\d+$/.test(token) ? token.padStart(5, '0') : token;
+            return {
+                OR: [
+                    { name: { contains: token, mode: 'insensitive' as const } },
+                    { code: { contains: token, mode: 'insensitive' as const } },
+                    ...(paddedToken !== token ? [{ code: { contains: paddedToken, mode: 'insensitive' as const } }] : []),
+                    { brand: { contains: token, mode: 'insensitive' as const } },
+                    { packaging: { contains: token, mode: 'insensitive' as const } },
+                    { description: { contains: token, mode: 'insensitive' as const } },
+                    { productGroup: { name: { contains: token, mode: 'insensitive' as const } } },
+                ],
+            };
+        });
     }
     if (warehouse) {
         where.productStocks = { some: { warehouseId: warehouse, warehouse: { deletedAt: null, isActive: true } } };

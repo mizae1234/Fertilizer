@@ -95,12 +95,18 @@ function BarcodeContent() {
 
     // Filtered products list
     const filteredProducts = useMemo(() => {
+        const tokens = searchTerm.toLowerCase().trim().split(/\s+/).filter(Boolean);
         return products.filter(p => {
-            const matchesSearch = !searchTerm ||
-                p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                p.code.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesGroup = selectedGroup === 'ALL' || p.productGroup?.name === selectedGroup;
-            return matchesSearch && matchesGroup;
+            if (!matchesGroup) return false;
+            if (tokens.length === 0) return true;
+            const name = (p.name || '').toLowerCase();
+            const code = (p.code || '').toLowerCase();
+            const brand = ((p as any).brand || '').toLowerCase();
+            return tokens.every(t => {
+                const padded = /^\d+$/.test(t) ? t.padStart(5, '0') : t;
+                return name.includes(t) || code.includes(t) || code.includes(padded) || brand.includes(t);
+            });
         });
     }, [products, searchTerm, selectedGroup]);
 

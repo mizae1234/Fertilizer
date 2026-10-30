@@ -82,6 +82,94 @@ interface ReturnItem {
     returnQty: number;
 }
 
+function SaleItemProductPicker({
+    products,
+    value,
+    onChange,
+}: {
+    products: Product[];
+    value: string;
+    onChange: (productId: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const searchTokens = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const filtered = products.filter(p => {
+        if (searchTokens.length === 0) return true;
+        const name = (p.name || '').toLowerCase();
+        const code = (p.code || '').toLowerCase();
+        const brand = ((p as any).brand || '').toLowerCase();
+        return searchTokens.every(t => {
+            const padded = /^\d+$/.test(t) ? t.padStart(5, '0') : t;
+            return name.includes(t) || code.includes(t) || code.includes(padded) || brand.includes(t);
+        });
+    });
+
+    const selected = products.find(p => p.id === value);
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                type="button"
+                onClick={() => { setOpen(!open); setSearch(''); }}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-left flex items-center justify-between gap-2 hover:border-gray-300 transition-colors"
+            >
+                <span className={selected ? 'text-gray-800 truncate' : 'text-gray-400 truncate'}>
+                    {selected ? `${selected.name} (${selected.code})` : '-- เลือกสินค้า --'}
+                </span>
+                <svg className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+
+            {open && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="p-2 border-b border-gray-100">
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="🔍 พิมพ์ชื่อ, รหัส, ยี่ห้อ..."
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                            autoFocus
+                        />
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                        {filtered.length === 0 ? (
+                            <div className="px-4 py-6 text-center text-sm text-gray-400">ไม่พบสินค้า</div>
+                        ) : (
+                            filtered.slice(0, 100).map(p => (
+                                <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => { onChange(p.id); setOpen(false); }}
+                                    className={`w-full text-left px-3 py-2.5 text-sm hover:bg-emerald-50 transition-colors flex items-center gap-2 border-b border-gray-50 last:border-0 ${
+                                        value === p.id ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700'
+                                    }`}
+                                >
+                                    <span className="font-mono text-xs text-gray-400 shrink-0 w-14">{p.code}</span>
+                                    <span className="truncate flex-1">{p.name}</span>
+                                    <span className="text-xs text-gray-400 shrink-0">({p.unit})</span>
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function SaleDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -547,11 +635,11 @@ export default function SaleDetailPage() {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="col-span-2 sm:col-span-1">
                                         <label className="text-xs text-gray-500 mb-1 block">สินค้า</label>
-                                        <select value={item.productId} onChange={e => updateItem(idx, 'productId', e.target.value)}
-                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
-                                            <option value="">-- เลือกสินค้า --</option>
-                                            {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}
-                                        </select>
+                                        <SaleItemProductPicker
+                                            products={products}
+                                            value={item.productId}
+                                            onChange={pid => updateItem(idx, 'productId', pid)}
+                                        />
                                     </div>
                                     <div className="col-span-2 sm:col-span-1">
                                         <label className="text-xs text-gray-500 mb-1 block">คลัง</label>

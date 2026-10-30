@@ -17,21 +17,39 @@ export async function GET(request: Request) {
         };
 
         if (exactCode) {
-            where.code = { equals: exactCode, mode: 'insensitive' };
-        } else if (search) {
+            const trimmed = exactCode.trim();
+            const padded = /^\d+$/.test(trimmed) ? trimmed.padStart(5, '0') : trimmed;
             where.OR = [
-                { name: { contains: search, mode: 'insensitive' } },
-                { code: { contains: search, mode: 'insensitive' } },
-                { description: { contains: search, mode: 'insensitive' } },
+                { code: { equals: trimmed, mode: 'insensitive' } },
+                ...(padded !== trimmed ? [{ code: { equals: padded, mode: 'insensitive' } }] : []),
             ];
+        } else if (search) {
+            const tokens = search.trim().split(/\s+/).filter(Boolean);
+            if (tokens.length > 0) {
+                where.AND = tokens.map(token => {
+                    const paddedToken = /^\d+$/.test(token) ? token.padStart(5, '0') : token;
+                    return {
+                        OR: [
+                            { name: { contains: token, mode: 'insensitive' } },
+                            { code: { contains: token, mode: 'insensitive' } },
+                            ...(paddedToken !== token ? [{ code: { contains: paddedToken, mode: 'insensitive' } }] : []),
+                            { brand: { contains: token, mode: 'insensitive' } },
+                            { packaging: { contains: token, mode: 'insensitive' } },
+                            { description: { contains: token, mode: 'insensitive' } },
+                            { productGroup: { name: { contains: token, mode: 'insensitive' } } },
+                        ]
+                    };
+                });
+            }
         }
 
         const products = await prisma.product.findMany({
             where,
             select: {
                 id: true, code: true, name: true, price: true, cost: true, unit: true,
-                description: true,
+                description: true, brand: true, packaging: true,
                 imageUrl: true, pointsPerUnit: true, minStock: true,
+                productGroup: { select: { id: true, name: true } },
                 productStocks: warehouseId
                     ? { where: { warehouseId, warehouse: { deletedAt: null, isActive: true } }, select: { warehouseId: true, quantity: true } }
                     : { where: { warehouse: { deletedAt: null, isActive: true } }, select: { warehouseId: true, quantity: true } },
@@ -43,7 +61,7 @@ export async function GET(request: Request) {
                     orderBy: [{ isBaseUnit: 'desc' }, { conversionRate: 'asc' }],
                 },
             },
-            take: 2000,
+            ...(search ? { take: 200 } : {}),
             orderBy: { name: 'asc' },
         });
 

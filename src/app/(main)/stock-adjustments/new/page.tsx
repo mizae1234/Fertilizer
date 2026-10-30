@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createStockAdjustment } from '@/app/actions/stock-adjustments';
 import AlertModal from '@/components/AlertModal';
 
-interface Product { id: string; name: string; code: string; unit: string }
+interface Product { id: string; name: string; code: string; unit: string; brand?: string | null }
 interface Warehouse { id: string; name: string }
 
 interface AdjustmentItem {
@@ -41,10 +41,17 @@ function ProductSearchSelect({ products, value, onChange }: {
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    const filtered = products.filter(p =>
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.code.toLowerCase().includes(search.toLowerCase())
-    );
+    const searchTokens = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const filtered = products.filter(p => {
+        if (searchTokens.length === 0) return true;
+        const name = (p.name || '').toLowerCase();
+        const code = (p.code || '').toLowerCase();
+        const brand = (p.brand || '').toLowerCase();
+        return searchTokens.every(t => {
+            const padded = /^\d+$/.test(t) ? t.padStart(5, '0') : t;
+            return name.includes(t) || code.includes(t) || code.includes(padded) || brand.includes(t);
+        });
+    });
 
     return (
         <div ref={ref} className="relative">

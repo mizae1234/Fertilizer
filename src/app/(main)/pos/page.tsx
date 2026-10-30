@@ -913,9 +913,13 @@ export default function POSPage() {
         } finally { setLoading(false); }
     };
 
-    const filteredBundles = bundles.filter(b =>
-        !search || b.name.toLowerCase().includes(search.toLowerCase()) || b.code.toLowerCase().includes(search.toLowerCase())
-    );
+    const bundleTokens = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const filteredBundles = bundles.filter(b => {
+        if (bundleTokens.length === 0) return true;
+        const bName = (b.name || '').toLowerCase();
+        const bCode = (b.code || '').toLowerCase();
+        return bundleTokens.every(t => bName.includes(t) || bCode.includes(t));
+    });
 
     const [showSearchResults, setShowSearchResults] = useState(false);
 
@@ -962,6 +966,7 @@ export default function POSPage() {
             e.preventDefault();
             const term = search.trim();
             if (!term) return;
+            const paddedTerm = /^\d+$/.test(term) ? term.padStart(5, '0') : term;
 
             // 1. If an item is highlighted in the dropdown
             if (showSearchResults && highlightedIndex >= 0 && highlightedIndex < searchResults.length) {
@@ -973,8 +978,11 @@ export default function POSPage() {
                 return;
             }
 
-            // 2. Exact match in currently loaded products by code (Barcode scan match)
-            const exactProduct = products.find(p => p.code.toLowerCase() === term.toLowerCase());
+            // 2. Exact match in currently loaded products by code (Barcode scan match, raw or zero-padded)
+            const exactProduct = products.find(p => {
+                const c = p.code.toLowerCase();
+                return c === term.toLowerCase() || c === paddedTerm.toLowerCase();
+            });
             if (exactProduct) {
                 addToCart(exactProduct);
                 playBeep();
@@ -983,7 +991,10 @@ export default function POSPage() {
             }
 
             // 3. Exact match in bundles by code
-            const exactBundle = bundles.find(b => b.code.toLowerCase() === term.toLowerCase());
+            const exactBundle = bundles.find(b => {
+                const c = b.code.toLowerCase();
+                return c === term.toLowerCase() || c === paddedTerm.toLowerCase();
+            });
             if (exactBundle) {
                 addBundleToCart(exactBundle);
                 playBeep();
@@ -1010,6 +1021,25 @@ export default function POSPage() {
                     playBeep();
                     setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1);
                     return;
+                }
+            } catch { /* ignore */ }
+
+            // 6. Query server immediately by search term (handles fast Enter before debounce completes)
+            try {
+                const res = await fetch(`/api/products?search=${encodeURIComponent(term)}&warehouseId=${defaultWarehouseId}`);
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    if (data.length === 1) {
+                        addToCart(data[0] as Product);
+                        playBeep();
+                        setSearch(''); setShowSearchResults(false); setHighlightedIndex(-1);
+                        return;
+                    } else if (data.length > 1) {
+                        setProducts(data);
+                        setShowSearchResults(true);
+                        setHighlightedIndex(0);
+                        return;
+                    }
                 }
             } catch { /* ignore */ }
 
