@@ -76,7 +76,7 @@ export default function ShopInfoPage() {
         <div className="animate-fade-in max-w-2xl mx-auto">
             {/* Header */}
             <div className="mb-6">
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">🏪 ข้อมูลร้านค้า</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">🏪 ตั้งค่าข้อมูลร้าน</h1>
                 <p className="text-sm text-gray-500 mt-1">จัดการข้อมูลร้านค้าสำหรับใช้ในเอกสารและใบเสร็จ</p>
             </div>
 

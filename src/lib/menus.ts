@@ -23,7 +23,7 @@ export const MENU_GROUPS = [
             { name: 'Template บิล', href: '/settings/receipt-template', icon: '🧾' },
             { name: 'หมวดหมู่สินค้า', href: '/settings/product-groups', icon: '📦' },
             { name: 'บัญชีร้านค้า', href: '/bank-accounts', icon: '🏦' },
-            { name: 'ข้อมูลร้าน', href: '/settings/shop-info', icon: '🏪' },
+            { name: 'ตั้งค่าข้อมูลร้าน', href: '/settings/shop-info', icon: '🏪' },
         ],
     },
     {
