@@ -795,10 +795,10 @@ export default function SaleDetailPage() {
             {/* ========== Payment Details ========== */}
             {!isEditing && sale.paymentMethod && (() => {
                 const paymentMethodLabels: Record<string, string> = {
-                    'CASH': '💵 เงินสด', 'TRANSFER': '🏦 โอน', 'CREDIT': '📋 เครดิต',
+                    'CASH': '💵 เงินสด', 'TRANSFER': '🏦 โอน', 'CHEQUE': '📑 เช็ค', 'CREDIT': '📋 เครดิต',
                     'SPLIT': '🔀 จ่ายหลายช่องทาง', 'CREDIT_CARD': '💳 บัตรเครดิต',
                 };
-                const payments = (sale.payments && Array.isArray(sale.payments) ? sale.payments : []) as { method: string; amount: number; bankAccountId?: string | null }[];
+                const payments = (sale.payments && Array.isArray(sale.payments) ? sale.payments : []) as { method: string; amount: number; bankAccountId?: string | null; chequeNo?: string }[];
                 const hasCredit = sale.paymentMethod === 'CREDIT' || sale.paymentMethod === 'SPLIT';
                 const totalInterest = (sale.debtInterests || []).reduce((s, di) => s + Number(di.amount), 0);
                 const grandTotal = Number(sale.totalAmount) + totalInterest;
@@ -878,6 +878,7 @@ export default function SaleDetailPage() {
                                                 <span className="text-gray-600">
                                                     {paymentMethodLabels[p.method] || p.method}
                                                     {bank && <span className="text-xs text-gray-400 ml-1.5">({bank.bankName} - {bank.accountNumber})</span>}
+                                                    {p.chequeNo && <span className="text-xs text-purple-600 ml-1.5 font-normal">(เลขที่: {p.chequeNo})</span>}
                                                 </span>
                                                 <span className={`font-medium ${p.method === 'CREDIT' ? 'text-orange-600' : 'text-gray-800'}`}>
                                                     {formatCurrency(Number(p.amount))}

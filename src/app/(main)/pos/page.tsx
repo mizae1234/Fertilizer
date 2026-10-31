@@ -5,6 +5,11 @@ import { useRouter } from 'next/navigation';
 import { createSaleFromPOS } from '@/app/actions/pos';
 import { formatCurrency } from '@/lib/utils';
 import AlertModal from '@/components/AlertModal';
+import { useShift } from '@/hooks/useShift';
+import ShiftBadge from '@/components/shifts/ShiftBadge';
+import OpenShiftModal from '@/components/shifts/OpenShiftModal';
+import CloseShiftModal from '@/components/shifts/CloseShiftModal';
+import ShiftPrintSlip from '@/components/shifts/ShiftPrintSlip';
 
 interface ProductUnitInfo {
     id: string; unitName: string; conversionRate: string; sellingPrice: string; isBaseUnit: boolean;
@@ -61,17 +66,18 @@ interface HeldSale {
     label: string;
 }
 
-interface PaymentLine { method: string; amount: number; dueDate: string; bankAccountId?: string }
+interface PaymentLine { method: string; amount: number; dueDate: string; bankAccountId?: string; chequeNo?: string }
 interface BankAccountInfo { id: string; accountName: string; accountNumber: string; bankName: string; qrCodeUrl: string | null; isDefault: boolean; isActive: boolean }
 const PAYMENT_METHODS = [
     { value: 'CASH', label: '💵 เงินสด', color: 'emerald' },
     { value: 'TRANSFER', label: '🏦 เงินโอน', color: 'blue' },
+    { value: 'CHEQUE', label: '📑 เช็ค', color: 'purple' },
     { value: 'CREDIT', label: '📋 ค้างชำระ', color: 'amber' },
 ];
 
 function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, allowCredit = true }: {
     total: number; loading: boolean;
-    onConfirm: (payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number) => void;
+    onConfirm: (payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string; chequeNo?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number) => void;
     onClose: () => void;
     defaultPrintType?: 'bill' | 'invoice' | 'none';
     allowCredit?: boolean;
@@ -123,13 +129,14 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
         updateLine(idx, { amount: Math.round((total - otherSum) * 100) / 100 });
     };
 
-    // When switching to TRANSFER, auto-select default bank
+    // When switching method, auto-select default bank or preserve fields
     const handleMethodChange = (idx: number, method: string) => {
         const defaultBank = bankAccounts.find(a => a.isDefault);
         updateLine(idx, {
             method,
             dueDate: method !== 'CREDIT' ? '' : lines[idx].dueDate,
             bankAccountId: method === 'TRANSFER' ? (lines[idx].bankAccountId || defaultBank?.id) : undefined,
+            chequeNo: method === 'CHEQUE' ? lines[idx].chequeNo : undefined,
         });
     };
 
@@ -139,6 +146,7 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
             amount: l.amount,
             ...(l.method === 'CREDIT' && l.dueDate ? { dueDate: l.dueDate } : {}),
             ...(l.method === 'TRANSFER' && l.bankAccountId ? { bankAccountId: l.bankAccountId } : {}),
+            ...(l.method === 'CHEQUE' && l.chequeNo ? { chequeNo: l.chequeNo } : {}),
         }));
         const cashVal = typeof cashReceived === 'number' && cashReceived > 0 ? cashReceived : undefined;
         onConfirm(payments, printType, cashVal);
@@ -229,6 +237,20 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
                                     <input type="date" value={line.dueDate}
                                         onChange={e => updateLine(idx, { dueDate: e.target.value })}
                                         className="flex-1 px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Cheque number */}
+                            {line.method === 'CHEQUE' && (
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs text-gray-500 shrink-0">📑 เลขที่เช็ค:</label>
+                                    <input
+                                        type="text"
+                                        value={line.chequeNo || ''}
+                                        onChange={e => updateLine(idx, { chequeNo: e.target.value })}
+                                        placeholder="ระบุเลขที่เช็ค (ถ้ามี)"
+                                        className="flex-1 px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                                     />
                                 </div>
                             )}
@@ -347,6 +369,26 @@ export default function POSPage() {
     });
     const [userId, setUserId] = useState('');
     const [userPrintSetting, setUserPrintSetting] = useState('bill');
+
+    // Shift management
+    const {
+        enabled: shiftEnabled,
+        currentShift,
+        showOpenModal: showOpenShiftModal,
+        setShowOpenModal: setShowOpenShiftModal,
+        showCloseModal: showCloseShiftModal,
+        setShowCloseModal: setShowCloseShiftModal,
+        handleOpenShift,
+        handleCloseShift,
+    } = useShift(userId);
+
+    const [printSlipData, setPrintSlipData] = useState<{
+        open: boolean;
+        shift: any;
+        summary: any;
+        closingCash: number;
+        difference: number;
+    }>({ open: false, shift: null, summary: null, closingCash: 0, difference: 0 });
     const [search, setSearch] = useState('');
     const [customerSearch, setCustomerSearch] = useState('');
     const [loading, setLoading] = useState(false);
@@ -833,10 +875,15 @@ export default function POSPage() {
             setTimeout(() => router.push('/login'), 1500);
             return;
         }
+        if (shiftEnabled && !currentShift) {
+            setAlertModal({ open: true, message: 'ระบบกะเปิดใช้งานอยู่ กรุณาเปิดกะก่อนเริ่มขายสินค้า', type: 'warning', title: 'ยังไม่ได้เปิดกะ' });
+            setShowOpenShiftModal(true);
+            return;
+        }
         setShowPaymentModal(true);
     };
 
-    const confirmPayment = async (payments: { method: string; amount: number; dueDate?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number) => {
+    const confirmPayment = async (payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string; chequeNo?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number) => {
         setLoading(true);
         try {
             // Expand bundle items into individual product items for stock deduction
@@ -880,6 +927,7 @@ export default function POSPage() {
                 notes: saleNotes.trim() || undefined,
                 discount: billDiscount,
                 cashReceived: cashReceived && typeof cashReceived === 'number' ? cashReceived : undefined,
+                shiftId: shiftEnabled && currentShift ? currentShift.id : undefined,
             });
             setShowPaymentModal(false);
             setCart([]);
@@ -1110,6 +1158,16 @@ export default function POSPage() {
                                     {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                                 </select>
                             </div>
+                            {shiftEnabled && (
+                                <div className="shrink-0">
+                                    <ShiftBadge
+                                        enabled={shiftEnabled}
+                                        currentShift={currentShift}
+                                        onOpenShift={() => setShowOpenShiftModal(true)}
+                                        onCloseShift={() => setShowCloseShiftModal(true)}
+                                    />
+                                </div>
+                            )}
                             <div className="flex-1" />
                             {/* Desktop: Customer + Search inline */}
                             <div className="hidden lg:flex items-center gap-3">
@@ -1646,6 +1704,58 @@ export default function POSPage() {
                         )}
                     </div>
                 </div>
+            )}
+
+            {/* Shift Modals */}
+            <OpenShiftModal
+                open={showOpenShiftModal}
+                onClose={() => setShowOpenShiftModal(false)}
+                onConfirm={async (startingCash, notes) => {
+                    await handleOpenShift(startingCash, notes);
+                    setAlertModal({
+                        open: true,
+                        message: 'เปิดกะเข้างานเรียบร้อยแล้ว พร้อมเริ่มขาย',
+                        type: 'success',
+                        title: 'เปิดกะสำเร็จ'
+                    });
+                }}
+            />
+
+            {currentShift && (
+                <CloseShiftModal
+                    open={showCloseShiftModal}
+                    shiftId={currentShift.id}
+                    onClose={() => setShowCloseShiftModal(false)}
+                    onConfirm={async (data) => {
+                        const closed = await handleCloseShift(data);
+                        setAlertModal({
+                            open: true,
+                            message: `ปิดกะ ${closed.shiftNumber} เรียบร้อยแล้ว`,
+                            type: 'success',
+                            title: 'ปิดกะสำเร็จ'
+                        });
+                    }}
+                    onPrint={(data) => {
+                        setPrintSlipData({
+                            open: true,
+                            shift: data.shift,
+                            summary: data.summary,
+                            closingCash: data.closingCash,
+                            difference: data.difference,
+                        });
+                    }}
+                />
+            )}
+
+            {printSlipData.open && (
+                <ShiftPrintSlip
+                    open={printSlipData.open}
+                    onClose={() => setPrintSlipData(prev => ({ ...prev, open: false }))}
+                    shift={printSlipData.shift}
+                    summary={printSlipData.summary}
+                    closingCash={printSlipData.closingCash}
+                    difference={printSlipData.difference}
+                />
             )}
 
             <AlertModal

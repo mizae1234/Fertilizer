@@ -29,6 +29,7 @@ export async function PUT(request: Request) {
                 address: body.address || '',
                 notes: body.notes || '',
                 logoUrl: body.logoUrl ?? undefined,
+                ...(body.enableShift !== undefined ? { enableShift: Boolean(body.enableShift) } : {}),
             },
             create: {
                 id: SHOP_INFO_ID,
@@ -37,6 +38,7 @@ export async function PUT(request: Request) {
                 address: body.address || '',
                 notes: body.notes || '',
                 logoUrl: body.logoUrl || null,
+                enableShift: Boolean(body.enableShift ?? false),
             },
         });
         return NextResponse.json(info);

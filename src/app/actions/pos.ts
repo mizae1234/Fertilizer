@@ -17,10 +17,11 @@ export async function createSaleFromPOS(data: {
         itemDiscount?: number;
     }[];
     userId: string;
-    payments: { method: string; amount: number; dueDate?: string }[];
+    payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string; chequeNo?: string }[];
     notes?: string;
     discount?: number;
     cashReceived?: number;
+    shiftId?: string;
 }) {
 
     if (!data.userId) {
@@ -89,6 +90,7 @@ export async function createSaleFromPOS(data: {
                         notes: data.notes || null,
                         cashReceived: data.cashReceived || null,
                         createdById: data.userId,
+                        shiftId: data.shiftId || null,
                         items: {
                             create: data.items.map((item, idx) => ({
                                 productId: item.productId,

@@ -2,6 +2,7 @@
 export const PAYMENT_METHODS = [
     { value: 'CASH', label: '💵 เงินสด', color: 'emerald' },
     { value: 'TRANSFER', label: '🏦 เงินโอน', color: 'blue' },
+    { value: 'CHEQUE', label: '📑 เช็ค', color: 'purple' },
     { value: 'CREDIT', label: '📋 เครดิต', color: 'amber' },
 ] as const;
 

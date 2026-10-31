@@ -9,6 +9,7 @@ export default function ShopInfoPage() {
     const [address, setAddress] = useState('');
     const [notes, setNotes] = useState('');
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
+    const [enableShift, setEnableShift] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; type: 'success' | 'error'; title?: string }>({ open: false, message: '', type: 'error' });
@@ -23,6 +24,7 @@ export default function ShopInfoPage() {
                     setAddress(data.address || '');
                     setNotes(data.notes || '');
                     setLogoUrl(data.logoUrl || null);
+                    setEnableShift(Boolean(data.enableShift));
                 }
                 setLoading(false);
             })
@@ -56,7 +58,7 @@ export default function ShopInfoPage() {
             const res = await fetch('/api/shop-info', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, taxId, address, notes, logoUrl }),
+                body: JSON.stringify({ name, taxId, address, notes, logoUrl, enableShift }),
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
@@ -151,6 +153,33 @@ export default function ShopInfoPage() {
                         rows={2}
                         className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
                     />
+                </div>
+            </div>
+
+            {/* POS Shift Management Feature Toggle */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-6">
+                <div className="flex items-center justify-between gap-4">
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                            <span>⏰</span> ระบบเปิด-ปิดกะเข้างาน (Shift Management)
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                            เมื่อเปิดใช้งาน พนักงานจะต้องเปิดกะระบุเงินทอนเริ่มต้นก่อนเริ่มขาย และเมื่อปิดกะระบบจะคำนวณสรุปยอดขายแยกตาม เงินสด, เงินโอน, เช็ค และค้างชำระ
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setEnableShift(!enableShift)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            enableShift ? 'bg-emerald-500' : 'bg-gray-300'
+                        }`}
+                    >
+                        <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                enableShift ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                        />
+                    </button>
                 </div>
             </div>
 

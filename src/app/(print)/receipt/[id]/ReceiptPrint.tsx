@@ -18,7 +18,7 @@ interface Sale {
     createdAt: string;
     totalAmount: number;
     discount: number;
-    payments: { method: string; amount: number }[];
+    payments: { method: string; amount: number; chequeNo?: string }[];
     notes: string | null;
     debtPaid: number;
     items: SaleItem[];
@@ -54,6 +54,7 @@ function methodLabel(m: string) {
     switch (m) {
         case 'CASH': return 'เงินสด';
         case 'TRANSFER': return 'โอนเงิน';
+        case 'CHEQUE': return 'เช็ค';
         case 'CREDIT': return 'ค้างชำระ';
         default: return m;
     }
@@ -210,7 +211,7 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                         }
                         return (
                             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                                <span>{methodLabel(p.method)}</span>
+                                <span>{methodLabel(p.method)}{p.chequeNo ? ` (${p.chequeNo})` : ''}</span>
                                 <span>{formatCurrency(p.amount)}</span>
                             </div>
                         );

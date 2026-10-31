@@ -5,6 +5,7 @@ export const MENU_GROUPS = [
         items: [
             { name: 'Dashboard', href: '/', icon: '📊' },
             { name: 'POS ขายสินค้า', href: '/pos', icon: '🛒' },
+            { name: 'ประวัติกะ', href: '/shifts', icon: '⏰' },
             { name: 'รายการขาย', href: '/sales', icon: '💰' },
             { name: 'บิลค้างจ่าย', href: '/overdue-bills', icon: '📋' },
         ],

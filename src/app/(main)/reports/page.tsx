@@ -828,8 +828,8 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                                                                         <td className="py-2 px-3 text-right font-medium text-gray-700">{formatCurrency(item.totalPrice)}</td>
                                                                         {idx === 0 && (
                                                                             <td className="py-2 px-3 align-top" rowSpan={sale.items.length}>
-                                                                                <span className={`text-xs px-2 py-0.5 rounded-full ${sale.paymentMethod === 'CASH' ? 'bg-green-100 text-green-700' : sale.paymentMethod === 'TRANSFER' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
-                                                                                    {sale.paymentMethod === 'CASH' ? 'เงินสด' : sale.paymentMethod === 'TRANSFER' ? 'โอน' : 'เครดิต'}
+                                                                                <span className={`text-xs px-2 py-0.5 rounded-full ${sale.paymentMethod === 'CASH' ? 'bg-green-100 text-green-700' : sale.paymentMethod === 'TRANSFER' ? 'bg-blue-100 text-blue-700' : sale.paymentMethod === 'CHEQUE' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                                                    {sale.paymentMethod === 'CASH' ? 'เงินสด' : sale.paymentMethod === 'TRANSFER' ? 'โอน' : sale.paymentMethod === 'CHEQUE' ? 'เช็ค' : 'เครดิต'}
                                                                                 </span>
                                                                             </td>
                                                                         )}
@@ -1491,6 +1491,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
         const rows = [
             { 'ประเภท': 'เงินสด', 'จำนวน': cashData.cashFlow.cash },
             { 'ประเภท': 'โอน', 'จำนวน': cashData.cashFlow.transfer },
+            { 'ประเภท': 'เช็ค', 'จำนวน': cashData.cashFlow.cheque || 0 },
             { 'ประเภท': 'เครดิตค้างจ่าย', 'จำนวน': cashData.cashFlow.credit },
             { 'ประเภท': 'รวม', 'จำนวน': cashData.cashFlow.total },
         ];
@@ -1743,7 +1744,7 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                             </div>
                             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
                                 <h3 className="font-semibold text-gray-800 text-sm mb-3">💵 Cash Flow</h3>
-                                <div className="grid grid-cols-3 gap-3 mb-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
                                     <div className="bg-emerald-50 rounded-lg p-3 text-center">
                                         <p className="text-xs text-gray-500">เงินสด</p>
                                         <p className="text-sm font-bold text-emerald-600">{formatCurrency(cashData.cashFlow.cash)}</p>
@@ -1751,6 +1752,10 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
                                     <div className="bg-blue-50 rounded-lg p-3 text-center">
                                         <p className="text-xs text-gray-500">โอน</p>
                                         <p className="text-sm font-bold text-blue-600">{formatCurrency(cashData.cashFlow.transfer)}</p>
+                                    </div>
+                                    <div className="bg-purple-50 rounded-lg p-3 text-center">
+                                        <p className="text-xs text-gray-500">เช็ค</p>
+                                        <p className="text-sm font-bold text-purple-600">{formatCurrency(cashData.cashFlow.cheque || 0)}</p>
                                     </div>
                                     <div className="bg-red-50 rounded-lg p-3 text-center">
                                         <p className="text-xs text-gray-500">เครดิตค้างจ่าย</p>

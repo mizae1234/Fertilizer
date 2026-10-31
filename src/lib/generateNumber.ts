@@ -11,6 +11,7 @@ const PREFIX_TABLE_MAP: Record<string, { table: string; column: string }> = {
     FR: { table: 'FactoryReturn', column: 'returnNumber' },
     RT: { table: 'SaleReturn', column: 'returnNumber' },
     WD: { table: 'StockWithdrawal', column: 'withdrawalNumber' },
+    SH: { table: 'CashierShift', column: 'shiftNumber' },
 };
 
 /**

@@ -14,6 +14,7 @@ const formatDate = (d: string | Date | null | undefined) => {
 const PAYMENT_METHODS = [
     { value: 'CASH', label: '💵 เงินสด' },
     { value: 'TRANSFER', label: '🏦 เงินโอน' },
+    { value: 'CHEQUE', label: '📑 เช็ค' },
     { value: 'CREDIT', label: '📋 เครดิต' },
 ];
 
@@ -381,7 +382,9 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
                                             ? '💵 เงินสด'
                                             : dp.method === 'TRANSFER'
                                                 ? `🏦 ${getBankName(dp) || 'เงินโอน'}`
-                                                : '📋 เครดิต'}
+                                                : dp.method === 'CHEQUE'
+                                                    ? '📑 เช็ค'
+                                                    : '📋 เครดิต'}
                                         {dp.method === 'CREDIT' && dp.dueDate && <span className="text-orange-500 ml-1">(กำหนดใหม่: {formatDate(dp.dueDate)})</span>}
                                     </p>
                                     <p className="text-[11px] text-gray-400">{dp.note || formatDate(dp.paidAt)}</p>

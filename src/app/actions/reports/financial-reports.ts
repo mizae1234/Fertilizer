@@ -30,6 +30,7 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
 
     let cashTotal = 0;
     let transferTotal = 0;
+    let chequeTotal = 0;
     let creditTotal = 0;
 
     for (const sale of sales) {
@@ -39,6 +40,7 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
                 switch (p.method) {
                     case 'CASH': cashTotal += Number(p.amount); break;
                     case 'TRANSFER': transferTotal += Number(p.amount); break;
+                    case 'CHEQUE': chequeTotal += Number(p.amount); break;
                     case 'CREDIT': creditTotal += Number(p.amount); break;
                     default: cashTotal += Number(p.amount);
                 }
@@ -47,6 +49,7 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
             switch (sale.paymentMethod) {
                 case 'CASH': cashTotal += amount; break;
                 case 'TRANSFER': transferTotal += amount; break;
+                case 'CHEQUE': chequeTotal += amount; break;
                 case 'CREDIT': creditTotal += amount; break;
                 default: cashTotal += amount;
             }
@@ -86,6 +89,7 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
     let creditGrandTotal = 0;     // ยอดเครดิตรวม
     let creditPaidCash = 0;       // ชำระเงินสดแล้ว
     let creditPaidTransfer = 0;   // ชำระโอนแล้ว
+    let creditPaidCheque = 0;     // ชำระเช็คแล้ว
     let creditOutstanding = 0;    // ค้างจ่าย
 
     // Group AR by customer — with paid/remaining calculation
@@ -116,6 +120,9 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
                 } else if (p.method === 'TRANSFER') {
                     initialPaid += Number(p.amount);
                     creditPaidTransfer += Number(p.amount);
+                } else if (p.method === 'CHEQUE') {
+                    initialPaid += Number(p.amount);
+                    creditPaidCheque += Number(p.amount);
                 }
             }
         }
@@ -127,6 +134,8 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
                 creditPaidCash += dpAmount;
             } else if (dp.method === 'TRANSFER') {
                 creditPaidTransfer += dpAmount;
+            } else if (dp.method === 'CHEQUE') {
+                creditPaidCheque += dpAmount;
             }
         }
 
@@ -181,9 +190,11 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
             cash: cashTotal + creditPaidCash,
             // Actual transfer received = direct transfer sales + credit repaid in transfer
             transfer: transferTotal + creditPaidTransfer,
+            // Actual cheque received = direct cheque sales + credit repaid in cheque
+            cheque: chequeTotal + creditPaidCheque,
             // Outstanding credit = not yet paid
             credit: creditOutstanding,
-            total: cashTotal + creditPaidCash + transferTotal + creditPaidTransfer + creditOutstanding,
+            total: cashTotal + creditPaidCash + transferTotal + creditPaidTransfer + chequeTotal + creditPaidCheque + creditOutstanding,
         },
         ar: {
             total: arTotal,
