@@ -47,6 +47,28 @@ export async function GET(
                     orderBy: { createdAt: 'desc' },
                     take: 200,
                 },
+                goodsReceiveItems: {
+                    where: {
+                        goodsReceive: {
+                            deletedAt: null,
+                        },
+                    },
+                    include: {
+                        goodsReceive: {
+                            select: {
+                                id: true,
+                                grNumber: true,
+                                receivedDate: true,
+                                status: true,
+                                notes: true,
+                                vendor: { select: { id: true, name: true } },
+                                createdBy: { select: { name: true } },
+                            },
+                        },
+                        warehouse: { select: { id: true, name: true } },
+                    },
+                    take: 100,
+                },
                 productLogs: {
                     include: { user: { select: { name: true } } },
                     orderBy: { createdAt: 'desc' },
@@ -57,6 +79,15 @@ export async function GET(
 
         if (!product) {
             return NextResponse.json({ error: 'ไม่พบสินค้า' }, { status: 404 });
+        }
+
+        // Sort goods receive items descending by receivedDate
+        if (product && product.goodsReceiveItems) {
+            product.goodsReceiveItems.sort((a, b) => {
+                const dateA = new Date(a.goodsReceive?.receivedDate || 0).getTime();
+                const dateB = new Date(b.goodsReceive?.receivedDate || 0).getTime();
+                return dateB - dateA;
+            });
         }
 
         // When date filter is applied, compute sum of transactions AFTER the filter

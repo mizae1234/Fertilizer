@@ -51,6 +51,27 @@ interface ProductUnit {
     isBaseUnit: boolean;
 }
 
+interface ProductGoodsReceiveItem {
+    id: string;
+    goodsReceiveId: string;
+    quantity: number;
+    unitCost: number | string;
+    totalCost: number | string;
+    lotNo: string | null;
+    mfgDate: string | null;
+    expDate: string | null;
+    goodsReceive: {
+        id: string;
+        grNumber: string;
+        receivedDate: string;
+        status: string;
+        notes: string | null;
+        vendor: { id: string; name: string };
+        createdBy: { name: string };
+    };
+    warehouse: { id: string; name: string };
+}
+
 interface ProductLog {
     id: string;
     action: string;
@@ -86,6 +107,7 @@ interface ProductDetail {
     productStocks: ProductStock[];
     productPrices: ProductPrice[];
     productUnits: ProductUnit[];
+    goodsReceiveItems?: ProductGoodsReceiveItem[];
     stockTransactions: StockTransaction[];
     productLogs: ProductLog[];
     txSumAfterFilter?: number;
@@ -114,7 +136,7 @@ export default function ProductDetailPage() {
 
     const [product, setProduct] = useState<ProductDetail | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'stock' | 'log' | 'editLog'>('stock');
+    const [activeTab, setActiveTab] = useState<'stock' | 'gr' | 'log' | 'editLog'>('stock');
 
     // Transaction date filter (default 7 days back)
     const getDefaultFrom = () => {
@@ -912,6 +934,12 @@ export default function ProductDetailPage() {
                     📦 Stock ตามคลัง
                 </button>
                 <button
+                    onClick={() => setActiveTab('gr')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'gr' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                    📥 ประวัตินำเข้า {product.goodsReceiveItems && product.goodsReceiveItems.length > 0 && `(${product.goodsReceiveItems.length})`}
+                </button>
+                <button
                     onClick={() => setActiveTab('log')}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'log' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                 >
@@ -947,6 +975,223 @@ export default function ProductDetailPage() {
                                     </div>
                                 </div>
                             ))
+                        )}
+                    </div>
+                )
+            }
+
+            {/* Goods Receive / Import History Tab */}
+            {
+                activeTab === 'gr' && (
+                    <div className="space-y-4">
+                        {(!product.goodsReceiveItems || product.goodsReceiveItems.length === 0) ? (
+                            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-8 text-center text-gray-400">
+                                <p className="text-3xl mb-2">📥</p>
+                                <p className="text-sm font-medium text-gray-600">ยังไม่มีประวัติการนำเข้าสินค้านี้จากใบรับสินค้า (GR)</p>
+                                <p className="text-xs text-gray-400 mt-1">ประวัติจะแสดงเมื่อมีการรับสินค้าผ่านเมนู &ldquo;รับสินค้า (Goods Receive)&rdquo;</p>
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                                <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between">
+                                    <div>
+                                        <h3 className="font-semibold text-gray-800 text-sm sm:text-base flex items-center gap-2">
+                                            <span>📥</span>
+                                            <span>ประวัติการนำเข้าสินค้า (Goods Receive)</span>
+                                        </h3>
+                                        <p className="text-xs text-gray-400 mt-0.5">
+                                            รวมทั้งหมด {product.goodsReceiveItems.length} รายการรับเข้า
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Desktop Table */}
+                                <div className="hidden md:block overflow-x-auto">
+                                    <table className="w-full text-left text-sm">
+                                        <thead>
+                                            <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs font-semibold">
+                                                <th className="px-4 py-3">วันที่รับเข้า</th>
+                                                <th className="px-4 py-3">เลขที่ใบรับ</th>
+                                                <th className="px-4 py-3">ผู้ขาย / บริษัท</th>
+                                                <th className="px-4 py-3">คลังสินค้า</th>
+                                                <th className="px-4 py-3 text-right">จำนวน</th>
+                                                {user?.role === 'ADMIN' && <th className="px-4 py-3 text-right">ต้นทุน/หน่วย</th>}
+                                                <th className="px-4 py-3">เลขล็อต (Lot No.)</th>
+                                                <th className="px-4 py-3">วันผลิต (MFG)</th>
+                                                <th className="px-4 py-3">วันหมดอายุ (EXP)</th>
+                                                <th className="px-4 py-3 text-center">สถานะ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 text-xs sm:text-sm">
+                                            {product.goodsReceiveItems.map(item => {
+                                                const expStatus = (() => {
+                                                    if (!item.expDate) return null;
+                                                    const today = new Date();
+                                                    today.setHours(0, 0, 0, 0);
+                                                    const exp = new Date(item.expDate);
+                                                    const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                                                    if (diffDays < 0) {
+                                                        return { label: 'หมดอายุแล้ว', color: 'bg-red-50 text-red-700 border-red-200' };
+                                                    }
+                                                    if (diffDays <= 30) {
+                                                        return { label: `ใกล้หมดอายุ (${diffDays} วัน)`, color: 'bg-amber-50 text-amber-700 border-amber-200' };
+                                                    }
+                                                    return { label: 'ปกติ', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+                                                })();
+
+                                                return (
+                                                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                                                        <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                                                            {formatDate(item.goodsReceive.receivedDate)}
+                                                        </td>
+                                                        <td className="px-4 py-3 font-medium whitespace-nowrap">
+                                                            <Link
+                                                                href={`/goods-receive/${item.goodsReceive.id}`}
+                                                                className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-semibold"
+                                                            >
+                                                                {item.goodsReceive.grNumber}
+                                                            </Link>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-gray-600">
+                                                            {item.goodsReceive.vendor?.name || '-'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                                                            {item.warehouse?.name || '-'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-semibold text-gray-800 whitespace-nowrap">
+                                                            +{item.quantity.toLocaleString()} {product.unit}
+                                                        </td>
+                                                        {user?.role === 'ADMIN' && (
+                                                            <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                                                                {formatCurrency(Number(item.unitCost))}
+                                                            </td>
+                                                        )}
+                                                        <td className="px-4 py-3 whitespace-nowrap">
+                                                            {item.lotNo ? (
+                                                                <span className="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-800 border border-gray-200">
+                                                                    {item.lotNo}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-400">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                                                            {item.mfgDate ? formatDate(item.mfgDate) : <span className="text-gray-400">-</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3 whitespace-nowrap">
+                                                            {item.expDate ? (
+                                                                <div className="flex flex-col items-start gap-1">
+                                                                    <span className="text-gray-700 font-medium">{formatDate(item.expDate)}</span>
+                                                                    {expStatus && (
+                                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${expStatus.color}`}>
+                                                                            {expStatus.label}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-gray-400">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                            {item.goodsReceive.status === 'APPROVED' && (
+                                                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                                                                    อนุมัติแล้ว
+                                                                </span>
+                                                            )}
+                                                            {item.goodsReceive.status === 'PENDING' && (
+                                                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                                                                    รออนุมัติ
+                                                                </span>
+                                                            )}
+                                                            {item.goodsReceive.status === 'REJECTED' && (
+                                                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                                                    ยกเลิก
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Mobile Card List */}
+                                <div className="md:hidden divide-y divide-gray-100">
+                                    {product.goodsReceiveItems.map(item => {
+                                        const expStatus = (() => {
+                                            if (!item.expDate) return null;
+                                            const today = new Date();
+                                            today.setHours(0, 0, 0, 0);
+                                            const exp = new Date(item.expDate);
+                                            const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                                            if (diffDays < 0) {
+                                                return { label: 'หมดอายุแล้ว', color: 'bg-red-50 text-red-700 border-red-200' };
+                                            }
+                                            if (diffDays <= 30) {
+                                                return { label: `ใกล้หมด (${diffDays} วัน)`, color: 'bg-amber-50 text-amber-700 border-amber-200' };
+                                            }
+                                            return { label: 'ปกติ', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+                                        })();
+
+                                        return (
+                                            <div key={item.id} className="p-4 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <Link
+                                                        href={`/goods-receive/${item.goodsReceive.id}`}
+                                                        className="text-sm font-bold font-mono text-emerald-600 hover:underline"
+                                                    >
+                                                        {item.goodsReceive.grNumber}
+                                                    </Link>
+                                                    {item.goodsReceive.status === 'APPROVED' && (
+                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                                                            อนุมัติแล้ว
+                                                        </span>
+                                                    )}
+                                                    {item.goodsReceive.status === 'PENDING' && (
+                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
+                                                            รออนุมัติ
+                                                        </span>
+                                                    )}
+                                                    {item.goodsReceive.status === 'REJECTED' && (
+                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-800">
+                                                            ยกเลิก
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex justify-between text-xs text-gray-500">
+                                                    <span>📅 {formatDate(item.goodsReceive.receivedDate)}</span>
+                                                    <span className="font-semibold text-gray-800">+{item.quantity.toLocaleString()} {product.unit}</span>
+                                                </div>
+                                                <div className="text-xs text-gray-600 flex justify-between">
+                                                    <span>🏢 {item.goodsReceive.vendor?.name || '-'}</span>
+                                                    <span>📦 {item.warehouse?.name}</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100 text-xs">
+                                                    <div>
+                                                        <span className="text-gray-400">เลขล็อต: </span>
+                                                        <span className="font-mono font-medium text-gray-700">{item.lotNo || '-'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-gray-400">วันผลิต: </span>
+                                                        <span className="text-gray-700">{item.mfgDate ? formatDate(item.mfgDate) : '-'}</span>
+                                                    </div>
+                                                    <div className="col-span-2 flex items-center justify-between">
+                                                        <div>
+                                                            <span className="text-gray-400">วันหมดอายุ: </span>
+                                                            <span className="font-medium text-gray-800">{item.expDate ? formatDate(item.expDate) : '-'}</span>
+                                                        </div>
+                                                        {expStatus && (
+                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${expStatus.color}`}>
+                                                                {expStatus.label}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         )}
                     </div>
                 )
