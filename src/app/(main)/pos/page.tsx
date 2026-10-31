@@ -1097,13 +1097,28 @@ export default function POSPage() {
             return;
         }
 
-        if (!showSearchResults || searchResults.length === 0) {
-            // Only allow '+' as quick pay when search is completely empty
-            if (e.key === '+' && search.trim() === '' && cart.length > 0) {
+        // If search input is completely empty (0 characters typed), allow quick shortcuts from search input
+        const currentSearchVal = (e.target as HTMLInputElement).value || '';
+        if (currentSearchVal.length === 0) {
+            if (e.key === '+' && cart.length > 0) {
                 e.preventDefault();
                 openPaymentModal();
                 return;
             }
+            if (e.key === '-') {
+                e.preventDefault();
+                setShowBillDiscount(true);
+                return;
+            }
+            if (e.key === '*') {
+                e.preventDefault();
+                qtyInputRef.current?.focus();
+                qtyInputRef.current?.select();
+                return;
+            }
+        }
+
+        if (!showSearchResults || searchResults.length === 0) {
             return;
         }
         if (e.key === 'ArrowDown') {
@@ -1134,23 +1149,23 @@ export default function POSPage() {
             // If typing in any input other than search, ignore all shortcuts
             if (isInput && !isSearchInput) return;
 
-            // If inside search input and there is text in the search input, ignore all shortcuts
+            // If inside search input and user has typed at least 1 character, disable shortcuts
             // This ensures products containing '*' (e.g. แร่วัวขาว 2kg.*12) or '-' (formulas) can be typed freely
             const searchVal = isSearchInput ? ((e.target as HTMLInputElement).value || '') : search;
             if (isSearchInput && searchVal.length > 0) return;
 
-            // Shortcuts when NOT typing in an input (or when search input is completely empty):
-            if (e.key === '+' && cart.length > 0 && (!isSearchInput || searchVal.length === 0)) {
+            // Shortcuts active when NOT typing in an input, OR when inside search input with 0 characters typed:
+            if (e.key === '+' && cart.length > 0) {
                 e.preventDefault();
                 openPaymentModal();
                 return;
             }
-            if (e.key === '-' && !isInput) {
+            if (e.key === '-') {
                 e.preventDefault();
                 setShowBillDiscount(true);
                 return;
             }
-            if (e.key === '*' && !isInput) {
+            if (e.key === '*') {
                 e.preventDefault();
                 qtyInputRef.current?.focus();
                 qtyInputRef.current?.select();
