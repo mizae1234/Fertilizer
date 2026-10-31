@@ -135,7 +135,7 @@ export default function ShiftPrintSlip({
                                 <span>+{formatCurrency(summary.cashSales)}</span>
                             </div>
                             <div className="flex justify-between font-bold">
-                                <span>เงินสดควรมี:</span>
+                                <span>เงินสดรวมในลิ้นชัก:</span>
                                 <span>{formatCurrency(summary.expectedCash)}</span>
                             </div>
                             <div className="flex justify-between font-bold pt-1 border-t border-dotted border-gray-300">

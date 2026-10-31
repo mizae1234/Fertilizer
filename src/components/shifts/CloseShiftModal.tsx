@@ -183,7 +183,7 @@ export default function CloseShiftModal({
                                         <span className="font-medium text-emerald-600">+{formatCurrency(shiftData.summary.cashSales)}</span>
                                     </div>
                                     <div className="flex justify-between pt-1 border-t border-amber-200 font-bold text-sm text-gray-800">
-                                        <span>= เงินสดที่ควรมีในลิ้นชัก:</span>
+                                        <span>= เงินสดรวมในลิ้นชัก:</span>
                                         <span className="text-emerald-700">{formatCurrency(shiftData.summary.expectedCash)}</span>
                                     </div>
                                 </div>
