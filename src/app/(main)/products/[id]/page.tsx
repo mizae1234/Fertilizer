@@ -427,7 +427,7 @@ export default function ProductDetailPage() {
     const isLowStock = totalStock < product.minStock;
 
     return (
-        <div className="animate-fade-in max-w-4xl mx-auto">
+        <div className="animate-fade-in max-w-[1600px] w-full mx-auto">
             {/* Back + Header */}
             <button onClick={() => router.push('/products')} className="text-sm text-gray-500 hover:text-gray-700 mb-3 flex items-center gap-1">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -1257,21 +1257,21 @@ export default function ProductDetailPage() {
                             ) : (
                                 <>
                                     {/* Desktop Table */}
-                                    <div className="hidden sm:block">
-                                        <table className="w-full">
+                                    <div className="hidden sm:block overflow-x-auto">
+                                        <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="bg-gray-50 border-b border-gray-100">
-                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">วันที่</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ประเภท</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">คงเหลือในคลัง</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">คงเหลือรวม</th>
-                                                    {user?.role === 'ADMIN' && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>}
-                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ราคาขาย</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">อ้างอิง</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ผู้ทำรายการ</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">วันที่</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">ประเภท</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">คลัง</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 whitespace-nowrap">จำนวน</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 whitespace-nowrap">คงเหลือในคลัง</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 whitespace-nowrap">คงเหลือรวม</th>
+                                                    {user?.role === 'ADMIN' && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 whitespace-nowrap">ต้นทุน/หน่วย</th>}
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 whitespace-nowrap">ราคาขาย</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">Lot No.</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">อ้างอิง</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap min-w-[120px]">ผู้ทำรายการ</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
@@ -1324,43 +1324,43 @@ export default function ProductDetailPage() {
                                                         const balances = calculatedBalances[tx.id] || { warehouseBalance: 0, totalBalance: 0 };
                                                         return (
                                                             <tr key={tx.id} className="hover:bg-gray-50">
-                                                                <td className="px-4 py-3 text-sm text-gray-600">{formatDateTime(tx.createdAt)}</td>
-                                                                <td className="px-4 py-3">
+                                                                <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{formatDateTime(tx.createdAt)}</td>
+                                                                <td className="px-4 py-3 whitespace-nowrap">
                                                                     <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${info.color}`}>
                                                                         {info.icon} {info.label}
                                                                     </span>
                                                                 </td>
-                                                                <td className="px-4 py-3 text-sm text-gray-600">{tx.warehouse.name}</td>
-                                                                <td className="px-4 py-3 text-sm text-right">
+                                                                <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{tx.warehouse.name}</td>
+                                                                <td className="px-4 py-3 text-sm text-right whitespace-nowrap">
                                                                     <span className={isOut ? 'text-red-600' : 'text-emerald-600'}>
                                                                         {isOut ? '-' : '+'}
                                                                         {Math.abs(tx.quantity).toLocaleString()} {product.unit}
                                                                     </span>
                                                                 </td>
-                                                                <td className="px-4 py-3 text-sm text-right font-medium text-gray-700">
+                                                                <td className="px-4 py-3 text-sm text-right font-medium text-gray-700 whitespace-nowrap">
                                                                     {balances.warehouseBalance.toLocaleString()}
                                                                 </td>
-                                                                <td className="px-4 py-3 text-sm text-right font-medium text-gray-700">
+                                                                <td className="px-4 py-3 text-sm text-right font-medium text-gray-700 whitespace-nowrap">
                                                                     {balances.totalBalance.toLocaleString()}
                                                                 </td>
-                                                                {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm text-gray-800 text-right">
+                                                                {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm text-gray-800 text-right whitespace-nowrap">
                                                                     {(tx.type === 'SALE' || tx.type === 'SALE_CANCEL' || tx.type === 'SALE_RETURN')
                                                                         ? (tx.actualCost != null ? formatCurrency(tx.actualCost) : <span className="text-gray-300">-</span>)
                                                                         : formatCurrency(Number(tx.unitCost))}
                                                                 </td>}
-                                                                <td className="px-4 py-3 text-sm text-right">
+                                                                <td className="px-4 py-3 text-sm text-right whitespace-nowrap">
                                                                     {tx.type === 'SALE' || tx.type === 'SALE_CANCEL' || tx.type === 'SALE_RETURN'
                                                                         ? <span className="text-blue-600 font-medium">{formatCurrency(tx.sellingPrice ?? Number(tx.unitCost))}</span>
                                                                         : <span className="text-gray-300">-</span>}
                                                                 </td>
-                                                                <td className="px-4 py-3 text-xs text-gray-500">
+                                                                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                                                                     {tx.lotNo ? <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">{tx.lotNo}</span> : <span className="text-gray-300">-</span>}
                                                                 </td>
-                                                                <td className="px-4 py-3 text-xs text-gray-500">
+                                                                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                                                                     {tx.reference && <span className="bg-gray-100 px-2 py-0.5 rounded">{tx.reference}</span>}
                                                                     {tx.notes && <p className="text-gray-400 mt-0.5">{tx.notes}</p>}
                                                                 </td>
-                                                                <td className="px-4 py-3 text-xs text-gray-600">
+                                                                <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
                                                                     {tx.user?.name || <span className="text-gray-300">-</span>}
                                                                 </td>
                                                             </tr>
