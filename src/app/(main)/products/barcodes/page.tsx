@@ -9,9 +9,11 @@ import { formatCurrency } from '@/lib/utils';
 interface ProductItem {
     id: string;
     code: string;
+    barcode?: string | null;
     name: string;
     price: number | string;
     unit: string;
+    brand?: string | null;
     productGroup?: { name: string } | null;
 }
 
@@ -102,10 +104,11 @@ function BarcodeContent() {
             if (tokens.length === 0) return true;
             const name = (p.name || '').toLowerCase();
             const code = (p.code || '').toLowerCase();
-            const brand = ((p as any).brand || '').toLowerCase();
+            const barcode = (p.barcode || '').toLowerCase();
+            const brand = (p.brand || '').toLowerCase();
             return tokens.every(t => {
                 const padded = /^\d+$/.test(t) ? t.padStart(5, '0') : t;
-                return name.includes(t) || code.includes(t) || code.includes(padded) || brand.includes(t);
+                return name.includes(t) || code.includes(t) || code.includes(padded) || barcode.includes(t) || brand.includes(t);
             });
         });
     }, [products, searchTerm, selectedGroup]);
@@ -348,7 +351,8 @@ function BarcodeContent() {
                                                         />
                                                     </td>
                                                     <td className="py-2 px-2 font-mono text-gray-600 font-medium whitespace-nowrap">
-                                                        {p.code}
+                                                        <div>{p.code}</div>
+                                                        {p.barcode && <div className="text-[10px] text-gray-400">🏷️ {p.barcode}</div>}
                                                     </td>
                                                     <td className="py-2 px-3 text-gray-800 font-medium">
                                                         <div className="truncate max-w-[220px]" title={p.name}>
@@ -535,7 +539,7 @@ function BarcodeContent() {
 
                                     <div className="my-auto flex flex-col items-center justify-center w-full">
                                         <BarcodeSvg
-                                            value={selectedList[0].product.code}
+                                            value={selectedList[0].product.barcode || selectedList[0].product.code}
                                             width={activePreset.heightMm <= 20 ? 1.0 : 1.3}
                                             height={activePreset.heightMm <= 20 ? 18 : 26}
                                             fontSize={config.showCode ? 9 : 0}
@@ -590,7 +594,7 @@ function BarcodeContent() {
                                 )}
                                 <div className="label-barcode-svg flex justify-center my-0.5 w-full">
                                     <BarcodeSvg
-                                        value={prod.code}
+                                        value={prod.barcode || prod.code}
                                         width={activePreset.heightMm <= 20 ? 1.0 : 1.35}
                                         height={activePreset.heightMm <= 20 ? 18 : 26}
                                         fontSize={config.showCode ? 9 : 0}
@@ -628,7 +632,7 @@ function BarcodeContent() {
                                 )}
                                 <div className="flex justify-center my-0.5">
                                     <BarcodeSvg
-                                        value={prod.code}
+                                        value={prod.barcode || prod.code}
                                         width={1.1}
                                         height={20}
                                         fontSize={config.showCode ? 8 : 0}

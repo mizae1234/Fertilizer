@@ -8,6 +8,7 @@ export async function GET() {
     // Create template workbook
     const baseHeaders = [
         'code',
+        'barcode',
         'name',
         'description',
         'unit',
@@ -22,6 +23,7 @@ export async function GET() {
 
     const baseThaiHeaders = [
         'รหัสสินค้า',
+        'บาร์โค้ด',
         'ชื่อสินค้า *',
         'คำอธิบาย',
         'หน่วยนับ *',
@@ -43,6 +45,7 @@ export async function GET() {
     // Example row
     const baseExample = [
         '00001',
+        '8851234567890',
         'ปุ๋ยยูเรีย 46-0-0',
         'ปุ๋ยเคมี สูตร 46-0-0',
         'ถุง',
@@ -64,6 +67,7 @@ export async function GET() {
     // Set col widths
     const baseCols = [
         { wch: 12 },
+        { wch: 18 },
         { wch: 30 },
         { wch: 25 },
         { wch: 10 },

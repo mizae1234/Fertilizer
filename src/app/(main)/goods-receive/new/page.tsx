@@ -7,7 +7,7 @@ import AlertModal from '@/components/AlertModal';
 import { useUser } from '@/hooks/useUser';
 
 interface Vendor { id: string; name: string; phone: string | null }
-interface Product { id: string; name: string; code: string; unit: string; brand?: string | null }
+interface Product { id: string; name: string; code: string; unit: string; barcode?: string | null; brand?: string | null }
 interface Warehouse { id: string; name: string }
 interface LineItem {
     productId: string;
@@ -47,10 +47,11 @@ function ProductPicker({
         if (searchTokens.length === 0) return true;
         const name = (p.name || '').toLowerCase();
         const code = (p.code || '').toLowerCase();
+        const barcode = (p.barcode || '').toLowerCase();
         const brand = (p.brand || '').toLowerCase();
         return searchTokens.every(t => {
             const padded = /^\d+$/.test(t) ? t.padStart(5, '0') : t;
-            return name.includes(t) || code.includes(t) || code.includes(padded) || brand.includes(t);
+            return name.includes(t) || code.includes(t) || code.includes(padded) || barcode.includes(t) || brand.includes(t);
         });
     });
 

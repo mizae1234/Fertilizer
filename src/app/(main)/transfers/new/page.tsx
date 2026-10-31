@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createTransfer } from '@/app/actions/transfers';
 import AlertModal from '@/components/AlertModal';
 
-interface Product { id: string; code: string; name: string; unit: string; brand?: string | null; }
+interface Product { id: string; code: string; name: string; unit: string; barcode?: string | null; brand?: string | null; }
 interface Warehouse { id: string; name: string; }
 
 export default function NewTransferPage() {
@@ -120,10 +120,11 @@ export default function NewTransferPage() {
                                                                 if (tokens.length === 0) return true;
                                                                 const name = (p.name || '').toLowerCase();
                                                                 const code = (p.code || '').toLowerCase();
+                                                                const barcode = (p.barcode || '').toLowerCase();
                                                                 const brand = (p.brand || '').toLowerCase();
                                                                 return tokens.every(t => {
                                                                     const padded = /^\d+$/.test(t) ? t.padStart(5, '0') : t;
-                                                                    return name.includes(t) || code.includes(t) || code.includes(padded) || brand.includes(t);
+                                                                    return name.includes(t) || code.includes(t) || code.includes(padded) || barcode.includes(t) || brand.includes(t);
                                                                 });
                                                             });
                                                             if (matches.length === 0) {

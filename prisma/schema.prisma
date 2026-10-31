@@ -120,6 +120,7 @@ model ProductGroup {
 model Product {
   id             String    @id @default(cuid())
   code           String    @unique
+  barcode        String?   @unique
   name           String
   description    String?
   unit           String    @default("bag")

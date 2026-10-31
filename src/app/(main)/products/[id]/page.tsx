@@ -65,6 +65,7 @@ interface ProductLog {
 interface ProductDetail {
     id: string;
     code: string;
+    barcode: string | null;
     name: string;
     description: string | null;
     unit: string;
@@ -139,7 +140,7 @@ export default function ProductDetailPage() {
     const [unitValue, setUnitValue] = useState('');
 
     // Product info editing
-    const [infoForm, setInfoForm] = useState({ code: '', name: '', description: '', brand: '', packaging: '', productGroupId: '', minStock: 10 });
+    const [infoForm, setInfoForm] = useState({ code: '', barcode: '', name: '', description: '', brand: '', packaging: '', productGroupId: '', minStock: 10 });
     const [savingInfo, setSavingInfo] = useState(false);
     const [productGroups, setProductGroups] = useState<{ id: string; name: string }[]>([]);
     const [brands, setBrands] = useState<string[]>([]);
@@ -211,6 +212,7 @@ export default function ProductDetailPage() {
         if (product) {
             setInfoForm({
                 code: product.code,
+                barcode: product.barcode || '',
                 name: product.name,
                 description: product.description || '',
                 brand: product.brand || '',
@@ -465,11 +467,17 @@ export default function ProductDetailPage() {
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
                 <h2 className="font-bold text-gray-800 mb-4">ข้อมูลสินค้า</h2>
 
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1.5">รหัสสินค้า</label>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">รหัสสินค้า (Code)</label>
                         <input type="text" value={infoForm.code} onChange={e => setInfoForm({ ...infoForm, code: e.target.value })}
-                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm" />
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm font-mono" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">บาร์โค้ด (Barcode)</label>
+                        <input type="text" value={infoForm.barcode} onChange={e => setInfoForm({ ...infoForm, barcode: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm font-mono"
+                            placeholder="ระบุบาร์โค้ด หรือสแกน" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">ชื่อสินค้า *</label>
@@ -600,6 +608,7 @@ export default function ProductDetailPage() {
 
                         const updateData: Record<string, any> = {
                             code: infoForm.code.trim(),
+                            barcode: infoForm.barcode?.trim() || null,
                             name: infoForm.name,
                             description: infoForm.description || null,
                             brand: infoForm.brand || null,

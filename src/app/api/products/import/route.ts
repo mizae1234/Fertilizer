@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
         // Find the header row (look for the row that contains 'code' and 'name')
         let headerRowIdx = 0;
-        const baseFieldNames = ['code', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging', 'productGroup', 'initialStock'];
+        const baseFieldNames = ['code', 'barcode', 'name', 'description', 'unit', 'pointsPerUnit', 'minStock', 'brand', 'cost', 'price', 'packaging', 'productGroup', 'initialStock'];
         const warehouseFields = warehouses.map(w => `stock_${w.id}`);
         const fieldNames = [...baseFieldNames, ...warehouseFields];
         
@@ -57,12 +57,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'ไม่พบคอลัมน์ "name" ใน Excel — ต้องมีอย่างน้อย code และ name' }, { status: 400 });
         }
 
-        // Get existing product codes to skip duplicates
+        // Get existing product codes & barcodes to skip duplicates
         const existingProducts = await prisma.product.findMany({
             where: { deletedAt: null },
-            select: { code: true },
+            select: { code: true, barcode: true },
         });
         const existingCodes = new Set(existingProducts.map(p => p.code.toLowerCase()));
+        const existingBarcodes = new Set(
+            existingProducts.filter(p => p.barcode).map(p => p.barcode!.toLowerCase())
+        );
 
         // Get last product code number for auto-generation
         const lastProduct = await prisma.product.findFirst({
@@ -120,6 +123,14 @@ export async function POST(request: Request) {
                 continue;
             }
 
+            // Check duplicate barcode
+            const barcode = getValue('barcode');
+            if (barcode && existingBarcodes.has(barcode.toLowerCase())) {
+                results.errors.push(`แถว ${i + 1}: บาร์โค้ด "${barcode}" มีอยู่แล้ว — ข้าม`);
+                results.skipped++;
+                continue;
+            }
+
             // Resolve productGroup
             let productGroupId: string | null = null;
             const groupName = getValue('productGroup');
@@ -147,6 +158,7 @@ export async function POST(request: Request) {
                 await prisma.product.create({
                     data: {
                         code,
+                        barcode: barcode || null,
                         name,
                         description: getValue('description') || null,
                         unit: getValue('unit') || 'ชิ้น',
@@ -160,6 +172,7 @@ export async function POST(request: Request) {
                     },
                 });
                 existingCodes.add(code.toLowerCase());
+                if (barcode) existingBarcodes.add(barcode.toLowerCase());
                 results.created++;
 
                 // Create initial stock for multiple warehouses

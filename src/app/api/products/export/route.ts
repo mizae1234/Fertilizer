@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
                     { name: { contains: token, mode: 'insensitive' as const } },
                     { code: { contains: token, mode: 'insensitive' as const } },
                     ...(paddedToken !== token ? [{ code: { contains: paddedToken, mode: 'insensitive' as const } }] : []),
+                    { barcode: { contains: token, mode: 'insensitive' as const } },
                     { brand: { contains: token, mode: 'insensitive' as const } },
                     { packaging: { contains: token, mode: 'insensitive' as const } },
                     { description: { contains: token, mode: 'insensitive' as const } },

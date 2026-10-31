@@ -10,7 +10,7 @@ interface ProductUnitInfo {
     id: string; unitName: string; conversionRate: string; sellingPrice: string; isBaseUnit: boolean;
 }
 interface Product {
-    id: string; code: string; name: string; unit: string; price: string;
+    id: string; code: string; barcode?: string | null; name: string; unit: string; price: string;
     description?: string | null;
     pointsPerUnit: number;
     imageUrl?: string | null;
@@ -978,10 +978,13 @@ export default function POSPage() {
                 return;
             }
 
-            // 2. Exact match in currently loaded products by code (Barcode scan match, raw or zero-padded)
+            // 2. Exact match in currently loaded products by code or barcode (Barcode scan match, raw or zero-padded)
             const exactProduct = products.find(p => {
                 const c = p.code.toLowerCase();
-                return c === term.toLowerCase() || c === paddedTerm.toLowerCase();
+                const b = (p.barcode || '').toLowerCase();
+                const t = term.toLowerCase();
+                const pt = paddedTerm.toLowerCase();
+                return b === t || c === t || c === pt;
             });
             if (exactProduct) {
                 addToCart(exactProduct);
@@ -1195,7 +1198,7 @@ export default function POSPage() {
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
                                                                 <p className="text-xs text-gray-400 truncate">
-                                                                    {p.code} · {p.unit}{p.description ? ` · ${p.description}` : ''}
+                                                                    {p.code}{p.barcode ? ` · 🏷️ ${p.barcode}` : ''} · {p.unit}{p.description ? ` · ${p.description}` : ''}
                                                                 </p>
                                                             </div>
                                                             <div className="text-right shrink-0">
@@ -1295,7 +1298,7 @@ export default function POSPage() {
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
                                                             <p className="text-[10px] text-gray-400 truncate">
-                                                                {p.code} · {p.unit} · คงเหลือ {stock}{p.description ? ` · ${p.description}` : ''}
+                                                                {p.code}{p.barcode ? ` · 🏷️ ${p.barcode}` : ''} · {p.unit} · คงเหลือ {stock}{p.description ? ` · ${p.description}` : ''}
                                                             </p>
                                                         </div>
                                                         <p className="text-sm font-bold text-emerald-600 shrink-0">{formatCurrency(price)}</p>

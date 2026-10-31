@@ -176,7 +176,7 @@ export async function PATCH(
     // Only allow known Product scalar fields
     const allowedFields = [
         'name', 'description', 'unit', 'cost', 'costMethod', 'price', 'brand',
-        'packaging', 'productGroupId', 'pointsPerUnit', 'minStock', 'isActive', 'code', 'imageUrl'
+        'packaging', 'productGroupId', 'pointsPerUnit', 'minStock', 'isActive', 'code', 'barcode', 'imageUrl'
     ];
     const user = await getServerUser();
     const isStaff = user?.role === 'STAFF';
@@ -185,7 +185,11 @@ export async function PATCH(
     const data: Record<string, any> = {};
     for (const key of allowedFields) {
         if (key in body) {
-            data[key] = body[key];
+            if (key === 'barcode') {
+                data.barcode = body.barcode ? (String(body.barcode).trim() || null) : null;
+            } else {
+                data[key] = body[key];
+            }
         }
     }
 
@@ -209,6 +213,20 @@ export async function PATCH(
             }
         }
 
+        // Check for duplicate barcode if barcode is being updated
+        if (data.barcode) {
+            const existingBarcode = await prisma.product.findFirst({
+                where: { barcode: data.barcode, id: { not: id }, deletedAt: null },
+                select: { id: true, name: true, code: true },
+            });
+            if (existingBarcode) {
+                return NextResponse.json(
+                    { error: `บาร์โค้ด "${data.barcode}" ถูกใช้แล้วโดยสินค้า "${existingBarcode.name}" (${existingBarcode.code})` },
+                    { status: 400 }
+                );
+            }
+        }
+
         // Fetch old product data for comparison
         const oldProduct = await prisma.product.findUnique({ where: { id } });
         if (!oldProduct) {
@@ -222,7 +240,7 @@ export async function PATCH(
 
         // Create audit log entries for each changed field
         const fieldLabels: Record<string, string> = {
-            name: 'ชื่อสินค้า', code: 'รหัสสินค้า', unit: 'หน่วยนับ',
+            name: 'ชื่อสินค้า', code: 'รหัสสินค้า', barcode: 'บาร์โค้ด', unit: 'หน่วยนับ',
             cost: 'ราคาทุน', costMethod: 'วิธีคิดต้นทุน', price: 'ราคาขาย', brand: 'แบรนด์',
             packaging: 'บรรจุภัณฑ์', productGroupId: 'กลุ่มสินค้า',
             pointsPerUnit: 'แต้มต่อหน่วย', minStock: 'สต็อกขั้นต่ำ',

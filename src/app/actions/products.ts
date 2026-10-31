@@ -17,6 +17,7 @@ export async function getProducts(page = 1, search = '') {
                             { name: { contains: token, mode: 'insensitive' as const } },
                             { code: { contains: token, mode: 'insensitive' as const } },
                             ...(paddedToken !== token ? [{ code: { contains: paddedToken, mode: 'insensitive' as const } }] : []),
+                            { barcode: { contains: token, mode: 'insensitive' as const } },
                             { brand: { contains: token, mode: 'insensitive' as const } },
                             { packaging: { contains: token, mode: 'insensitive' as const } },
                             { description: { contains: token, mode: 'insensitive' as const } },
@@ -53,6 +54,7 @@ export async function getProducts(page = 1, search = '') {
 
 export async function createProduct(data: {
     code?: string;
+    barcode?: string | null;
     name: string;
     description?: string;
     unit?: string;
@@ -90,9 +92,21 @@ export async function createProduct(data: {
         }
     }
 
+    const barcode = data.barcode?.trim() || null;
+    if (barcode) {
+        const existingBarcode = await prisma.product.findFirst({
+            where: { barcode, deletedAt: null },
+            select: { id: true, name: true, code: true },
+        });
+        if (existingBarcode) {
+            throw new Error(`บาร์โค้ด "${barcode}" ถูกใช้แล้วโดยสินค้า "${existingBarcode.name}" (${existingBarcode.code})`);
+        }
+    }
+
     const product = await prisma.product.create({
         data: {
             code,
+            barcode,
             name: data.name,
             description: data.description,
             unit: data.unit || 'bag',
@@ -131,28 +145,47 @@ export async function createProduct(data: {
 export async function updateProduct(
     id: string,
     data: {
+        code?: string;
+        barcode?: string | null;
         name: string;
         description?: string;
         unit?: string;
         cost?: number;
         price?: number;
         brand?: string;
+        packaging?: string;
         productGroupId?: string | null;
         pointsPerUnit?: number;
         minStock?: number;
         prices?: { customerGroupId: string; price: number }[];
     }
 ) {
+    if (data.barcode !== undefined) {
+        const barcode = data.barcode?.trim() || null;
+        if (barcode) {
+            const existingBarcode = await prisma.product.findFirst({
+                where: { barcode, id: { not: id }, deletedAt: null },
+                select: { id: true, name: true, code: true },
+            });
+            if (existingBarcode) {
+                throw new Error(`บาร์โค้ด "${barcode}" ถูกใช้แล้วโดยสินค้า "${existingBarcode.name}" (${existingBarcode.code})`);
+            }
+        }
+    }
+
     await prisma.$transaction(async (tx) => {
         await tx.product.update({
             where: { id },
             data: {
+                ...(data.code ? { code: data.code.trim() } : {}),
+                ...(data.barcode !== undefined ? { barcode: data.barcode?.trim() || null } : {}),
                 name: data.name,
                 description: data.description,
                 unit: data.unit,
                 cost: data.cost,
                 price: data.price,
                 brand: data.brand,
+                packaging: data.packaging,
                 productGroupId: data.productGroupId,
                 pointsPerUnit: data.pointsPerUnit,
                 minStock: data.minStock,

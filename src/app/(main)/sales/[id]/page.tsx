@@ -53,7 +53,7 @@ interface SaleDetail {
 }
 
 interface ProductUnitInfo { id: string; unitName: string; conversionRate: string; sellingPrice: string; isBaseUnit: boolean; }
-interface Product { id: string; code: string; name: string; unit: string; price: string; pointsPerUnit: number; productStocks: { warehouseId: string; quantity: number }[]; productUnits: ProductUnitInfo[]; }
+interface Product { id: string; code: string; barcode?: string | null; name: string; unit: string; price: string; pointsPerUnit: number; brand?: string | null; productStocks: { warehouseId: string; quantity: number }[]; productUnits: ProductUnitInfo[]; }
 interface Warehouse { id: string; name: string; }
 interface Customer { id: string; name: string; phone: string; }
 
@@ -108,10 +108,11 @@ function SaleItemProductPicker({
         if (searchTokens.length === 0) return true;
         const name = (p.name || '').toLowerCase();
         const code = (p.code || '').toLowerCase();
-        const brand = ((p as any).brand || '').toLowerCase();
+        const barcode = (p.barcode || '').toLowerCase();
+        const brand = (p.brand || '').toLowerCase();
         return searchTokens.every(t => {
             const padded = /^\d+$/.test(t) ? t.padStart(5, '0') : t;
-            return name.includes(t) || code.includes(t) || code.includes(padded) || brand.includes(t);
+            return name.includes(t) || code.includes(t) || code.includes(padded) || barcode.includes(t) || brand.includes(t);
         });
     });
 

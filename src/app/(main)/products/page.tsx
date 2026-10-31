@@ -44,6 +44,7 @@ export default async function ProductsPage({ searchParams }: Props) {
                             { name: { contains: token, mode: 'insensitive' as const } },
                             { code: { contains: token, mode: 'insensitive' as const } },
                             ...(paddedToken !== token ? [{ code: { contains: paddedToken, mode: 'insensitive' as const } }] : []),
+                            { barcode: { contains: token, mode: 'insensitive' as const } },
                             { brand: { contains: token, mode: 'insensitive' as const } },
                             { packaging: { contains: token, mode: 'insensitive' as const } },
                             { description: { contains: token, mode: 'insensitive' as const } },
@@ -158,7 +159,14 @@ export default async function ProductsPage({ searchParams }: Props) {
                                     return (
                                         <tr key={product.id} className="hover:bg-gray-50">
                                             <td className="px-4 py-3 text-sm font-mono text-gray-600">
-                                                <Link href={`/products/${product.id}`} className="hover:text-emerald-600">{product.code}</Link>
+                                                <Link href={`/products/${product.id}`} className="hover:text-emerald-600 font-medium block">
+                                                    {product.code}
+                                                </Link>
+                                                {product.barcode && (
+                                                    <span className="text-[11px] text-gray-400 block font-mono" title="บาร์โค้ด">
+                                                        🏷️ {product.barcode}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <Link href={`/products/${product.id}`}>

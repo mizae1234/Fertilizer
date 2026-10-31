@@ -21,6 +21,7 @@ export async function GET(request: Request) {
             const padded = /^\d+$/.test(trimmed) ? trimmed.padStart(5, '0') : trimmed;
             where.OR = [
                 { code: { equals: trimmed, mode: 'insensitive' } },
+                { barcode: { equals: trimmed, mode: 'insensitive' } },
                 ...(padded !== trimmed ? [{ code: { equals: padded, mode: 'insensitive' } }] : []),
             ];
         } else if (search) {
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
                             { name: { contains: token, mode: 'insensitive' } },
                             { code: { contains: token, mode: 'insensitive' } },
                             ...(paddedToken !== token ? [{ code: { contains: paddedToken, mode: 'insensitive' } }] : []),
+                            { barcode: { contains: token, mode: 'insensitive' } },
                             { brand: { contains: token, mode: 'insensitive' } },
                             { packaging: { contains: token, mode: 'insensitive' } },
                             { description: { contains: token, mode: 'insensitive' } },
@@ -46,7 +48,7 @@ export async function GET(request: Request) {
         const products = await prisma.product.findMany({
             where,
             select: {
-                id: true, code: true, name: true, price: true, cost: true, unit: true,
+                id: true, code: true, barcode: true, name: true, price: true, cost: true, unit: true,
                 description: true, brand: true, packaging: true,
                 imageUrl: true, pointsPerUnit: true, minStock: true,
                 productGroup: { select: { id: true, name: true } },
