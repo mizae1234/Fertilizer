@@ -71,6 +71,8 @@ export async function createGoodsReceive(data: {
         quantity: number;
         unitCost: number;
         lotNo?: string;
+        mfgDate?: string | Date | null;
+        expDate?: string | Date | null;
     }[];
     userId: string;
 }) {
@@ -104,6 +106,8 @@ export async function createGoodsReceive(data: {
                     unitCost: item.unitCost,
                     totalCost: item.quantity * item.unitCost,
                     lotNo: item.lotNo || null,
+                    mfgDate: item.mfgDate ? new Date(item.mfgDate) : null,
+                    expDate: item.expDate ? new Date(item.expDate) : null,
                 })),
             },
         },
@@ -124,6 +128,8 @@ export async function updateGoodsReceive(id: string, data: {
         quantity: number;
         unitCost: number;
         lotNo?: string;
+        mfgDate?: string | Date | null;
+        expDate?: string | Date | null;
     }[];
 }) {
     await checkGoodsReceiveAccess(false);
@@ -157,6 +163,8 @@ export async function updateGoodsReceive(id: string, data: {
                         unitCost: item.unitCost,
                         totalCost: item.quantity * item.unitCost,
                         lotNo: item.lotNo || null,
+                        mfgDate: item.mfgDate ? new Date(item.mfgDate) : null,
+                        expDate: item.expDate ? new Date(item.expDate) : null,
                     })),
                 },
             },
@@ -275,6 +283,17 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     notes: `รับสินค้าจาก GR ${gr.grNumber}`,
                 },
             });
+
+            // If GR item has mfgDate or expDate, update product record
+            if (item.mfgDate || item.expDate) {
+                const dateUpdates: Record<string, any> = {};
+                if (item.mfgDate) dateUpdates.mfgDate = item.mfgDate;
+                if (item.expDate) dateUpdates.expDate = item.expDate;
+                await tx.product.update({
+                    where: { id: item.productId },
+                    data: dateUpdates,
+                });
+            }
         }));
 
         // Update product.cost based on costMethod for each product

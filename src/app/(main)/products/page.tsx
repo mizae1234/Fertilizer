@@ -174,6 +174,18 @@ export default async function ProductsPage({ searchParams }: Props) {
                                                     {product.description && (
                                                         <p className="text-xs text-gray-400 truncate max-w-[200px]">{product.description}</p>
                                                     )}
+                                                    {product.expDate && (
+                                                        <span className={`inline-block mt-0.5 text-[11px] px-1.5 py-0.5 rounded font-medium ${
+                                                            new Date(product.expDate) < new Date()
+                                                                ? 'bg-red-50 text-red-600'
+                                                                : new Date(product.expDate).getTime() - Date.now() < 30 * 24 * 3600 * 1000
+                                                                    ? 'bg-amber-50 text-amber-700'
+                                                                    : 'bg-gray-100 text-gray-500'
+                                                        }`}>
+                                                            {new Date(product.expDate) < new Date() ? '⚠️ หมดอายุ: ' : '⏳ หมดอายุ: '}
+                                                            {new Date(product.expDate).toLocaleDateString('th-TH')}
+                                                        </span>
+                                                    )}
                                                 </Link>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-600">

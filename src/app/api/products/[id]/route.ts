@@ -176,7 +176,8 @@ export async function PATCH(
     // Only allow known Product scalar fields
     const allowedFields = [
         'name', 'description', 'unit', 'cost', 'costMethod', 'price', 'brand',
-        'packaging', 'productGroupId', 'pointsPerUnit', 'minStock', 'isActive', 'code', 'barcode', 'imageUrl'
+        'packaging', 'productGroupId', 'pointsPerUnit', 'minStock', 'isActive', 'code', 'barcode', 'imageUrl',
+        'mfgDate', 'expDate'
     ];
     const user = await getServerUser();
     const isStaff = user?.role === 'STAFF';
@@ -187,6 +188,8 @@ export async function PATCH(
         if (key in body) {
             if (key === 'barcode') {
                 data.barcode = body.barcode ? (String(body.barcode).trim() || null) : null;
+            } else if (key === 'mfgDate' || key === 'expDate') {
+                data[key] = body[key] ? new Date(body[key]) : null;
             } else {
                 data[key] = body[key];
             }
@@ -245,6 +248,7 @@ export async function PATCH(
             packaging: 'บรรจุภัณฑ์', productGroupId: 'กลุ่มสินค้า',
             pointsPerUnit: 'แต้มต่อหน่วย', minStock: 'สต็อกขั้นต่ำ',
             isActive: 'สถานะ', description: 'คำอธิบาย', imageUrl: 'รูปภาพ',
+            mfgDate: 'วันผลิต', expDate: 'วันหมดอายุ',
         };
         const logEntries: { field: string; oldValue: string; newValue: string; details: string }[] = [];
         for (const key of Object.keys(data)) {

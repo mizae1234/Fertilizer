@@ -20,6 +20,8 @@ interface GoodsReceiveData {
         unitCost: number | string;
         totalCost: number | string;
         lotNo: string | null;
+        mfgDate?: string | null;
+        expDate?: string | null;
         product: { name: string; code: string; unit: string };
         warehouse: { name: string };
     }[];
@@ -97,7 +99,7 @@ export default function PrintGoodsReceiveButton({ id }: { id: string }) {
                 <th style="width:90px;">รหัส</th>
                 <th>ชื่อสินค้า</th>
                 <th style="width:80px;">คลัง</th>
-                <th style="width:70px;">Lot No.</th>
+                <th style="width:90px;">Lot / หมดอายุ</th>
                 <th style="width:80px;" class="center">จำนวน</th>
                 ${!isStaff ? `<th style="width:80px;" class="right">ต้นทุน/หน่วย</th>` : ''}
                 ${!isStaff ? `<th style="width:90px;" class="right">รวม</th>` : ''}
@@ -110,7 +112,11 @@ export default function PrintGoodsReceiveButton({ id }: { id: string }) {
                 <td>${item.product.code}</td>
                 <td>${item.product.name}</td>
                 <td>${item.warehouse.name}</td>
-                <td>${item.lotNo || '-'}</td>
+                <td>
+                    ${item.lotNo ? `<div>${item.lotNo}</div>` : ''}
+                    ${item.expDate ? `<div style="font-size:10px;color:#666;">EXP: ${new Date(item.expDate).toLocaleDateString('th-TH')}</div>` : ''}
+                    ${!item.lotNo && !item.expDate ? '-' : ''}
+                </td>
                 <td class="center">${item.quantity} ${item.product.unit}</td>
                 ${!isStaff ? `<td class="right">${formatCurrency(Number(item.unitCost))}</td>` : ''}
                 ${!isStaff ? `<td class="right font-semibold">${formatCurrency(Number(item.totalCost))}</td>` : ''}

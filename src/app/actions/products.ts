@@ -66,6 +66,8 @@ export async function createProduct(data: {
     pointsPerUnit?: number;
     minStock?: number;
     imageUrl?: string;
+    mfgDate?: string | Date | null;
+    expDate?: string | Date | null;
     prices?: { customerGroupId: string; price: number }[];
     units?: { unitName: string; conversionRate: number; sellingPrice: number; isBaseUnit: boolean }[];
 }) {
@@ -118,6 +120,8 @@ export async function createProduct(data: {
             pointsPerUnit: data.pointsPerUnit || 0,
             minStock: data.minStock || 10,
             imageUrl: data.imageUrl || null,
+            mfgDate: data.mfgDate ? new Date(data.mfgDate) : null,
+            expDate: data.expDate ? new Date(data.expDate) : null,
             productPrices: data.prices
                 ? {
                     create: data.prices.map((p) => ({
@@ -157,6 +161,8 @@ export async function updateProduct(
         productGroupId?: string | null;
         pointsPerUnit?: number;
         minStock?: number;
+        mfgDate?: string | Date | null;
+        expDate?: string | Date | null;
         prices?: { customerGroupId: string; price: number }[];
     }
 ) {
@@ -189,6 +195,8 @@ export async function updateProduct(
                 productGroupId: data.productGroupId,
                 pointsPerUnit: data.pointsPerUnit,
                 minStock: data.minStock,
+                ...(data.mfgDate !== undefined ? { mfgDate: data.mfgDate ? new Date(data.mfgDate) : null } : {}),
+                ...(data.expDate !== undefined ? { expDate: data.expDate ? new Date(data.expDate) : null } : {}),
             },
         });
 

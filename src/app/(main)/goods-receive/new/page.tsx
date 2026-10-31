@@ -17,6 +17,8 @@ interface LineItem {
     quantity: number;
     unitCost: number;
     lotNo: string;
+    mfgDate?: string;
+    expDate?: string;
 }
 
 // ── Searchable Product Picker ─────────────────────────────
@@ -163,6 +165,7 @@ export default function NewGoodsReceivePage() {
         setItems([...items, {
             productId: '', productName: '', productCode: '',
             warehouseId: defaultWarehouseId, quantity: 1, unitCost: 0, lotNo: '',
+            mfgDate: '', expDate: '',
         }]);
     };
 
@@ -212,6 +215,8 @@ export default function NewGoodsReceivePage() {
                     quantity: i.quantity,
                     unitCost: i.unitCost,
                     lotNo: i.lotNo || undefined,
+                    mfgDate: i.mfgDate || undefined,
+                    expDate: i.expDate || undefined,
                 })),
                 userId: payload.userId,
             });
@@ -351,74 +356,106 @@ export default function NewGoodsReceivePage() {
                             {items.map((item, idx) => {
                                 const isCustomWarehouse = item.warehouseId !== defaultWarehouseId;
                                 return (
-                                    <div key={idx} className="p-3 sm:p-4 bg-gray-50 rounded-xl">
-                                        {/* ─── Desktop: single row ─── */}
-                                        <div className="hidden sm:flex items-end gap-2">
-                                            <div className="flex-1 min-w-0">
-                                                <label className="block text-xs text-gray-500 mb-1">สินค้า</label>
-                                                <ProductPicker
-                                                    products={availableProducts(item.productId)}
-                                                    value={item.productId}
-                                                    onChange={(pid, product) => handleProductSelect(idx, pid, product)}
-                                                />
-                                            </div>
-                                            <div className="w-24 shrink-0">
-                                                <label className="block text-xs text-gray-500 mb-1">จำนวน</label>
-                                                <input
-                                                    type="number"
-                                                    value={item.quantity}
-                                                    onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
-                                                    onFocus={(e) => e.target.select()}
-                                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
-                                                    min="1"
-                                                    required
-                                                />
-                                            </div>
-                                            {user?.role === 'ADMIN' && (
-                                                <div className="w-28 shrink-0">
-                                                    <label className="block text-xs text-gray-500 mb-1">ต้นทุน/หน่วย</label>
+                                    <div key={idx} className="p-3 sm:p-4 bg-gray-50 rounded-xl space-y-2.5">
+                                        {/* ─── Desktop: clean 2-level row ─── */}
+                                        <div className="hidden sm:block space-y-2">
+                                            <div className="flex items-end gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <label className="block text-xs text-gray-500 mb-1">สินค้า</label>
+                                                    <ProductPicker
+                                                        products={availableProducts(item.productId)}
+                                                        value={item.productId}
+                                                        onChange={(pid, product) => handleProductSelect(idx, pid, product)}
+                                                    />
+                                                </div>
+                                                <div className="w-24 shrink-0">
+                                                    <label className="block text-xs text-gray-500 mb-1">จำนวน</label>
                                                     <input
                                                         type="number"
-                                                        value={item.unitCost}
-                                                        onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
+                                                        value={item.quantity}
+                                                        onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
                                                         onFocus={(e) => e.target.select()}
                                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
-                                                        min="0"
-                                                        step="0.01"
+                                                        min="1"
                                                         required
                                                     />
                                                 </div>
-                                            )}
-                                            <div className="w-36 shrink-0">
-                                                <label className="block text-xs text-gray-500 mb-1">เข้าคลัง</label>
-                                                <select
-                                                    value={item.warehouseId}
-                                                    onChange={(e) => updateItem(idx, 'warehouseId', e.target.value)}
-                                                    className={`w-full px-2 py-2 rounded-lg border text-sm bg-white ${isCustomWarehouse
-                                                        ? 'border-orange-300 text-orange-700 font-medium'
-                                                        : 'border-gray-200 text-gray-600'
-                                                        }`}
-                                                >
-                                                    {warehouses.map(w => (
-                                                        <option key={w.id} value={w.id}>{w.name}</option>
-                                                    ))}
-                                                </select>
+                                                {user?.role === 'ADMIN' && (
+                                                    <div className="w-28 shrink-0">
+                                                        <label className="block text-xs text-gray-500 mb-1">ต้นทุน/หน่วย</label>
+                                                        <input
+                                                            type="number"
+                                                            value={item.unitCost}
+                                                            onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
+                                                            onFocus={(e) => e.target.select()}
+                                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
+                                                            min="0"
+                                                            step="0.01"
+                                                            required
+                                                        />
+                                                    </div>
+                                                )}
+                                                <div className="w-36 shrink-0">
+                                                    <label className="block text-xs text-gray-500 mb-1">เข้าคลัง</label>
+                                                    <select
+                                                        value={item.warehouseId}
+                                                        onChange={(e) => updateItem(idx, 'warehouseId', e.target.value)}
+                                                        className={`w-full px-2 py-2 rounded-lg border text-sm bg-white ${isCustomWarehouse
+                                                            ? 'border-orange-300 text-orange-700 font-medium'
+                                                            : 'border-gray-200 text-gray-600'
+                                                            }`}
+                                                    >
+                                                        {warehouses.map(w => (
+                                                            <option key={w.id} value={w.id}>{w.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <button type="button" onClick={() => removeItem(idx)}
+                                                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg shrink-0 mb-0.5"
+                                                    title="ลบรายการ">
+                                                    🗑️
+                                                </button>
                                             </div>
-                                            <div className="w-28 shrink-0">
-                                                <label className="block text-xs text-gray-500 mb-1">Lot No.</label>
-                                                <input
-                                                    type="text"
-                                                    value={item.lotNo}
-                                                    onChange={(e) => updateItem(idx, 'lotNo', e.target.value)}
-                                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
-                                                    placeholder="LOT-xxx"
-                                                />
+
+                                            {/* Secondary info row: Lot No., วันผลิต, วันหมดอายุ */}
+                                            <div className="flex items-center gap-3 pt-1 border-t border-gray-200/50 text-xs">
+                                                <div className="flex items-center gap-1.5 w-40">
+                                                    <span className="shrink-0 text-gray-400 font-medium">Lot:</span>
+                                                    <input
+                                                        type="text"
+                                                        value={item.lotNo}
+                                                        onChange={(e) => updateItem(idx, 'lotNo', e.target.value)}
+                                                        className="w-full px-2 py-1 rounded-md border border-gray-200 text-xs bg-white"
+                                                        placeholder="LOT-xxx"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-1.5 w-48">
+                                                    <span className="shrink-0 text-gray-500 font-medium">📅 วันผลิต:</span>
+                                                    <input
+                                                        type="date"
+                                                        value={item.mfgDate || ''}
+                                                        onChange={(e) => updateItem(idx, 'mfgDate', e.target.value)}
+                                                        className="w-full px-2 py-1 rounded-md border border-gray-200 text-xs bg-white text-gray-700"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-1.5 w-48">
+                                                    <span className="shrink-0 text-gray-500 font-medium">⏳ วันหมดอายุ:</span>
+                                                    <input
+                                                        type="date"
+                                                        value={item.expDate || ''}
+                                                        onChange={(e) => updateItem(idx, 'expDate', e.target.value)}
+                                                        className="w-full px-2 py-1 rounded-md border border-gray-200 text-xs bg-white text-gray-700"
+                                                    />
+                                                </div>
+                                                {user?.role === 'ADMIN' && item.quantity > 0 && item.unitCost > 0 && (
+                                                    <div className="ml-auto text-right">
+                                                        <span className="text-gray-400">รวม: </span>
+                                                        <span className="font-semibold text-gray-800">
+                                                            {(item.quantity * item.unitCost).toLocaleString('th-TH', { style: 'currency', currency: 'THB' })}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <button type="button" onClick={() => removeItem(idx)}
-                                                className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg shrink-0 mb-0.5"
-                                                title="ลบรายการ">
-                                                🗑️
-                                            </button>
                                         </div>
 
                                         {/* ─── Mobile: stacked ─── */}
@@ -499,17 +536,35 @@ export default function NewGoodsReceivePage() {
                                                     placeholder="LOT-xxx"
                                                 />
                                             </div>
-                                        </div>
-
-                                        {/* Item subtotal (both) */}
-                                        {user?.role === 'ADMIN' && item.quantity > 0 && item.unitCost > 0 && (
-                                            <div className="mt-2 pt-2 border-t border-gray-200/50 text-right">
-                                                <span className="text-xs text-gray-400">รวม: </span>
-                                                <span className="text-sm font-semibold text-gray-700">
-                                                    {(item.quantity * item.unitCost).toLocaleString('th-TH', { style: 'currency', currency: 'THB' })}
-                                                </span>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="block text-xs text-gray-500 mb-1">📅 วันผลิต</label>
+                                                    <input
+                                                        type="date"
+                                                        value={item.mfgDate || ''}
+                                                        onChange={(e) => updateItem(idx, 'mfgDate', e.target.value)}
+                                                        className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white text-gray-700"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-500 mb-1">⏳ วันหมดอายุ</label>
+                                                    <input
+                                                        type="date"
+                                                        value={item.expDate || ''}
+                                                        onChange={(e) => updateItem(idx, 'expDate', e.target.value)}
+                                                        className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white text-gray-700"
+                                                    />
+                                                </div>
                                             </div>
-                                        )}
+                                            {user?.role === 'ADMIN' && item.quantity > 0 && item.unitCost > 0 && (
+                                                <div className="mt-2 pt-2 border-t border-gray-200/50 text-right">
+                                                    <span className="text-xs text-gray-400">รวม: </span>
+                                                    <span className="text-sm font-semibold text-gray-700">
+                                                        {(item.quantity * item.unitCost).toLocaleString('th-TH', { style: 'currency', currency: 'THB' })}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}

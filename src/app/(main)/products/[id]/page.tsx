@@ -80,6 +80,8 @@ interface ProductDetail {
     pointsPerUnit: number;
     minStock: number;
     isActive: boolean;
+    mfgDate: string | null;
+    expDate: string | null;
     createdAt: string;
     productStocks: ProductStock[];
     productPrices: ProductPrice[];
@@ -140,7 +142,7 @@ export default function ProductDetailPage() {
     const [unitValue, setUnitValue] = useState('');
 
     // Product info editing
-    const [infoForm, setInfoForm] = useState({ code: '', barcode: '', name: '', description: '', brand: '', packaging: '', productGroupId: '', minStock: 10 });
+    const [infoForm, setInfoForm] = useState({ code: '', barcode: '', name: '', description: '', brand: '', packaging: '', productGroupId: '', minStock: 10, mfgDate: '', expDate: '' });
     const [savingInfo, setSavingInfo] = useState(false);
     const [productGroups, setProductGroups] = useState<{ id: string; name: string }[]>([]);
     const [brands, setBrands] = useState<string[]>([]);
@@ -219,6 +221,8 @@ export default function ProductDetailPage() {
                 packaging: product.packaging || '',
                 productGroupId: product.productGroupId || '',
                 minStock: product.minStock,
+                mfgDate: product.mfgDate ? product.mfgDate.slice(0, 10) : '',
+                expDate: product.expDate ? product.expDate.slice(0, 10) : '',
             });
             setSellingPriceValue(String(Number(product.price)));
             setPointsValue(String(product.pointsPerUnit));
@@ -408,8 +412,22 @@ export default function ProductDetailPage() {
                 กลับรายการสินค้า
             </button>
 
-            <div className="flex items-center justify-between mb-4">
-                <h1 className="text-xl font-bold text-gray-800">📦 {product.name}</h1>
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-xl font-bold text-gray-800">📦 {product.name}</h1>
+                    {product.expDate && (
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                            new Date(product.expDate) < new Date()
+                                ? 'bg-red-100 text-red-700'
+                                : new Date(product.expDate).getTime() - Date.now() < 30 * 24 * 3600 * 1000
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                            {new Date(product.expDate) < new Date() ? '⚠️ หมดอายุแล้ว: ' : '⏳ หมดอายุ: '}
+                            {formatDate(product.expDate)}
+                        </span>
+                    )}
+                </div>
                 <div className="flex items-center gap-2">
                     <Link
                         href={`/products/barcodes?productId=${product.id}`}
@@ -595,6 +613,27 @@ export default function ProductDetailPage() {
                     </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">📅 วันผลิต (MFG Date)</label>
+                        <input
+                            type="date"
+                            value={infoForm.mfgDate || ''}
+                            onChange={e => setInfoForm({ ...infoForm, mfgDate: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm bg-white text-gray-700"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">⏳ วันหมดอายุ (EXP Date)</label>
+                        <input
+                            type="date"
+                            value={infoForm.expDate || ''}
+                            onChange={e => setInfoForm({ ...infoForm, expDate: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm bg-white text-gray-700"
+                        />
+                    </div>
+                </div>
+
                 {/* Save Button */}
                 <button onClick={async () => {
                     if (!infoForm.code.trim()) { showAlert('กรุณาระบุรหัสสินค้า', 'error', 'ผิดพลาด'); return; }
@@ -617,6 +656,8 @@ export default function ProductDetailPage() {
                             unit: unitValue || product.unit,
                             pointsPerUnit: parseInt(pointsValue) || 0,
                             minStock: infoForm.minStock,
+                            mfgDate: infoForm.mfgDate ? infoForm.mfgDate : null,
+                            expDate: infoForm.expDate ? infoForm.expDate : null,
                         };
                         if (user?.role === 'ADMIN') {
                             updateData.cost = costVal;

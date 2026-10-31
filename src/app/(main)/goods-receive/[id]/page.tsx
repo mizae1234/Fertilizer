@@ -25,6 +25,8 @@ interface GRItem {
     quantity: number;
     unitCost: number;
     lotNo: string;
+    mfgDate?: string;
+    expDate?: string;
 }
 
 interface GRDetail {
@@ -50,6 +52,8 @@ interface GRDetail {
         unitCost: number | string;
         totalCost: number | string;
         lotNo: string | null;
+        mfgDate?: string | null;
+        expDate?: string | null;
         product: { name: string; code: string; unit: string; costMethod?: string | null };
         warehouse: { name: string };
     }[];
@@ -209,6 +213,8 @@ export default function GoodsReceiveDetailPage() {
                     quantity: item.quantity,
                     unitCost: Number(item.unitCost),
                     lotNo: item.lotNo || '',
+                    mfgDate: item.mfgDate ? new Date(item.mfgDate).toISOString().split('T')[0] : '',
+                    expDate: item.expDate ? new Date(item.expDate).toISOString().split('T')[0] : '',
                 })));
                 setGoodsPaid(data.goodsPaid || false);
                 setShippingPaid(data.shippingPaid || false);
@@ -234,7 +240,7 @@ export default function GoodsReceiveDetailPage() {
 
     // Item helpers
     const addItem = () => {
-        setItems([...items, { productId: '', productName: '', productCode: '', productUnit: '', warehouseId: warehouses[0]?.id || '', warehouseName: warehouses[0]?.name || '', quantity: 1, unitCost: 0, lotNo: '' }]);
+        setItems([...items, { productId: '', productName: '', productCode: '', productUnit: '', warehouseId: warehouses[0]?.id || '', warehouseName: warehouses[0]?.name || '', quantity: 1, unitCost: 0, lotNo: '', mfgDate: '', expDate: '' }]);
     };
 
     const removeItem = (idx: number) => {
@@ -276,6 +282,8 @@ export default function GoodsReceiveDetailPage() {
                     quantity: i.quantity,
                     unitCost: i.unitCost,
                     lotNo: i.lotNo || undefined,
+                    mfgDate: i.mfgDate || undefined,
+                    expDate: i.expDate || undefined,
                 })),
             });
             if (updated) {
@@ -570,6 +578,24 @@ export default function GoodsReceiveDetailPage() {
                                             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                         />
                                     </div>
+                                    {/* MFG Date */}
+                                    <div className="w-36 lg:w-auto lg:flex-[1.5]">
+                                        <label className="text-xs text-gray-400 mb-1 block">📅 วันผลิต</label>
+                                        <input
+                                            type="date" value={item.mfgDate || ''}
+                                            onChange={e => updateItem(idx, 'mfgDate', e.target.value)}
+                                            className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-gray-700"
+                                        />
+                                    </div>
+                                    {/* EXP Date */}
+                                    <div className="w-36 lg:w-auto lg:flex-[1.5]">
+                                        <label className="text-xs text-gray-400 mb-1 block">⏳ วันหมดอายุ</label>
+                                        <input
+                                            type="date" value={item.expDate || ''}
+                                            onChange={e => updateItem(idx, 'expDate', e.target.value)}
+                                            className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-gray-700"
+                                        />
+                                    </div>
                                     {/* Cost Method */}
                                     {user?.role === 'ADMIN' && (
                                         <div className="w-32 lg:w-auto lg:flex-[1.5]">
@@ -628,6 +654,8 @@ export default function GoodsReceiveDetailPage() {
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">สินค้า</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Lot No.</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">วันผลิต</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">วันหมดอายุ</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
                                     {user?.role === 'ADMIN' && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">ต้นทุน/หน่วย</th>}
                                     {user?.role === 'ADMIN' && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">รวม</th>}
@@ -642,6 +670,14 @@ export default function GoodsReceiveDetailPage() {
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-600">{item.warehouse.name}</td>
                                         <td className="px-4 py-3 text-sm text-gray-600">{item.lotNo || '-'}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-600">{item.mfgDate ? formatDate(item.mfgDate) : '-'}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-600">
+                                            {item.expDate ? (
+                                                <span className={new Date(item.expDate) < new Date() ? 'text-red-600 font-semibold' : ''}>
+                                                    {formatDate(item.expDate)}
+                                                </span>
+                                            ) : '-'}
+                                        </td>
                                         <td className="px-4 py-3 text-sm text-gray-800 text-right">{item.quantity} {item.product.unit}</td>
                                         {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitCost))}</td>}
                                         {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(item.totalCost))}</td>}
@@ -656,7 +692,12 @@ export default function GoodsReceiveDetailPage() {
                                     <div className="flex justify-between items-start mb-1">
                                         <div>
                                             <p className="text-sm font-medium text-gray-800">{item.product.name}</p>
-                                            <p className="text-xs text-gray-400">{item.product.code} · {item.warehouse.name}{item.lotNo ? ` · Lot: ${item.lotNo}` : ''}</p>
+                                            <p className="text-xs text-gray-400">
+                                                {item.product.code} · {item.warehouse.name}
+                                                {item.lotNo ? ` · Lot: ${item.lotNo}` : ''}
+                                                {item.mfgDate ? ` · ผลิต: ${formatDate(item.mfgDate)}` : ''}
+                                                {item.expDate ? ` · หมดอายุ: ${formatDate(item.expDate)}` : ''}
+                                            </p>
                                         </div>
                                         {user?.role === 'ADMIN' && <p className="text-sm font-bold text-gray-800">{formatCurrency(Number(item.totalCost))}</p>}
                                     </div>

@@ -135,6 +135,8 @@ model Product {
   minStock       Int       @default(10)
   imageUrl       String?
   isActive       Boolean   @default(true)
+  mfgDate        DateTime?
+  expDate        DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
@@ -311,6 +313,8 @@ model GoodsReceiveItem {
   unitCost       Decimal @db.Decimal(12, 2)
   totalCost      Decimal @db.Decimal(12, 2)
   lotNo          String?
+  mfgDate        DateTime?
+  expDate        DateTime?
 
   goodsReceive GoodsReceive @relation(fields: [goodsReceiveId], references: [id], onDelete: Cascade)
   product      Product      @relation(fields: [productId], references: [id])

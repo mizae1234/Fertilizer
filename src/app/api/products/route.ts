@@ -51,6 +51,7 @@ export async function GET(request: Request) {
                 id: true, code: true, barcode: true, name: true, price: true, cost: true, unit: true,
                 description: true, brand: true, packaging: true,
                 imageUrl: true, pointsPerUnit: true, minStock: true,
+                mfgDate: true, expDate: true,
                 productGroup: { select: { id: true, name: true } },
                 productStocks: warehouseId
                     ? { where: { warehouseId, warehouse: { deletedAt: null, isActive: true } }, select: { warehouseId: true, quantity: true } }
