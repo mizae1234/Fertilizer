@@ -55,7 +55,7 @@ function ProductSearchSelect({ products, value, onChange }: {
     });
 
     return (
-        <div ref={ref} className="relative">
+        <div ref={ref} className={`relative ${open ? 'z-50' : ''}`}>
             <input
                 type="text"
                 value={open ? search : (selected ? `${selected.code} - ${selected.name}` : '')}

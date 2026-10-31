@@ -92,7 +92,7 @@ function GRProductPicker({
     const selected = products.find(p => p.id === value);
 
     return (
-        <div ref={ref} className="relative">
+        <div ref={ref} className={`relative ${open ? 'z-50' : ''}`}>
             <button
                 type="button"
                 onClick={() => { setOpen(!open); setSearch(''); }}
@@ -501,8 +501,8 @@ export default function GoodsReceiveDetailPage() {
             </div>
 
             {/* Items Section */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden mb-4 sm:mb-6">
-                <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-100">
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 mb-4 sm:mb-6 relative z-10">
+                <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-100 rounded-t-xl">
                     <h2 className="text-sm font-semibold text-gray-700">รายการสินค้า ({items.length})</h2>
                     {isPending && (
                         <button onClick={addItem} className="text-xs font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
@@ -672,7 +672,7 @@ export default function GoodsReceiveDetailPage() {
 
                 {/* Total */}
                 {user?.role === 'ADMIN' && (
-                    <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-3 flex justify-between items-center">
+                    <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-3 flex justify-between items-center rounded-b-xl">
                         <span className="text-sm font-semibold text-gray-600">มูลค่ารวม</span>
                         <span className="text-lg font-bold text-emerald-600">{formatCurrency(isPending ? total : Number(gr.totalAmount))}</span>
                     </div>

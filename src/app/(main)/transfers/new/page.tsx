@@ -91,7 +91,7 @@ export default function NewTransferPage() {
                             const selectedProduct = products.find(p => p.id === item.productId);
                             return (
                                 <div key={idx} className="flex items-end gap-3 p-3 bg-gray-50 rounded-xl">
-                                    <div className="flex-1 relative">
+                                    <div className={`flex-1 relative ${activeSearchIdx === idx ? 'z-30' : ''}`}>
                                         <label className="block text-xs text-gray-500 mb-1">สินค้า</label>
                                         {selectedProduct ? (
                                             <div className="flex items-center gap-2">
@@ -113,7 +113,7 @@ export default function NewTransferPage() {
                                                     className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                                                 />
                                                 {activeSearchIdx === idx && (itemSearch[idx] || '') !== '' && (
-                                                    <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                                                         {(() => {
                                                             const tokens = (itemSearch[idx] || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
                                                             const matches = products.filter(p => {

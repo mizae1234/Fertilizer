@@ -58,7 +58,7 @@ function ProductPicker({
     const selected = products.find(p => p.id === value);
 
     return (
-        <div ref={ref} className="relative">
+        <div ref={ref} className={`relative ${open ? 'z-50' : ''}`}>
             <button
                 type="button"
                 onClick={() => { setOpen(!open); setSearch(''); }}
@@ -324,7 +324,7 @@ export default function NewGoodsReceivePage() {
                 </div>
 
                 {/* Items */}
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6">
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 relative z-10">
                     <div className="flex items-center justify-between mb-3 sm:mb-4">
                         <div>
                             <h2 className="text-sm font-semibold text-gray-700">รายการสินค้า</h2>

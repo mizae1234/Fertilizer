@@ -119,7 +119,7 @@ function SaleItemProductPicker({
     const selected = products.find(p => p.id === value);
 
     return (
-        <div ref={ref} className="relative">
+        <div ref={ref} className={`relative ${open ? 'z-50' : ''}`}>
             <button
                 type="button"
                 onClick={() => { setOpen(!open); setSearch(''); }}
@@ -617,8 +617,8 @@ export default function SaleDetailPage() {
             </div>
 
             {/* Items */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden mb-6">
-                <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 mb-6 relative z-10">
+                <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between rounded-t-xl">
                     <h2 className="font-semibold text-gray-800">รายการสินค้า ({isEditing ? items.length : sale.items.length} รายการ)</h2>
                     {isEditing && (
                         <button onClick={addItem} className="text-xs text-emerald-600 font-medium hover:underline">+ เพิ่มรายการ</button>
