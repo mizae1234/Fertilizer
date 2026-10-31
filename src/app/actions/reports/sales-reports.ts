@@ -18,7 +18,7 @@ export async function getSalesOverview(dateFrom?: string, dateTo?: string) {
         ...(dateRange ? { createdAt: dateRange } : {}),
     };
 
-    const [totalSales, salesByWarehouse, dailySales] = await Promise.all([
+    const [totalSales, salesByWarehouse, dailySales, paymentSales] = await Promise.all([
         prisma.sale.aggregate({
             where,
             _sum: { totalAmount: true },
@@ -45,7 +45,50 @@ export async function getSalesOverview(dateFrom?: string, dateTo?: string) {
             GROUP BY DATE("createdAt")
             ORDER BY date ASC
         `),
+
+        prisma.sale.findMany({
+            where,
+            select: {
+                totalAmount: true,
+                paymentMethod: true,
+                payments: true,
+            },
+        }),
     ]);
+
+    let cashTotal = 0, cashCount = 0;
+    let transferTotal = 0, transferCount = 0;
+    let chequeTotal = 0, chequeCount = 0;
+    let creditTotal = 0, creditCount = 0;
+
+    for (const sale of paymentSales) {
+        const amt = Number(sale.totalAmount);
+        if (sale.payments && typeof sale.payments === 'object' && Array.isArray(sale.payments)) {
+            let hasCash = false, hasTransfer = false, hasCheque = false, hasCredit = false;
+            for (const p of sale.payments as { method: string; amount: number }[]) {
+                const pAmt = Number(p.amount);
+                switch (p.method) {
+                    case 'CASH': cashTotal += pAmt; hasCash = true; break;
+                    case 'TRANSFER': transferTotal += pAmt; hasTransfer = true; break;
+                    case 'CHEQUE': chequeTotal += pAmt; hasCheque = true; break;
+                    case 'CREDIT': creditTotal += pAmt; hasCredit = true; break;
+                    default: cashTotal += pAmt; hasCash = true;
+                }
+            }
+            if (hasCash) cashCount++;
+            if (hasTransfer) transferCount++;
+            if (hasCheque) chequeCount++;
+            if (hasCredit) creditCount++;
+        } else {
+            switch (sale.paymentMethod) {
+                case 'CASH': cashTotal += amt; cashCount++; break;
+                case 'TRANSFER': transferTotal += amt; transferCount++; break;
+                case 'CHEQUE': chequeTotal += amt; chequeCount++; break;
+                case 'CREDIT': creditTotal += amt; creditCount++; break;
+                default: cashTotal += amt; cashCount++;
+            }
+        }
+    }
 
     const warehouseIds = salesByWarehouse.map(s => s.warehouseId);
     const warehouses = warehouseIds.length > 0
@@ -65,6 +108,12 @@ export async function getSalesOverview(dateFrom?: string, dateTo?: string) {
             totalAmount: Number(s._sum.totalPrice || 0),
             count: s._count,
         })),
+        byPaymentMethod: {
+            cash: { total: cashTotal, count: cashCount },
+            transfer: { total: transferTotal, count: transferCount },
+            cheque: { total: chequeTotal, count: chequeCount },
+            credit: { total: creditTotal, count: creditCount },
+        },
         dailySales: dailySales.map(d => ({
             date: new Date(d.date).toISOString().split('T')[0],
             total: Number(d.total),

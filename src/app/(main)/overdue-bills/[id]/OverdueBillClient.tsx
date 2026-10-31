@@ -59,10 +59,10 @@ function AlertModal({ open, onClose, message, type, title }: { open: boolean; on
 // ─── Debt Payment Modal ───
 function DebtPaymentModal({ total, loading, onConfirm, onClose }: {
     total: number; loading: boolean;
-    onConfirm: (payments: { method: string; amount: number; dueDate?: string }[]) => void;
+    onConfirm: (payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string; chequeNo?: string }[]) => void;
     onClose: () => void;
 }) {
-    const [lines, setLines] = useState([{ method: 'CASH', amount: total, dueDate: '', bankAccountId: '' }]);
+    const [lines, setLines] = useState([{ method: 'CASH', amount: total, dueDate: '', bankAccountId: '', chequeNo: '' }]);
     const [bankAccounts, setBankAccounts] = useState<BankAccountInfo[]>([]);
 
     useEffect(() => {
@@ -82,12 +82,12 @@ function DebtPaymentModal({ total, loading, onConfirm, onClose }: {
     };
     const removeLine = (idx: number) => {
         const newLines = lines.filter((_, i) => i !== idx);
-        setLines(newLines.length === 0 ? [{ method: 'CASH', amount: total, dueDate: '', bankAccountId: '' }] : newLines);
+        setLines(newLines.length === 0 ? [{ method: 'CASH', amount: total, dueDate: '', bankAccountId: '', chequeNo: '' }] : newLines);
     };
     const addLine = () => {
         const rem = Math.max(0, total - lines.reduce((s, l) => s + (l.amount || 0), 0));
         const defaultBank = bankAccounts.find(a => a.isDefault);
-        setLines([...lines, { method: 'CASH', amount: Math.round(rem * 100) / 100, dueDate: '', bankAccountId: defaultBank?.id || '' }]);
+        setLines([...lines, { method: 'CASH', amount: Math.round(rem * 100) / 100, dueDate: '', bankAccountId: defaultBank?.id || '', chequeNo: '' }]);
     };
     const setFullAmount = (idx: number) => {
         const otherSum = lines.reduce((s, l, i) => i === idx ? s : s + (l.amount || 0), 0);
@@ -99,6 +99,7 @@ function DebtPaymentModal({ total, loading, onConfirm, onClose }: {
             method,
             dueDate: method !== 'CREDIT' ? '' : lines[idx].dueDate,
             bankAccountId: method === 'TRANSFER' ? (lines[idx].bankAccountId || defaultBank?.id || '') : '',
+            chequeNo: method === 'CHEQUE' ? (lines[idx].chequeNo || '') : '',
         });
     };
 
@@ -144,6 +145,17 @@ function DebtPaymentModal({ total, loading, onConfirm, onClose }: {
                                         </option>
                                     ))}
                                 </select>
+                            )}
+
+                            {/* Cheque number input */}
+                            {line.method === 'CHEQUE' && (
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs text-gray-500 shrink-0">📑 เลขที่เช็ค:</label>
+                                    <input type="text" value={line.chequeNo || ''}
+                                        onChange={e => updateLine(idx, { chequeNo: e.target.value })}
+                                        placeholder="ระบุเลขที่เช็ค (ถ้ามี)"
+                                        className="flex-1 px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:ring-2 focus:ring-orange-500 bg-white" />
+                                </div>
                             )}
 
                             <div className="flex items-center gap-2">

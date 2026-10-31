@@ -201,6 +201,7 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
     const [loading, setLoading] = useState(true);
     const [detailSearch, setDetailSearch] = useState('');
     const [detailWarehouse, setDetailWarehouse] = useState('');
+    const [detailPaymentMethod, setDetailPaymentMethod] = useState('');
     const [detailPage, setDetailPage] = useState(1);
     const [customerSearch, setCustomerSearch] = useState('');
     const [customerPage, setCustomerPage] = useState(1);
@@ -271,8 +272,16 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
 
     const handleExportSales = () => {
         if (!salesData) return;
-        const rows = salesData.byWarehouse.map(w => ({ 'คลังสินค้า': w.warehouseName, 'ยอดขาย': w.totalAmount, 'จำนวนบิล': w.count }));
-        rows.push({ 'คลังสินค้า': 'รวม', 'ยอดขาย': salesData.totalAmount, 'จำนวนบิล': salesData.totalCount });
+        const rows: Record<string, unknown>[] = salesData.byWarehouse.map(w => ({ 'คลังสินค้า': w.warehouseName, 'ยอดขาย': w.totalAmount, 'จำนวนบิล': w.count }));
+        rows.push({ 'คลังสินค้า': 'รวมทั้งสิ้น', 'ยอดขาย': salesData.totalAmount, 'จำนวนบิล': salesData.totalCount });
+        if ((salesData as any).byPaymentMethod) {
+            const pm = (salesData as any).byPaymentMethod;
+            rows.push({ 'คลังสินค้า': '---', 'ยอดขาย': 0, 'จำนวนบิล': 0 });
+            rows.push({ 'คลังสินค้า': 'ช่องทาง: เงินสด', 'ยอดขาย': pm.cash.total, 'จำนวนบิล': pm.cash.count });
+            rows.push({ 'คลังสินค้า': 'ช่องทาง: โอนเงิน', 'ยอดขาย': pm.transfer.total, 'จำนวนบิล': pm.transfer.count });
+            rows.push({ 'คลังสินค้า': 'ช่องทาง: เช็ค', 'ยอดขาย': pm.cheque.total, 'จำนวนบิล': pm.cheque.count });
+            rows.push({ 'คลังสินค้า': 'ช่องทาง: เครดิต/ค้างชำระ', 'ยอดขาย': pm.credit.total, 'จำนวนบิล': pm.credit.count });
+        }
         exportToExcel(rows, `รายงานยอดขาย_${dateFrom || 'all'}_${dateTo || 'all'}`);
     };
     const handleExportProducts = () => {
@@ -406,6 +415,7 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
         const q = detailSearch.toLowerCase().trim();
         const filtered = detailData
             .map(sale => {
+                if (detailPaymentMethod && sale.paymentMethod !== detailPaymentMethod) return null;
                 const items = sale.items.filter(item => {
                     if (detailWarehouse && item.warehouse !== detailWarehouse) return false;
                     return true;
@@ -421,9 +431,15 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
             .filter(Boolean) as typeof detailData;
         const rows: Record<string, unknown>[] = [];
         for (const s of filtered) {
+            const payLabel = s.paymentMethod === 'CASH' ? 'เงินสด'
+                : s.paymentMethod === 'TRANSFER' ? 'โอนเงิน'
+                : s.paymentMethod === 'CHEQUE' ? 'เช็ค'
+                : s.paymentMethod === 'CREDIT' ? 'เครดิต'
+                : s.paymentMethod === 'SPLIT' ? 'หลายช่องทาง'
+                : s.paymentMethod;
             for (const item of s.items) {
                 rows.push({
-                    'เลขที่': s.saleNumber, 'ลูกค้า': s.customer, 'วันที่': new Date(s.createdAt).toLocaleDateString('th-TH'), 'ชำระ': s.paymentMethod,
+                    'เลขที่': s.saleNumber, 'ลูกค้า': s.customer, 'วันที่': new Date(s.createdAt).toLocaleDateString('th-TH'), 'ชำระ': payLabel,
                     'สินค้า': item.productName, 'รหัส': item.productCode, 'คลัง': item.warehouse, 'จำนวน': item.quantity, 'ราคา/หน่วย': item.unitPrice, 'รวม': item.totalPrice
                 });
             }
@@ -471,6 +487,33 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                                             <div className="text-right"><span className="text-sm font-semibold text-gray-800">{formatCurrency(wh.totalAmount)}</span><span className="text-xs text-gray-400 ml-2">({wh.count} บิล)</span></div>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+                            {(salesData as any).byPaymentMethod && (
+                                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                                    <h3 className="font-semibold text-gray-800 text-sm mb-3">💳 แยกตามช่องทางการชำระ</h3>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                        <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-100/60">
+                                            <p className="text-xs text-emerald-700 font-medium">💵 เงินสด</p>
+                                            <p className="text-base font-bold text-emerald-600 mt-1">{formatCurrency((salesData as any).byPaymentMethod.cash.total)}</p>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">{(salesData as any).byPaymentMethod.cash.count} บิล</p>
+                                        </div>
+                                        <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100/60">
+                                            <p className="text-xs text-blue-700 font-medium">📱 เงินโอน</p>
+                                            <p className="text-base font-bold text-blue-600 mt-1">{formatCurrency((salesData as any).byPaymentMethod.transfer.total)}</p>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">{(salesData as any).byPaymentMethod.transfer.count} บิล</p>
+                                        </div>
+                                        <div className="bg-purple-50 rounded-xl p-3 text-center border border-purple-100/60">
+                                            <p className="text-xs text-purple-700 font-medium">📑 เช็ค</p>
+                                            <p className="text-base font-bold text-purple-600 mt-1">{formatCurrency((salesData as any).byPaymentMethod.cheque.total)}</p>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">{(salesData as any).byPaymentMethod.cheque.count} บิล</p>
+                                        </div>
+                                        <div className="bg-orange-50 rounded-xl p-3 text-center border border-orange-100/60">
+                                            <p className="text-xs text-orange-700 font-medium">⏳ เครดิต/ค้างชำระ</p>
+                                            <p className="text-base font-bold text-orange-600 mt-1">{formatCurrency((salesData as any).byPaymentMethod.credit.total)}</p>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">{(salesData as any).byPaymentMethod.credit.count} บิล</p>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                             {salesData.dailySales.length > 0 && (
@@ -762,6 +805,7 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                             const q = detailSearch.toLowerCase().trim();
                             const filtered = detailData
                                 .map(sale => {
+                                    if (detailPaymentMethod && sale.paymentMethod !== detailPaymentMethod) return null;
                                     const items = sale.items.filter(item => {
                                         if (detailWarehouse && item.warehouse !== detailWarehouse) return false;
                                         return true;
@@ -791,6 +835,14 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                                             className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 bg-white">
                                             <option value="">🏭 คลังทั้งหมด</option>
                                             {warehouses.map(w => <option key={w} value={w}>{w}</option>)}
+                                        </select>
+                                        <select value={detailPaymentMethod} onChange={e => { setDetailPaymentMethod(e.target.value); setDetailPage(1); }}
+                                            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 bg-white">
+                                            <option value="">💳 ทุกช่องทางชำระ</option>
+                                            <option value="CASH">💵 เงินสด</option>
+                                            <option value="TRANSFER">📱 เงินโอน</option>
+                                            <option value="CHEQUE">📑 เช็ค</option>
+                                            <option value="CREDIT">⏳ เครดิต</option>
                                         </select>
                                         <p className="text-sm text-gray-500 shrink-0">{filtered.length} บิล · {filtered.reduce((sum, s) => sum + s.items.length, 0)} รายการ</p>
                                         <ExportButton onClick={handleExportDetail} label="Export รายละเอียด" />
