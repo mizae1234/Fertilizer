@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { generateNumber } from '@/lib/generateNumber';
+import { getServerUser } from '@/lib/server-auth';
 
 export async function getStockAdjustments(page = 1, search = '', from = '', to = '') {
     const perPage = 15;
@@ -154,4 +155,95 @@ export async function createStockAdjustment(data: {
     revalidatePath('/products');
     revalidatePath('/warehouses');
     return { adjNumber };
+}
+
+export async function createBatchStockAdjustment(data: {
+    warehouseId: string;
+    note?: string;
+    userId?: string;
+    items: {
+        productId: string;
+        currentStock: number;
+        countedStock: number;
+        reason?: string;
+    }[];
+}) {
+    if (!data.warehouseId) throw new Error('กรุณาระบุคลังสินค้า');
+
+    // Filter only items where countedStock is a valid number and differs from currentStock
+    const validChanges = (data.items || []).filter(item => {
+        return typeof item.countedStock === 'number' && !isNaN(item.countedStock) && item.countedStock !== item.currentStock;
+    });
+
+    if (validChanges.length === 0) {
+        throw new Error('ไม่พบรายการสินค้าที่มีการเปลี่ยนแปลงยอดสต็อก');
+    }
+
+    const serverUser = await getServerUser();
+    const effectiveUserId = data.userId || serverUser?.userId || null;
+
+    const adjNumber = await generateNumber('ADJ');
+
+    await prisma.$transaction(async (tx) => {
+        for (const item of validChanges) {
+            const diff = item.countedStock - item.currentStock;
+            if (diff === 0) continue;
+
+            const stock = await tx.productStock.findUnique({
+                where: {
+                    productId_warehouseId: {
+                        productId: item.productId,
+                        warehouseId: data.warehouseId,
+                    },
+                },
+            });
+
+            const product = await tx.product.findUnique({
+                where: { id: item.productId },
+                select: { cost: true, name: true },
+            });
+            const defaultCost = product ? Number(product.cost) : 0;
+            const unitCost = stock ? Number(stock.avgCost) || defaultCost : defaultCost;
+
+            const defaultReason = diff > 0 ? 'ตรวจนับเกิน' : 'ตรวจนับขาด';
+            const noteText = [item.reason?.trim() || defaultReason, data.note?.trim()].filter(Boolean).join(' — ');
+
+            if (stock) {
+                await tx.productStock.update({
+                    where: { id: stock.id },
+                    data: {
+                        quantity: item.countedStock,
+                        ...(Number(stock.avgCost) === 0 ? { avgCost: defaultCost } : {}),
+                    },
+                });
+            } else {
+                await tx.productStock.create({
+                    data: {
+                        productId: item.productId,
+                        warehouseId: data.warehouseId,
+                        quantity: item.countedStock,
+                        avgCost: defaultCost,
+                    },
+                });
+            }
+
+            await tx.stockTransaction.create({
+                data: {
+                    productId: item.productId,
+                    warehouseId: data.warehouseId,
+                    type: 'ADJUSTMENT',
+                    quantity: diff,
+                    unitCost: unitCost,
+                    reference: adjNumber,
+                    userId: effectiveUserId,
+                    notes: noteText,
+                },
+            });
+        }
+    });
+
+    revalidatePath('/stock-adjustments');
+    revalidatePath('/products');
+    revalidatePath('/warehouses');
+    return { adjNumber, count: validChanges.length };
 }

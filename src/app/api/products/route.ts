@@ -10,11 +10,22 @@ export async function GET(request: Request) {
         const search = searchParams.get('search') || '';
         const exactCode = searchParams.get('exactCode') || '';
         const warehouseId = searchParams.get('warehouseId') || '';
+        const productGroupId = searchParams.get('productGroupId') || '';
+        const brand = searchParams.get('brand') || '';
+        const limit = searchParams.get('limit');
 
         const where: any = {
             deletedAt: null,
             isActive: true,
         };
+
+        if (productGroupId) {
+            where.productGroupId = productGroupId;
+        }
+
+        if (brand) {
+            where.brand = { equals: brand, mode: 'insensitive' };
+        }
 
         if (exactCode) {
             const trimmed = exactCode.trim();
@@ -45,6 +56,8 @@ export async function GET(request: Request) {
             }
         }
 
+        const parsedLimit = limit ? parseInt(limit) : (search && !productGroupId && !brand ? 200 : undefined);
+
         const products = await prisma.product.findMany({
             where,
             select: {
@@ -68,7 +81,7 @@ export async function GET(request: Request) {
                     orderBy: { minQuantity: 'asc' },
                 },
             },
-            ...(search ? { take: 200 } : {}),
+            ...(parsedLimit ? { take: parsedLimit } : {}),
             orderBy: { name: 'asc' },
         });
 

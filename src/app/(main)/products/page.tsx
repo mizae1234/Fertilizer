@@ -108,7 +108,10 @@ export default async function ProductsPage({ searchParams }: Props) {
                 title="สินค้า"
                 subtitle={`จัดการสินค้าทั้งหมด (${total} รายการ)`}
                 actions={
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Link href="/stock-adjustments/batch" className="px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 font-medium text-sm hover:bg-emerald-100 shadow-xs flex items-center gap-1.5 transition-colors">
+                            📋 ตรวจนับสต็อกด่วน
+                        </Link>
                         <Link href="/products/barcodes" className="px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 font-medium text-sm hover:bg-gray-50 shadow-xs flex items-center gap-1.5 transition-colors">
                             🏷️ พิมพ์บาร์โค้ด
                         </Link>

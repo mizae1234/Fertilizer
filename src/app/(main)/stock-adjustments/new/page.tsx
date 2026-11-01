@@ -230,12 +230,21 @@ export default function NewStockAdjustmentPage() {
     return (
         <div className="animate-fade-in max-w-4xl mx-auto">
             {/* Header */}
-            <div className="flex items-center gap-3 mb-6">
-                <button onClick={() => router.push('/stock-adjustments')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-800">📦 บันทึกปรับปรุง Stock</h1>
-                    <p className="text-sm text-gray-500 mt-1">เพิ่มหรือลด stock สินค้า</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+                <div className="flex items-center gap-3">
+                    <button onClick={() => router.push('/stock-adjustments')} className="text-gray-400 hover:text-gray-600 text-lg">←</button>
+                    <div>
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">📦 บันทึกปรับปรุง Stock</h1>
+                        <p className="text-sm text-gray-500 mt-1">เพิ่มหรือลด stock สินค้ารายตัว</p>
+                    </div>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => router.push('/stock-adjustments/batch')}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs sm:text-sm font-medium hover:bg-emerald-100 transition-colors flex items-center gap-1.5 self-start sm:self-auto"
+                >
+                    📋 สลับไปโหมดตรวจนับด่วนยกหมวด/ยกคลัง →
+                </button>
             </div>
 
             {/* Adjustment Type Toggle */}

@@ -33,9 +33,14 @@ export default async function StockAdjustmentsPage({ searchParams }: Props) {
                 title="ปรับปรุง Stock"
                 subtitle={`บันทึกเพิ่ม/ลด stock สินค้า (${total} รายการ)`}
                 actions={
-                    <Link href="/stock-adjustments/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 text-white font-medium text-sm hover:from-red-600 hover:to-orange-600 shadow-md shadow-red-200 text-center">
-                        + บันทึกปรับปรุง Stock
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Link href="/stock-adjustments/batch" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-medium text-sm hover:from-emerald-700 hover:to-teal-700 shadow-md shadow-emerald-200 text-center flex items-center gap-1.5 transition-all">
+                            📋 ใบตรวจนับสต็อกด่วน (ยกหมวด/ยกคลัง)
+                        </Link>
+                        <Link href="/stock-adjustments/new" className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 text-white font-medium text-sm hover:from-red-600 hover:to-orange-600 shadow-md shadow-red-200 text-center">
+                            + บันทึกปรับปรุง Stock
+                        </Link>
+                    </div>
                 }
             />
 
