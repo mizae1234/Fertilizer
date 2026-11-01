@@ -284,3 +284,57 @@ export async function updateProductCost(
 
     revalidatePath('/products');
 }
+
+export async function updateProductCategory(productId: string, productGroupId: string | null) {
+    const updated = await prisma.product.update({
+        where: { id: productId },
+        data: {
+            productGroupId: productGroupId || null,
+        },
+        select: {
+            id: true,
+            productGroupId: true,
+            productGroup: { select: { id: true, name: true } },
+        },
+    });
+    revalidatePath('/products');
+    return updated;
+}
+
+export async function updateProductBrand(productId: string, brand: string | null) {
+    const trimmed = brand?.trim() || null;
+    const updated = await prisma.product.update({
+        where: { id: productId },
+        data: {
+            brand: trimmed,
+        },
+        select: {
+            id: true,
+            brand: true,
+        },
+    });
+    revalidatePath('/products');
+    return updated;
+}
+
+export async function bulkUpdateProducts(
+    productIds: string[],
+    updates: { productGroupId?: string | null; brand?: string | null }
+) {
+    if (!productIds || productIds.length === 0) return { count: 0 };
+    const data: Record<string, unknown> = {};
+    if (updates.productGroupId !== undefined) {
+        data.productGroupId = updates.productGroupId || null;
+    }
+    if (updates.brand !== undefined) {
+        data.brand = updates.brand ? updates.brand.trim() || null : null;
+    }
+
+    const result = await prisma.product.updateMany({
+        where: { id: { in: productIds } },
+        data,
+    });
+    revalidatePath('/products');
+    return result;
+}
+

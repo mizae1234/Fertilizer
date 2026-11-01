@@ -1,16 +1,13 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { formatCurrency } from '@/lib/utils';
 import { Suspense } from 'react';
 import ProductFilter from './ProductFilter';
 import ExportProductsButton from './ExportProductsButton';
 import ImportProductsButton from './ImportProductsButton';
+import ProductsTable from './ProductsTable';
 import { isServerAdmin } from '@/lib/server-auth';
 import PageHeader from '@/components/PageHeader';
 import Pagination from '@/components/Pagination';
-import SortableHeader from '@/components/SortableHeader';
-import DeleteButton from '@/components/DeleteButton';
-import { deleteProduct } from '@/app/actions/products';
 
 interface Props {
     searchParams: Promise<{ page?: string; search?: string; warehouse?: string; group?: string; sort?: string; order?: string }>;
@@ -27,10 +24,17 @@ export default async function ProductsPage({ searchParams }: Props) {
     const order = sp.order || 'desc';
     const perPage = 10;
 
-    const [warehouses, productGroups] = await Promise.all([
+    const [warehouses, productGroups, brandsData] = await Promise.all([
         prisma.warehouse.findMany({ where: { deletedAt: null, isActive: true }, orderBy: { name: 'asc' } }),
-        prisma.productGroup.findMany({ orderBy: { name: 'asc' } }),
+        prisma.productGroup.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+        prisma.product.findMany({
+            where: { brand: { not: null }, deletedAt: null },
+            select: { brand: true },
+            distinct: ['brand'],
+            orderBy: { brand: 'asc' },
+        }),
     ]);
+    const availableBrands = brandsData.map(b => b.brand).filter(Boolean) as string[];
 
     const searchTokens = search.trim().split(/\s+/).filter(Boolean);
     const where = {
@@ -71,7 +75,7 @@ export default async function ProductsPage({ searchParams }: Props) {
         prisma.product.findMany({
             where,
             include: {
-                productGroup: { select: { name: true } },
+                productGroup: { select: { id: true, name: true } },
                 productStocks: {
                     where: {
                         warehouse: { deletedAt: null, isActive: true },
@@ -102,6 +106,12 @@ export default async function ProductsPage({ searchParams }: Props) {
         return `/products?${p}`;
     };
 
+    const serializedProducts = products.map(p => ({
+        ...p,
+        cost: Number(p.cost),
+        price: Number(p.price),
+    }));
+
     return (
         <div className="animate-fade-in">
             <PageHeader
@@ -129,114 +139,18 @@ export default async function ProductsPage({ searchParams }: Props) {
                 <ProductFilter warehouses={warehouses} productGroups={productGroups} />
             </Suspense>
 
-            {/* Table */}
+            {/* Interactive Products Table with Inline Editing & Bulk Actions */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="bg-gray-50 border-b border-gray-100">
-                                <SortableHeader label="รหัส" field="code" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
-                                <SortableHeader label="ชื่อสินค้า" field="name" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">หมวดหมู่</th>
-                                <SortableHeader label="ยี่ห้อ" field="brand" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
-                                <SortableHeader label="บรรจุภัณฑ์" field="packaging" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
-                                {adminUser && <SortableHeader label="ต้นทุน" field="cost" currentSort={sort} currentOrder={order} buildUrl={buildUrl} align="right" />}
-                                <SortableHeader label="ราคาขาย" field="price" currentSort={sort} currentOrder={order} buildUrl={buildUrl} align="right" />
-                                <SortableHeader label="หน่วย" field="unit" currentSort={sort} currentOrder={order} buildUrl={buildUrl} />
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    {warehouseFilter ? `Stock (${warehouses.find(w => w.id === warehouseFilter)?.name || ''})` : 'Stock รวม'}
-                                </th>
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">สถานะ</th>
-                                <th className="px-4 py-3"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {products.length === 0 ? (
-                                <tr>
-                                    <td colSpan={11} className="px-4 py-12 text-center text-gray-400">ไม่พบสินค้า</td>
-                                </tr>
-                            ) : (
-                                products.map((product) => {
-                                    const totalStock = product.productStocks.reduce((s, ps) => s + ps.quantity, 0);
-                                    const isLowStock = totalStock < product.minStock;
-                                    return (
-                                        <tr key={product.id} className="hover:bg-gray-50">
-                                            <td className="px-4 py-3 text-sm font-mono text-gray-600">
-                                                <Link href={`/products/${product.id}`} className="hover:text-emerald-600 font-medium block">
-                                                    {product.code}
-                                                </Link>
-                                                {product.barcode && (
-                                                    <span className="text-[11px] text-gray-400 block font-mono" title="บาร์โค้ด">
-                                                        🏷️ {product.barcode}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <Link href={`/products/${product.id}`}>
-                                                    <p className="text-sm font-medium text-emerald-700 hover:text-emerald-800">{product.name}</p>
-                                                    {product.description && (
-                                                        <p className="text-xs text-gray-400 truncate max-w-[200px]">{product.description}</p>
-                                                    )}
-                                                    {product.expDate && (
-                                                        <span className={`inline-block mt-0.5 text-[11px] px-1.5 py-0.5 rounded font-medium ${
-                                                            new Date(product.expDate) < new Date()
-                                                                ? 'bg-red-50 text-red-600'
-                                                                : new Date(product.expDate).getTime() - Date.now() < 30 * 24 * 3600 * 1000
-                                                                    ? 'bg-amber-50 text-amber-700'
-                                                                    : 'bg-gray-100 text-gray-500'
-                                                        }`}>
-                                                            {new Date(product.expDate) < new Date() ? '⚠️ หมดอายุ: ' : '⏳ หมดอายุ: '}
-                                                            {new Date(product.expDate).toLocaleDateString('th-TH')}
-                                                        </span>
-                                                    )}
-                                                </Link>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">
-                                                {product.productGroup ? (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-700">
-                                                        {product.productGroup.name}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-gray-300">-</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">{product.brand || <span className="text-gray-300">-</span>}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">{product.packaging || <span className="text-gray-300">-</span>}</td>
-                                            {adminUser && <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatCurrency(Number(product.cost))}</td>}
-                                            <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(product.price))}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">{product.unit}</td>
-                                            <td className="px-4 py-3">
-                                                <span className={`text-sm font-semibold ${isLowStock ? 'text-red-600' : 'text-gray-800'}`}>
-                                                    {totalStock.toLocaleString()}
-                                                </span>
-                                                {isLowStock && (
-                                                    <span className="ml-1 text-xs text-red-500">⚠️</span>
-                                                )}
-                                                {!warehouseFilter && product.productStocks.length > 0 && (
-                                                    <div className="mt-1">
-                                                        {product.productStocks.map(ps => (
-                                                            <span key={ps.warehouseId} className="inline-block mr-1 text-[10px] text-gray-400">
-                                                                {ps.warehouse.name}: {ps.quantity}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${product.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                                                    {product.isActive ? 'ใช้งาน' : 'ไม่ใช้งาน'}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <DeleteButton id={product.id} name={product.name} entityLabel="สินค้า" deleteAction={deleteProduct} />
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                <ProductsTable
+                    products={serializedProducts}
+                    productGroups={productGroups}
+                    availableBrands={availableBrands}
+                    adminUser={adminUser}
+                    warehouseFilter={warehouseFilter}
+                    sort={sort}
+                    order={order}
+                    buildUrl={buildUrl}
+                />
 
                 {/* Pagination */}
                 {totalPages > 1 && (
