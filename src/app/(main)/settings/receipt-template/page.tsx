@@ -422,7 +422,7 @@ export default function ReceiptTemplatePage() {
                                                     </div>
                                                     <div className="text-right">
                                                         <div className="text-[9px] text-gray-400"># SALE-20260001</div>
-                                                        <div className="font-bold text-xs mt-0.5">ใบส่งของ / ใบเสร็จรับเงิน</div>
+                                                        <div className="font-bold text-xs mt-0.5">ใบส่งของ (หรือ ใบกำกับภาษี)</div>
                                                     </div>
                                                 </div>
                                                 <div className="border border-gray-300 rounded text-[9px] mb-3">

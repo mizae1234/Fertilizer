@@ -93,15 +93,44 @@ function numberToThaiText(num: number): string {
 }
 
 export default function InvoicePrint({ sale, template }: { sale: SaleData; template: TemplateData | null }) {
-    const [title, setTitle] = useState('ใบส่งของ / ใบเสร็จรับเงิน');
+    const [title, setTitle] = useState('ใบส่งของ');
+    const [showChooser, setShowChooser] = useState(false);
 
-    // Auto print (skip if loaded silently via iframe with ?silent=1)
+    // Auto print or show chooser based on URL parameters
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        if (params.get('silent') === '1') return; // parent will handle printing
-        const timer = setTimeout(() => window.print(), 500);
-        return () => clearTimeout(timer);
+        const silent = params.get('silent') === '1';
+        const urlTitle = params.get('title');
+        const urlType = params.get('type');
+
+        let initialTitle = '';
+        if (urlTitle) {
+            initialTitle = urlTitle;
+        } else if (urlType === 'tax' || urlType === 'tax_invoice') {
+            initialTitle = 'ใบกำกับภาษี';
+        } else if (urlType === 'delivery' || urlType === 'do') {
+            initialTitle = 'ใบส่งของ';
+        } else if (urlType === 'receipt') {
+            initialTitle = 'ใบเสร็จรับเงิน';
+        }
+
+        if (initialTitle) {
+            setTitle(initialTitle);
+            if (!silent) {
+                const timer = setTimeout(() => window.print(), 500);
+                return () => clearTimeout(timer);
+            }
+        } else {
+            // No explicit title/type in URL -> show chooser modal to let user choose
+            setShowChooser(true);
+        }
     }, []);
+
+    const handleSelectAndPrint = (selectedTitle: string) => {
+        setTitle(selectedTitle);
+        setShowChooser(false);
+        setTimeout(() => window.print(), 300);
+    };
 
     const headerLines = template?.headerText?.split('\n').filter(Boolean) || [];
     const companyName = headerLines[0] || 'บริษัท';
@@ -154,21 +183,234 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                 }
             `}</style>
 
-            {/* Print button (hidden in print) */}
-            <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 50, display: 'flex', gap: 8 }}>
-                <button onClick={() => window.print()}
-                    style={{ padding: '10px 24px', background: 'linear-gradient(135deg, #10b981, #14b8a6)', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}>
-                    🖨️ พิมพ์ / บันทึก PDF
-                </button>
-                <button onClick={() => window.history.back()}
-                    style={{ padding: '10px 20px', background: '#fff', color: '#333', border: '1px solid #ddd', borderRadius: 12, fontWeight: 500, fontSize: 14, cursor: 'pointer' }}>
-                    ← กลับ
-                </button>
+            {/* Top Floating Toolbar (hidden in print) */}
+            <div className="no-print" style={{
+                position: 'fixed',
+                top: 16,
+                left: 16,
+                right: 16,
+                zIndex: 50,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 12,
+                background: 'rgba(255, 255, 255, 0.96)',
+                backdropFilter: 'blur(8px)',
+                padding: '10px 18px',
+                borderRadius: 16,
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.25)',
+                border: '1px solid rgba(229, 231, 235, 0.9)',
+                maxWidth: '960px',
+                margin: '0 auto',
+            }}>
+                {/* Left: Quick Document Title Switcher */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>
+                        📋 หัวบิล:
+                    </span>
+                    {[
+                        { label: '📦 ใบส่งของ', value: 'ใบส่งของ', color: '#059669', bg: '#ecfdf5', border: '#10b981' },
+                        { label: '📑 ใบกำกับภาษี', value: 'ใบกำกับภาษี', color: '#2563eb', bg: '#eff6ff', border: '#3b82f6' },
+                        { label: '🧾 ใบเสร็จรับเงิน', value: 'ใบเสร็จรับเงิน', color: '#7c3aed', bg: '#f5f3ff', border: '#8b5cf6' },
+                    ].map(opt => {
+                        const active = title === opt.value;
+                        return (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setTitle(opt.value)}
+                                style={{
+                                    padding: '6px 14px',
+                                    borderRadius: 10,
+                                    fontSize: 13,
+                                    fontWeight: active ? 700 : 500,
+                                    cursor: 'pointer',
+                                    border: active ? `2px solid ${opt.border}` : '1px solid #d1d5db',
+                                    background: active ? opt.bg : '#ffffff',
+                                    color: active ? opt.color : '#4b5563',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: active ? '0 2px 4px rgba(0,0,0,0.06)' : 'none',
+                                }}
+                            >
+                                {opt.label}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Right: Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                        type="button"
+                        onClick={() => window.print()}
+                        style={{
+                            padding: '8px 20px',
+                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 10,
+                            fontWeight: 600,
+                            fontSize: 13,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            boxShadow: '0 4px 10px rgba(16,185,129,0.3)',
+                        }}
+                    >
+                        🖨️ พิมพ์ {title}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => window.history.back()}
+                        style={{
+                            padding: '8px 16px',
+                            background: '#fff',
+                            color: '#4b5563',
+                            border: '1px solid #d1d5db',
+                            borderRadius: 10,
+                            fontWeight: 500,
+                            fontSize: 13,
+                            cursor: 'pointer',
+                        }}
+                    >
+                        ← กลับ
+                    </button>
+                </div>
             </div>
+
+            {/* Modal Dialog to choose title if not pre-specified */}
+            {showChooser && (
+                <div className="no-print" style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 100,
+                    background: 'rgba(0, 0, 0, 0.55)',
+                    backdropFilter: 'blur(5px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 16,
+                }}>
+                    <div style={{
+                        background: '#ffffff',
+                        borderRadius: 24,
+                        padding: 28,
+                        maxWidth: 460,
+                        width: '100%',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+                        border: '1px solid #e5e7eb',
+                        textAlign: 'center',
+                    }}>
+                        <div style={{ fontSize: 40, marginBottom: 10 }}>🖨️</div>
+                        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#111827', margin: '0 0 6px' }}>
+                            เลือกหัวบิลที่ต้องการพิมพ์
+                        </h2>
+                        <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 20px' }}>
+                            บิลเลขที่ <strong style={{ color: '#111827' }}>#{sale.saleNumber}</strong> — เลือกเพื่อสั่งพิมพ์ทันที
+                        </p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectAndPrint('ใบส่งของ')}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '14px 20px',
+                                    borderRadius: 14,
+                                    border: '2px solid #10b981',
+                                    background: '#ecfdf5',
+                                    color: '#065f46',
+                                    fontWeight: 700,
+                                    fontSize: 15,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(16, 185, 129, 0.15)',
+                                    transition: 'all 0.15s ease',
+                                }}
+                            >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <span style={{ fontSize: 22 }}>📦</span> พิมพ์ "ใบส่งของ"
+                                </span>
+                                <span style={{ fontSize: 11, background: '#10b981', color: '#fff', padding: '3px 9px', borderRadius: 9999, fontWeight: 600 }}>A4</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleSelectAndPrint('ใบกำกับภาษี')}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '14px 20px',
+                                    borderRadius: 14,
+                                    border: '2px solid #3b82f6',
+                                    background: '#eff6ff',
+                                    color: '#1e40af',
+                                    fontWeight: 700,
+                                    fontSize: 15,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(59, 130, 246, 0.15)',
+                                    transition: 'all 0.15s ease',
+                                }}
+                            >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <span style={{ fontSize: 22 }}>📑</span> พิมพ์ "ใบกำกับภาษี"
+                                </span>
+                                <span style={{ fontSize: 11, background: '#3b82f6', color: '#fff', padding: '3px 9px', borderRadius: 9999, fontWeight: 600 }}>A4</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleSelectAndPrint('ใบเสร็จรับเงิน')}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '14px 20px',
+                                    borderRadius: 14,
+                                    border: '2px solid #8b5cf6',
+                                    background: '#f5f3ff',
+                                    color: '#5b21b6',
+                                    fontWeight: 700,
+                                    fontSize: 15,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(139, 92, 246, 0.15)',
+                                    transition: 'all 0.15s ease',
+                                }}
+                            >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <span style={{ fontSize: 22 }}>🧾</span> พิมพ์ "ใบเสร็จรับเงิน"
+                                </span>
+                                <span style={{ fontSize: 11, background: '#8b5cf6', color: '#fff', padding: '3px 9px', borderRadius: 9999, fontWeight: 600 }}>A4</span>
+                            </button>
+                        </div>
+
+                        <div style={{ marginTop: 20 }}>
+                            <button
+                                type="button"
+                                onClick={() => setShowChooser(false)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#6b7280',
+                                    fontSize: 13,
+                                    cursor: 'pointer',
+                                    textDecoration: 'underline',
+                                }}
+                            >
+                                ปิดหน้าต่างนี้ เพื่อดู/แก้ไขเอกสารก่อนพิมพ์
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* A4 Page */}
             <div className="invoice-page" style={{
-                width: '210mm', minHeight: '297mm', margin: '20px auto', background: '#fff',
+                width: '210mm', minHeight: '297mm', margin: '80px auto 20px', background: '#fff',
                 padding: '15mm', fontFamily: '"Sarabun", "Inter", sans-serif', fontSize: 13,
                 color: '#222', lineHeight: 1.6,
                 boxShadow: '0 0 20px rgba(0,0,0,0.3)',

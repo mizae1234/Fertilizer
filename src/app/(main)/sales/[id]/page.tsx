@@ -198,6 +198,7 @@ export default function SaleDetailPage() {
 
     // Modals
     const [showDelete, setShowDelete] = useState(false);
+    const [showA4Menu, setShowA4Menu] = useState(false);
     const [actionLoading, setActionLoading] = useState('');
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; type: 'success' | 'error'; title?: string }>({ open: false, message: '', type: 'error' });
 
@@ -527,10 +528,61 @@ export default function SaleDetailPage() {
                                 className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 text-sm font-medium hover:bg-amber-100">
                                 🧾 สลิป
                             </button>
-                            <button onClick={() => window.open(`/invoice/${id}`, '_blank')}
-                                className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-sm font-medium hover:bg-emerald-100">
-                                🖨️ ใบเสร็จ A4
-                            </button>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowA4Menu(!showA4Menu)}
+                                    className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-sm font-medium hover:bg-emerald-100 flex items-center gap-1.5">
+                                    🖨️ พิมพ์ A4 <span className="text-[10px]">▼</span>
+                                </button>
+                                {showA4Menu && (
+                                    <div
+                                        className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-30"
+                                        onMouseLeave={() => setShowA4Menu(false)}
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowA4Menu(false);
+                                                window.open(`/invoice/${id}?title=${encodeURIComponent('ใบส่งของ')}`, '_blank');
+                                            }}
+                                            className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2"
+                                        >
+                                            <span>📦</span> ใบส่งของ
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowA4Menu(false);
+                                                window.open(`/invoice/${id}?title=${encodeURIComponent('ใบกำกับภาษี')}`, '_blank');
+                                            }}
+                                            className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
+                                        >
+                                            <span>📑</span> ใบกำกับภาษี
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowA4Menu(false);
+                                                window.open(`/invoice/${id}?title=${encodeURIComponent('ใบเสร็จรับเงิน')}`, '_blank');
+                                            }}
+                                            className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2"
+                                        >
+                                            <span>🧾</span> ใบเสร็จรับเงิน
+                                        </button>
+                                        <div className="border-t border-gray-100 my-1" />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowA4Menu(false);
+                                                window.open(`/invoice/${id}`, '_blank');
+                                            }}
+                                            className="w-full text-left px-3.5 py-2 text-[11px] text-gray-500 hover:bg-gray-50 flex items-center gap-2"
+                                        >
+                                            <span>⚙️</span> เปิดหน้าพิมพ์เพื่อเลือก
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </>
                     )}
                     {!isEditing && sale.status === 'APPROVED' && user?.role === 'ADMIN' && (

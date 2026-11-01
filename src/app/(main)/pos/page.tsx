@@ -77,7 +77,7 @@ const PAYMENT_METHODS = [
 
 function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, allowCredit = true }: {
     total: number; loading: boolean;
-    onConfirm: (payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string; chequeNo?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number) => void;
+    onConfirm: (payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string; chequeNo?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number, invoiceTitle?: string) => void;
     onClose: () => void;
     defaultPrintType?: 'bill' | 'invoice' | 'none';
     allowCredit?: boolean;
@@ -87,6 +87,7 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
     ]);
     const [bankAccounts, setBankAccounts] = useState<BankAccountInfo[]>([]);
     const [printType, setPrintType] = useState<'bill' | 'invoice' | 'none'>(defaultPrintType || 'bill');
+    const [invoiceTitle, setInvoiceTitle] = useState<'ใบส่งของ' | 'ใบกำกับภาษี' | 'ใบเสร็จรับเงิน'>('ใบส่งของ');
     const [cashReceived, setCashReceived] = useState<number | ''>(0);
 
     // Sync printType when defaultPrintType prop updates
@@ -149,7 +150,7 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
             ...(l.method === 'CHEQUE' && l.chequeNo ? { chequeNo: l.chequeNo } : {}),
         }));
         const cashVal = typeof cashReceived === 'number' && cashReceived > 0 ? cashReceived : undefined;
-        onConfirm(payments, printType, cashVal);
+        onConfirm(payments, printType, cashVal, printType === 'invoice' ? invoiceTitle : undefined);
     };
 
     // Calculate change — show whenever there's a cash component
@@ -269,17 +270,32 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
                         <div className="flex gap-2">
                             <button type="button" onClick={() => setPrintType('bill')}
                                 className={`flex-1 rounded-lg text-xs font-medium py-2 transition-all ${printType === 'bill' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-emerald-300'}`}>
-                                🧾 ปริ้นบิล
+                                🧾 ปริ้นสลิป
                             </button>
                             <button type="button" onClick={() => setPrintType('invoice')}
                                 className={`flex-1 rounded-lg text-xs font-medium py-2 transition-all ${printType === 'invoice' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-emerald-300'}`}>
-                                📄 ใบกำกับ
+                                📄 เอกสาร A4
                             </button>
                             <button type="button" onClick={() => setPrintType('none')}
                                 className={`flex-1 rounded-lg text-xs font-medium py-2 transition-all ${printType === 'none' ? 'bg-gray-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-400'}`}>
                                 🚫 ไม่ปริ้น
                             </button>
                         </div>
+                        {printType === 'invoice' && (
+                            <div className="mt-2.5 pt-2.5 border-t border-gray-200">
+                                <p className="text-[11px] text-gray-500 mb-1.5 font-medium">📋 เลือกหัวบิล A4:</p>
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setInvoiceTitle('ใบส่งของ')}
+                                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${invoiceTitle === 'ใบส่งของ' ? 'bg-emerald-600 text-white shadow-xs font-semibold' : 'bg-white text-gray-700 border border-gray-300 hover:border-emerald-400'}`}>
+                                        📦 ใบส่งของ
+                                    </button>
+                                    <button type="button" onClick={() => setInvoiceTitle('ใบกำกับภาษี')}
+                                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-medium transition-all ${invoiceTitle === 'ใบกำกับภาษี' ? 'bg-blue-600 text-white shadow-xs font-semibold' : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-400'}`}>
+                                        📑 ใบกำกับภาษี
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Cash received / change — show whenever there's a CASH payment */}
@@ -883,7 +899,7 @@ export default function POSPage() {
         setShowPaymentModal(true);
     };
 
-    const confirmPayment = async (payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string; chequeNo?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number) => {
+    const confirmPayment = async (payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string; chequeNo?: string }[], printType: 'bill' | 'invoice' | 'none', cashReceived?: number, invoiceTitle?: string) => {
         setLoading(true);
         try {
             // Expand bundle items into individual product items for stock deduction
@@ -943,7 +959,8 @@ export default function POSPage() {
                     const url = cashReceived ? `/receipt/${result.id}?cashReceived=${cashReceived}` : `/receipt/${result.id}`;
                     window.open(url, '_blank');
                 } else {
-                    window.open(`/invoice/${result.id}`, '_blank');
+                    const titleParam = invoiceTitle ? `?title=${encodeURIComponent(invoiceTitle)}` : '';
+                    window.open(`/invoice/${result.id}${titleParam}`, '_blank');
                 }
             }
 
