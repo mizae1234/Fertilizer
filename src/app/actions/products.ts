@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { getServerUser } from '@/lib/server-auth';
 
 export async function getProducts(page = 1, search = '') {
     const perPage = 10;
@@ -286,6 +287,20 @@ export async function updateProductCost(
 }
 
 export async function updateProductCategory(productId: string, productGroupId: string | null) {
+    const serverUser = await getServerUser();
+    const oldProduct = await prisma.product.findUnique({
+        where: { id: productId },
+        select: { productGroupId: true, productGroup: { select: { name: true } } },
+    });
+
+    const newGroup = productGroupId ? await prisma.productGroup.findUnique({
+        where: { id: productGroupId },
+        select: { name: true },
+    }) : null;
+
+    const oldName = oldProduct?.productGroup?.name || 'ไม่ระบุ';
+    const newName = newGroup?.name || 'ไม่ระบุ';
+
     const updated = await prisma.product.update({
         where: { id: productId },
         data: {
@@ -297,12 +312,37 @@ export async function updateProductCategory(productId: string, productGroupId: s
             productGroup: { select: { id: true, name: true } },
         },
     });
+
+    if (oldProduct?.productGroupId !== productGroupId) {
+        await prisma.productLog.create({
+            data: {
+                productId,
+                userId: serverUser?.userId || null,
+                action: 'UPDATE',
+                field: 'productGroupId',
+                oldValue: oldName,
+                newValue: newName,
+                details: `แก้ไขหมวดหมู่สินค้า: "${oldName}" → "${newName}"`,
+            },
+        });
+    }
+
     revalidatePath('/products');
+    revalidatePath(`/products/${productId}`);
     return updated;
 }
 
 export async function updateProductBrand(productId: string, brand: string | null) {
+    const serverUser = await getServerUser();
     const trimmed = brand?.trim() || null;
+    const oldProduct = await prisma.product.findUnique({
+        where: { id: productId },
+        select: { brand: true },
+    });
+
+    const oldBrand = oldProduct?.brand || 'ไม่ระบุ';
+    const newBrand = trimmed || 'ไม่ระบุ';
+
     const updated = await prisma.product.update({
         where: { id: productId },
         data: {
@@ -313,7 +353,23 @@ export async function updateProductBrand(productId: string, brand: string | null
             brand: true,
         },
     });
+
+    if (oldProduct?.brand !== trimmed) {
+        await prisma.productLog.create({
+            data: {
+                productId,
+                userId: serverUser?.userId || null,
+                action: 'UPDATE',
+                field: 'brand',
+                oldValue: oldBrand,
+                newValue: newBrand,
+                details: `แก้ไขยี่ห้อ (Brand): "${oldBrand}" → "${newBrand}"`,
+            },
+        });
+    }
+
     revalidatePath('/products');
+    revalidatePath(`/products/${productId}`);
     return updated;
 }
 
@@ -322,6 +378,7 @@ export async function bulkUpdateProducts(
     updates: { productGroupId?: string | null; brand?: string | null }
 ) {
     if (!productIds || productIds.length === 0) return { count: 0 };
+    const serverUser = await getServerUser();
     const data: Record<string, unknown> = {};
     if (updates.productGroupId !== undefined) {
         data.productGroupId = updates.productGroupId || null;
@@ -330,10 +387,57 @@ export async function bulkUpdateProducts(
         data.brand = updates.brand ? updates.brand.trim() || null : null;
     }
 
+    // Fetch old products for audit logging
+    const oldProducts = await prisma.product.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, brand: true, productGroupId: true, productGroup: { select: { name: true } } },
+    });
+
+    const targetGroup = updates.productGroupId ? await prisma.productGroup.findUnique({
+        where: { id: updates.productGroupId },
+        select: { name: true },
+    }) : null;
+    const newGroupName = updates.productGroupId ? (targetGroup?.name || 'ไม่ระบุ') : 'ไม่ระบุ';
+    const newBrandName = updates.brand ? updates.brand.trim() : 'ไม่ระบุ';
+
     const result = await prisma.product.updateMany({
         where: { id: { in: productIds } },
         data,
     });
+
+    // Create logs for each product
+    const logs: { productId: string; userId: string | null; action: string; field: string; oldValue: string; newValue: string; details: string }[] = [];
+    for (const op of oldProducts) {
+        if (updates.productGroupId !== undefined && op.productGroupId !== updates.productGroupId) {
+            const oldGName = op.productGroup?.name || 'ไม่ระบุ';
+            logs.push({
+                productId: op.id,
+                userId: serverUser?.userId || null,
+                action: 'UPDATE',
+                field: 'productGroupId',
+                oldValue: oldGName,
+                newValue: newGroupName,
+                details: `แก้ไขหมวดหมู่สินค้า (แก้ไขแบบกลุ่ม): "${oldGName}" → "${newGroupName}"`,
+            });
+        }
+        if (updates.brand !== undefined && op.brand !== (updates.brand ? updates.brand.trim() || null : null)) {
+            const oldBName = op.brand || 'ไม่ระบุ';
+            logs.push({
+                productId: op.id,
+                userId: serverUser?.userId || null,
+                action: 'UPDATE',
+                field: 'brand',
+                oldValue: oldBName,
+                newValue: newBrandName,
+                details: `แก้ไขยี่ห้อ (แก้ไขแบบกลุ่ม): "${oldBName}" → "${newBrandName}"`,
+            });
+        }
+    }
+
+    if (logs.length > 0) {
+        await prisma.productLog.createMany({ data: logs });
+    }
+
     revalidatePath('/products');
     return result;
 }
