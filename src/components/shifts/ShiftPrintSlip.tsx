@@ -49,6 +49,10 @@ export default function ShiftPrintSlip({
                 {/* Printable Content */}
                 <div className="p-4 overflow-y-auto text-black font-mono text-xs leading-relaxed bg-white">
                     <style jsx global>{`
+                        @page {
+                            size: 80mm auto;
+                            margin: 0 !important;
+                        }
                         @media print {
                             body * {
                                 visibility: hidden;
@@ -61,8 +65,9 @@ export default function ShiftPrintSlip({
                                 left: 0;
                                 top: 0;
                                 width: 80mm;
-                                margin: 0;
-                                padding: 4mm;
+                                margin: 0 auto;
+                                padding: 2mm 4mm;
+                                box-sizing: border-box;
                             }
                             .no-print {
                                 display: none !important;

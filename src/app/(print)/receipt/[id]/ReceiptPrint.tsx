@@ -35,6 +35,7 @@ interface TemplateData {
     showBillNo: boolean;
     showStaff: boolean;
     showCustomer: boolean;
+    paperSize?: string;
 }
 
 type Template = TemplateData | null;
@@ -68,6 +69,12 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
     }, []);
 
     const shopName = template?.shopName || 'Fertilizer POS';
+    const is58mm = template?.paperSize === '58mm';
+    // 80mm thermal paper has ~72mm printable width (576 dots at 203 DPI)
+    // 58mm thermal paper has ~48mm printable width (384 dots at 203 DPI)
+    const paperWidth = is58mm ? '58mm' : '80mm';
+    const contentWidth = is58mm ? '48mm' : '72mm';
+
     const paidAtSale = (sale.payments || [])
         .filter(p => p.method !== 'CREDIT')
         .reduce((s, p) => s + p.amount, 0);
@@ -81,19 +88,38 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
         <>
             <style jsx global>{`
                 @page {
-                    size: 80mm auto;
-                    margin: 0;
+                    size: ${paperWidth} auto;
+                    margin: 0 !important;
                 }
 
                 @media print {
-                    body { margin: 0; padding: 0; }
-                    .no-print { display: none !important; }
+                    *, *::before, *::after {
+                        box-sizing: border-box !important;
+                    }
+                    html, body {
+                        width: 100% !important;
+                        max-width: ${paperWidth} !important;
+                        margin: 0 auto !important;
+                        padding: 0 !important;
+                        background: #fff !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    .receipt-container {
+                        width: ${contentWidth} !important;
+                        max-width: ${contentWidth} !important;
+                        margin: 0 auto !important;
+                        padding: 0 1mm !important;
+                    }
+                    .no-print {
+                        display: none !important;
+                    }
                 }
 
                 body {
                     font-family: 'Sarabun', 'Tahoma', sans-serif;
-                    font-size: 16px;
-                    line-height: 1.4;
+                    font-size: ${is58mm ? '13px' : '15px'};
+                    line-height: 1.35;
                     color: #000;
                     background: #fff;
                 }
@@ -109,7 +135,7 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                 </button>
             </div>
 
-            <div style={{ width: '76mm', margin: '0 auto', padding: '1mm 0' }}>
+            <div className="receipt-container" style={{ width: contentWidth, maxWidth: contentWidth, margin: '0 auto', padding: '1mm 0', boxSizing: 'border-box' }}>
                 {/* Logo */}
                 {template?.showLogo && template?.logoUrl && (
                     <div style={{ textAlign: 'center', marginBottom: '4px' }}>

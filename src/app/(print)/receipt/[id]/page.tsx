@@ -80,6 +80,7 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
         showBillNo: template.showBillNo ?? true,
         showStaff: template.showStaff ?? true,
         showCustomer: template.showCustomer ?? true,
+        paperSize: template.paperSize || '80mm',
     } : null;
 
     const cashReceived = sale.cashReceived ? Number(sale.cashReceived) : cashReceivedParam;

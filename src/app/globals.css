@@ -155,11 +155,6 @@ body {
     print-color-adjust: exact;
   }
 
-  /* Page setup */
-  @page {
-    size: A4;
-    margin: 15mm;
-  }
 
   /* Disable all animations and transitions */
   * {
