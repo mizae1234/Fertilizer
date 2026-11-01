@@ -38,6 +38,10 @@ export async function GET(
                 productUnits: {
                     orderBy: [{ isBaseUnit: 'desc' }, { conversionRate: 'asc' }],
                 },
+                priceTiers: {
+                    include: { productUnit: { select: { id: true, unitName: true } } },
+                    orderBy: [{ productUnitId: 'asc' }, { minQuantity: 'asc' }],
+                },
                 stockTransactions: {
                     where: Object.keys(txWhere).length > 0 ? txWhere : undefined,
                     include: {

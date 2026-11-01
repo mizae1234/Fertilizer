@@ -51,6 +51,15 @@ interface ProductUnit {
     isBaseUnit: boolean;
 }
 
+interface ProductPriceTier {
+    id: string;
+    productId: string;
+    productUnitId: string | null;
+    productUnit?: { id: string; unitName: string } | null;
+    minQuantity: number;
+    price: number | string;
+}
+
 interface ProductGoodsReceiveItem {
     id: string;
     goodsReceiveId: string;
@@ -107,6 +116,7 @@ interface ProductDetail {
     productStocks: ProductStock[];
     productPrices: ProductPrice[];
     productUnits: ProductUnit[];
+    priceTiers?: ProductPriceTier[];
     goodsReceiveItems?: ProductGoodsReceiveItem[];
     stockTransactions: StockTransaction[];
     productLogs: ProductLog[];
@@ -180,6 +190,7 @@ export default function ProductDetailPage() {
     // Temp rows for adding new items (not yet saved)
     const [newPriceRows, setNewPriceRows] = useState<{ customerGroupId: string; productUnitId: string; price: number }[]>([]);
     const [newUnitRows, setNewUnitRows] = useState<{ unitName: string; conversionRate: number; sellingPrice: number; isBaseUnit: boolean }[]>([]);
+    const [newTierRows, setNewTierRows] = useState<{ productUnitId: string; minQuantity: number; price: number }[]>([]);
 
     // Alert modal
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; type: 'success' | 'error' | 'warning'; title?: string }>({ open: false, message: '', type: 'error' });
@@ -411,6 +422,75 @@ export default function ProductDetailPage() {
     const updateExistingUnit = (unitId: string, updates: Partial<ProductUnit>) => {
         if (!product) return;
         setProduct({ ...product, productUnits: product.productUnits.map(u => u.id === unitId ? { ...u, ...updates } : u) });
+    };
+
+    // Price Tiers CRUD
+    const handleSaveExistingTier = async (tier: ProductPriceTier) => {
+        setSavingId(tier.id);
+        try {
+            const res = await fetch(`/api/products/${id}/tiers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tierId: tier.id,
+                    productUnitId: tier.productUnitId || null,
+                    minQuantity: Number(tier.minQuantity),
+                    price: Number(tier.price),
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
+            showAlert('บันทึกขั้นราคาเรียบร้อย', 'success', 'สำเร็จ');
+            await refreshProduct();
+        } catch (error) {
+            showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
+        } finally {
+            setSavingId(null);
+        }
+    };
+
+    const handleSaveNewTier = async (row: { productUnitId: string; minQuantity: number; price: number }, idx: number) => {
+        if (!row.minQuantity || row.minQuantity < 1) { showAlert('กรุณากรอกจำนวนขั้นต่ำตั้งแต่ 1 ขึ้นไป', 'warning', 'แจ้งเตือน'); return; }
+        if (row.price === undefined || row.price < 0) { showAlert('กรุณากรอกราคาให้ถูกต้อง', 'warning', 'แจ้งเตือน'); return; }
+        setSavingId(`new-tier-${idx}`);
+        try {
+            const res = await fetch(`/api/products/${id}/tiers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(row),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
+            showAlert('เพิ่มขั้นราคาเรียบร้อย', 'success', 'สำเร็จ');
+            setNewTierRows(prev => prev.filter((_, i) => i !== idx));
+            await refreshProduct();
+        } catch (error) {
+            showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
+        } finally {
+            setSavingId(null);
+        }
+    };
+
+    const handleDeleteTier = async (tier: ProductPriceTier) => {
+        const unitName = tier.productUnit?.unitName || product?.unit || 'หน่วยหลัก';
+        if (!confirm(`ลบขั้นราคา "${unitName} (ซื้อตั้งแต่ ${tier.minQuantity} ขึ้นไป)" ?`)) return;
+        try {
+            const res = await fetch(`/api/products/${id}/tiers?tierId=${tier.id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
+            showAlert('ลบขั้นราคาเรียบร้อย', 'success', 'สำเร็จ');
+            await refreshProduct();
+        } catch (error) {
+            showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
+        }
+    };
+
+    const updateExistingTier = (tierId: string, updates: Partial<ProductPriceTier>) => {
+        if (!product) return;
+        setProduct({
+            ...product,
+            priceTiers: (product.priceTiers || []).map(t => t.id === tierId ? { ...t, ...updates } : t)
+        });
     };
 
     if (loading) {
@@ -919,6 +999,175 @@ export default function ProductDetailPage() {
                                 </button>
                                 <button type="button" onClick={() => setNewPriceRows(prev => prev.filter((_, i) => i !== idx))}
                                     className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Volume / Tiered Pricing Section */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
+                <div className="flex items-center justify-between mb-2">
+                    <div>
+                        <h2 className="font-semibold text-gray-800 flex items-center gap-1.5">
+                            <span>🪜</span> บันไดราคาตามจำนวน (Volume Pricing)
+                        </h2>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                            กำหนดราคาขายตามจำนวนการซื้อ เช่น 1-5 ชิ้น 500บ. / 6 ชิ้นขึ้นไป 480บ. (หรือซื้อ 2 ลังขึ้นไป ลังละ 5,640บ.)
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setNewTierRows(prev => [...prev, { productUnitId: '', minQuantity: 2, price: 0 }])}
+                        className="text-xs text-emerald-600 font-medium hover:underline bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 transition-colors"
+                    >
+                        + เพิ่มขั้นราคา
+                    </button>
+                </div>
+
+                {((!product.priceTiers || product.priceTiers.length === 0) && newTierRows.length === 0) ? (
+                    <p className="text-sm text-gray-400 text-center py-4 border border-dashed border-gray-200 rounded-xl my-2">
+                        ยังไม่ได้ตั้งบันไดราคา — สามารถกด "+ เพิ่มขั้นราคา" เพื่อตั้งราคาพิเศษตามจำนวนการซื้อได้
+                    </p>
+                ) : (
+                    <div className="space-y-3 mt-3">
+                        <div className="hidden sm:grid sm:grid-cols-12 gap-2 text-xs font-medium text-gray-400 px-2">
+                            <div className="col-span-4">หน่วยนับ</div>
+                            <div className="col-span-3">ซื้อตั้งแต่จำนวน (ขั้นต่ำ)</div>
+                            <div className="col-span-3">ราคาต่อหน่วย (บาท)</div>
+                            <div className="col-span-2 text-right">จัดการ</div>
+                        </div>
+
+                        {product.priceTiers?.map(tier => {
+                            return (
+                                <div key={tier.id} className="flex sm:grid sm:grid-cols-12 items-center gap-2 p-2.5 rounded-xl border border-gray-200 bg-gray-50/50 flex-wrap sm:flex-nowrap">
+                                    <div className="sm:col-span-4 w-full sm:w-auto">
+                                        <select
+                                            value={tier.productUnitId || ''}
+                                            onChange={e => updateExistingTier(tier.id, { productUnitId: e.target.value || null })}
+                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                        >
+                                            <option value="">{product.unit} (หน่วยหลัก)</option>
+                                            {product.productUnits.map(u => (
+                                                <option key={u.id} value={u.id}>{u.unitName} (อัตรา 1:{u.conversionRate})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="sm:col-span-3 flex items-center gap-1.5 w-full sm:w-auto">
+                                        <span className="text-xs text-gray-500 sm:hidden">ซื้อตั้งแต่:</span>
+                                        <input
+                                            type="number"
+                                            value={tier.minQuantity || ''}
+                                            onChange={e => updateExistingTier(tier.id, { minQuantity: parseInt(e.target.value) || 1 })}
+                                            min={1}
+                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                            placeholder="จำนวนขั้นต่ำ"
+                                        />
+                                        <span className="text-xs text-gray-400 shrink-0">ขึ้นไป</span>
+                                    </div>
+                                    <div className="sm:col-span-3 flex items-center gap-1.5 w-full sm:w-auto">
+                                        <span className="text-xs text-gray-500 sm:hidden">ราคา:</span>
+                                        <input
+                                            type="number"
+                                            value={Number(tier.price) || ''}
+                                            onChange={e => updateExistingTier(tier.id, { price: parseFloat(e.target.value) || 0 })}
+                                            min={0}
+                                            step="0.01"
+                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                                            placeholder="ราคาต่อหน่วย"
+                                        />
+                                        <span className="text-xs text-gray-400 shrink-0">บ.</span>
+                                    </div>
+                                    <div className="sm:col-span-2 flex items-center justify-end gap-1.5 w-full sm:w-auto">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSaveExistingTier(tier)}
+                                            disabled={savingId === tier.id}
+                                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium disabled:opacity-50 transition-colors"
+                                        >
+                                            {savingId === tier.id ? '...' : 'บันทึก'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteTier(tier)}
+                                            className="text-red-400 hover:text-red-600 p-1.5 text-sm"
+                                            title="ลบขั้นราคา"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {newTierRows.map((row, idx) => (
+                            <div key={`new-tier-${idx}`} className="flex sm:grid sm:grid-cols-12 items-center gap-2 p-2.5 rounded-xl border border-emerald-300 bg-emerald-50/40 flex-wrap sm:flex-nowrap">
+                                <div className="sm:col-span-4 w-full sm:w-auto">
+                                    <select
+                                        value={row.productUnitId}
+                                        onChange={e => {
+                                            const updated = [...newTierRows];
+                                            updated[idx].productUnitId = e.target.value;
+                                            setNewTierRows(updated);
+                                        }}
+                                        className="w-full px-3 py-2 rounded-lg border border-emerald-200 text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                    >
+                                        <option value="">{product.unit} (หน่วยหลัก)</option>
+                                        {product.productUnits.map(u => (
+                                            <option key={u.id} value={u.id}>{u.unitName} (อัตรา 1:{u.conversionRate})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="sm:col-span-3 flex items-center gap-1.5 w-full sm:w-auto">
+                                    <span className="text-xs text-gray-500 sm:hidden">ซื้อตั้งแต่:</span>
+                                    <input
+                                        type="number"
+                                        value={row.minQuantity || ''}
+                                        onChange={e => {
+                                            const updated = [...newTierRows];
+                                            updated[idx].minQuantity = parseInt(e.target.value) || 1;
+                                            setNewTierRows(updated);
+                                        }}
+                                        min={1}
+                                        className="w-full px-3 py-2 rounded-lg border border-emerald-200 text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                        placeholder="จำนวนขั้นต่ำ เช่น 6"
+                                    />
+                                    <span className="text-xs text-gray-400 shrink-0">ขึ้นไป</span>
+                                </div>
+                                <div className="sm:col-span-3 flex items-center gap-1.5 w-full sm:w-auto">
+                                    <span className="text-xs text-gray-500 sm:hidden">ราคา:</span>
+                                    <input
+                                        type="number"
+                                        value={row.price || ''}
+                                        onChange={e => {
+                                            const updated = [...newTierRows];
+                                            updated[idx].price = parseFloat(e.target.value) || 0;
+                                            setNewTierRows(updated);
+                                        }}
+                                        min={0}
+                                        step="0.01"
+                                        className="w-full px-3 py-2 rounded-lg border border-emerald-200 text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                                        placeholder="ราคาต่อหน่วย เช่น 480"
+                                    />
+                                    <span className="text-xs text-gray-400 shrink-0">บ.</span>
+                                </div>
+                                <div className="sm:col-span-2 flex items-center justify-end gap-1.5 w-full sm:w-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSaveNewTier(row, idx)}
+                                        disabled={savingId === `new-tier-${idx}`}
+                                        className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium disabled:opacity-50 transition-colors"
+                                    >
+                                        {savingId === `new-tier-${idx}` ? '...' : 'บันทึก'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewTierRows(prev => prev.filter((_, i) => i !== idx))}
+                                        className="text-red-400 hover:text-red-600 p-1.5 text-sm"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

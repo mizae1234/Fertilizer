@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSaleFromPOS } from '@/app/actions/pos';
 import { formatCurrency } from '@/lib/utils';
+import { resolveItemUnitPrice } from '@/lib/priceCalculator';
 import AlertModal from '@/components/AlertModal';
 import { useShift } from '@/hooks/useShift';
 import ShiftBadge from '@/components/shifts/ShiftBadge';
@@ -14,6 +15,12 @@ import ShiftPrintSlip from '@/components/shifts/ShiftPrintSlip';
 interface ProductUnitInfo {
     id: string; unitName: string; conversionRate: string; sellingPrice: string; isBaseUnit: boolean;
 }
+interface PriceTierInfo {
+    id: string;
+    productUnitId: string | null;
+    minQuantity: number;
+    price: string | number;
+}
 interface Product {
     id: string; code: string; barcode?: string | null; name: string; unit: string; price: string;
     description?: string | null;
@@ -22,6 +29,7 @@ interface Product {
     productStocks: { warehouseId: string; quantity: number }[];
     productPrices: { customerGroupId: string; price: string; productUnitId: string | null; customerGroup: { id: string; name: string } }[];
     productUnits: ProductUnitInfo[];
+    priceTiers?: PriceTierInfo[];
 }
 interface Warehouse { id: string; name: string; }
 interface CustomerGroup { id: string; name: string; }
@@ -47,6 +55,11 @@ interface CartItem {
     conversionRate: number;
     baseUnitPrice: number; // original base-unit price, never overwritten
     productUnits: ProductUnitInfo[];
+    // Price Tiers
+    priceTiers?: PriceTierInfo[];
+    isTierApplied?: boolean;
+    appliedTierText?: string;
+    isManualPrice?: boolean;
     // Bundle fields
     isBundle?: boolean;
     bundleId?: string;
@@ -544,24 +557,22 @@ export default function POSPage() {
     useEffect(() => {
         if (cart.length === 0) return;
         setCart(prev => prev.map(c => {
-            if (c.isBundle) return c;
-            const product = products.find(p => p.id === c.productId);
-            if (!product) return c;
-
-            if (selectedCustomer) {
-                // Find price for this customer group + current unit
-                const unitId = c.selectedUnitId || null;
-                const gp = c.productPrices.find(pp =>
-                    pp.customerGroupId === selectedCustomer.customerGroup.id && pp.productUnitId === unitId
-                );
-                if (gp) return { ...c, unitPrice: gp.price };
-            }
-            // No customer or no group price → revert to normal price
-            if (c.selectedUnitId) {
-                const unit = product.productUnits?.find(u => u.id === c.selectedUnitId);
-                if (unit) return { ...c, unitPrice: Number(unit.sellingPrice) };
-            }
-            return { ...c, unitPrice: getPrice(product) };
+            if (c.isBundle || c.isManualPrice) return c;
+            const priceRes = resolveItemUnitPrice({
+                quantity: c.quantity,
+                basePrice: c.baseUnitPrice,
+                selectedUnitId: c.selectedUnitId || null,
+                productUnits: c.productUnits,
+                priceTiers: c.priceTiers,
+                productPrices: c.productPrices,
+                customerGroupId: selectedCustomer?.customerGroup?.id,
+            });
+            return {
+                ...c,
+                unitPrice: priceRes.unitPrice,
+                isTierApplied: priceRes.isTierApplied,
+                appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${c.selectedUnitName || c.unit}` : undefined,
+            };
         }));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedCustomer]);
@@ -578,36 +589,60 @@ export default function POSPage() {
         const qtyToAdd = defaultQty || 1;
         const existing = cart.find(c => c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === '');
         if (existing) {
-            setCart(cart.map(c =>
-                c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === ''
-                    ? { ...c, quantity: c.quantity + qtyToAdd, points: (c.quantity + qtyToAdd) * c.conversionRate * c.pointsPerUnit }
-                    : c
-            ));
+            setCart(cart.map(c => {
+                if (c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === '') {
+                    const newQty = c.quantity + qtyToAdd;
+                    const priceRes = !c.isManualPrice ? resolveItemUnitPrice({
+                        quantity: newQty,
+                        basePrice: c.baseUnitPrice,
+                        selectedUnitId: null,
+                        productUnits: c.productUnits,
+                        priceTiers: c.priceTiers,
+                        productPrices: c.productPrices,
+                        customerGroupId: selectedCustomer?.customerGroup?.id,
+                    }) : { unitPrice: c.unitPrice, isTierApplied: !!c.isTierApplied, appliedTier: null };
+
+                    return {
+                        ...c,
+                        quantity: newQty,
+                        unitPrice: priceRes.unitPrice,
+                        isTierApplied: priceRes.isTierApplied,
+                        appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${c.unit}` : undefined,
+                        points: newQty * c.conversionRate * c.pointsPerUnit,
+                    };
+                }
+                return c;
+            }));
             triggerPulse(product.id);
             setDefaultQty(1);
         } else {
-            // Auto-determine price based on customer group + unit
-            let price = getPrice(product);
-            const priceTier = 'custom';
-            if (selectedCustomer) {
-                const unitId = null;
-                const gp = product.productPrices.find(p =>
-                    p.customerGroup.id === selectedCustomer.customerGroup.id && p.productUnitId === unitId
-                );
-                if (gp) price = Number(gp.price);
-            }
+            const productPricesMapped = product.productPrices.map(pp => ({ customerGroupId: pp.customerGroup.id, productUnitId: pp.productUnitId, price: Number(pp.price) }));
+            const basePrice = Number(product.price);
+            const priceRes = resolveItemUnitPrice({
+                quantity: qtyToAdd,
+                basePrice,
+                selectedUnitId: null,
+                productUnits: product.productUnits || [],
+                priceTiers: product.priceTiers || [],
+                productPrices: productPricesMapped,
+                customerGroupId: selectedCustomer?.customerGroup?.id,
+            });
+
             setCart([...cart, {
                 productId: product.id, productName: product.name, productCode: product.code,
-                unit: unitName, warehouseId, quantity: qtyToAdd, unitPrice: price,
+                unit: unitName, warehouseId, quantity: qtyToAdd, unitPrice: priceRes.unitPrice,
                 points: product.pointsPerUnit * qtyToAdd, availableStock: stock,
                 pointsPerUnit: product.pointsPerUnit,
-                priceTier,
-                productPrices: product.productPrices.map(pp => ({ customerGroupId: pp.customerGroup.id, productUnitId: pp.productUnitId, price: Number(pp.price) })),
+                priceTier: 'custom',
+                productPrices: productPricesMapped,
                 selectedUnitId: '',
                 selectedUnitName: unitName,
                 conversionRate: convRate,
-                baseUnitPrice: price,
+                baseUnitPrice: basePrice,
                 productUnits: product.productUnits || [],
+                priceTiers: product.priceTiers || [],
+                isTierApplied: priceRes.isTierApplied,
+                appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${unitName}` : undefined,
                 itemDiscount: 0,
             }]);
             setLastAddedId(product.id);
@@ -698,7 +733,30 @@ export default function POSPage() {
     const updateCartQty = (idx: number, qty: number) => {
         if (qty <= 0) { removeFromCart(idx); return; }
         const item = cart[idx];
-        setCart(cart.map((c, i) => i === idx ? { ...c, quantity: qty, points: qty * c.conversionRate * c.pointsPerUnit } : c));
+        setCart(cart.map((c, i) => {
+            if (i !== idx) return c;
+            if (c.isBundle) {
+                return { ...c, quantity: qty, points: qty * c.conversionRate * c.pointsPerUnit };
+            }
+            const priceRes = !c.isManualPrice ? resolveItemUnitPrice({
+                quantity: qty,
+                basePrice: c.baseUnitPrice,
+                selectedUnitId: c.selectedUnitId || null,
+                productUnits: c.productUnits,
+                priceTiers: c.priceTiers,
+                productPrices: c.productPrices,
+                customerGroupId: selectedCustomer?.customerGroup?.id,
+            }) : { unitPrice: c.unitPrice, isTierApplied: !!c.isTierApplied, appliedTier: null };
+
+            return {
+                ...c,
+                quantity: qty,
+                unitPrice: priceRes.unitPrice,
+                isTierApplied: priceRes.isTierApplied,
+                appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${c.selectedUnitName || c.unit}` : undefined,
+                points: qty * c.conversionRate * c.pointsPerUnit,
+            };
+        }));
         triggerPulse(item.productId);
     };
 
@@ -736,7 +794,7 @@ export default function POSPage() {
     const removeFromCart = (idx: number) => setCart(cart.filter((_, i) => i !== idx));
 
     const updateCartPrice = (idx: number, price: number) => {
-        setCart(cart.map((c, i) => i === idx ? { ...c, unitPrice: price, priceTier: 'custom' } : c));
+        setCart(cart.map((c, i) => i === idx ? { ...c, unitPrice: price, isManualPrice: true, isTierApplied: false, appliedTierText: undefined, priceTier: 'custom' } : c));
     };
 
     // updateCartPriceTier removed — price is auto-determined by customer group + unit
@@ -749,31 +807,25 @@ export default function POSPage() {
 
             // "default" = product's original unit (no productUnit record)
             if (unitId === '__default__') {
-                // Determine the base unit price:
-                // 1. Try customer group price for base unit (productUnitId === null)
-                // 2. Try product.price from products array
-                // 3. Fallback: find base unit in productUnits and use its sellingPrice
-                let price: number | undefined;
-                if (selectedCustomer) {
-                    const gp = c.productPrices.find(pp =>
-                        pp.customerGroupId === selectedCustomer.customerGroup.id && pp.productUnitId === null
-                    );
-                    if (gp) price = gp.price;
-                }
-                if (price === undefined) {
-                    if (product) {
-                        price = getPrice(product);
-                    } else {
-                        // products array cleared after search — use stored baseUnitPrice
-                        price = c.baseUnitPrice;
-                    }
-                }
+                const priceRes = resolveItemUnitPrice({
+                    quantity: c.quantity,
+                    basePrice: c.baseUnitPrice,
+                    selectedUnitId: null,
+                    productUnits: c.productUnits,
+                    priceTiers: c.priceTiers,
+                    productPrices: c.productPrices,
+                    customerGroupId: selectedCustomer?.customerGroup?.id,
+                });
+
                 return {
                     ...c,
                     selectedUnitId: '',
                     selectedUnitName: c.unit,
                     conversionRate: 1,
-                    unitPrice: price,
+                    unitPrice: priceRes.unitPrice,
+                    isTierApplied: priceRes.isTierApplied,
+                    appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${c.unit}` : undefined,
+                    isManualPrice: false,
                     availableStock: baseStock,
                     priceTier: 'custom',
                     points: c.quantity * 1 * c.pointsPerUnit,
@@ -783,20 +835,26 @@ export default function POSPage() {
             const unit = c.productUnits.find(u => u.id === unitId);
             if (!unit) return c;
             const convRate = Number(unit.conversionRate);
-            // Auto-lookup group price for this specific unit
-            let unitPrice = Number(unit.sellingPrice);
-            if (selectedCustomer) {
-                const gp = c.productPrices.find(pp =>
-                    pp.customerGroupId === selectedCustomer.customerGroup.id && pp.productUnitId === unit.id
-                );
-                if (gp) unitPrice = gp.price;
-            }
+
+            const priceRes = resolveItemUnitPrice({
+                quantity: c.quantity,
+                basePrice: c.baseUnitPrice,
+                selectedUnitId: unit.id,
+                productUnits: c.productUnits,
+                priceTiers: c.priceTiers,
+                productPrices: c.productPrices,
+                customerGroupId: selectedCustomer?.customerGroup?.id,
+            });
+
             return {
                 ...c,
                 selectedUnitId: unit.id,
                 selectedUnitName: unit.unitName,
                 conversionRate: convRate,
-                unitPrice,
+                unitPrice: priceRes.unitPrice,
+                isTierApplied: priceRes.isTierApplied,
+                appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${unit.unitName}` : undefined,
+                isManualPrice: false,
                 availableStock: baseStock,
                 priceTier: 'custom',
                 points: c.quantity * convRate * c.pointsPerUnit,
@@ -1521,7 +1579,14 @@ export default function POSPage() {
                                                 {/* Single row on desktop, 2 rows on mobile */}
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-xs lg:text-sm font-semibold text-gray-800 truncate">{item.productName}</p>
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <p className="text-xs lg:text-sm font-semibold text-gray-800 truncate">{item.productName}</p>
+                                                            {item.isTierApplied && item.appliedTierText && (
+                                                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-medium shrink-0">
+                                                                    🪜 {item.appliedTierText}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <p className="text-[10px] lg:hidden text-gray-400">{item.productCode} · {formatCurrency(item.unitPrice)}/{item.selectedUnitName}</p>
                                                         <p className="text-xs text-gray-400 hidden lg:block">{item.productCode}</p>
                                                     </div>

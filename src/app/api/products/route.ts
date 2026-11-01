@@ -63,6 +63,10 @@ export async function GET(request: Request) {
                     select: { id: true, unitName: true, conversionRate: true, sellingPrice: true, isBaseUnit: true },
                     orderBy: [{ isBaseUnit: 'desc' }, { conversionRate: 'asc' }],
                 },
+                priceTiers: {
+                    select: { id: true, productUnitId: true, minQuantity: true, price: true },
+                    orderBy: { minQuantity: 'asc' },
+                },
             },
             ...(search ? { take: 200 } : {}),
             orderBy: { name: 'asc' },

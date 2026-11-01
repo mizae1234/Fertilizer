@@ -155,6 +155,7 @@ model Product {
   saleReturnItems    SaleReturnItem[]
   quotationItems     QuotationItem[]
   stockWithdrawalItems StockWithdrawalItem[]
+  priceTiers         ProductPriceTier[]
 }
 
 // ============ Product Audit Log ============
@@ -218,8 +219,26 @@ model ProductUnit {
 
   product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
   productPrices ProductPrice[]
+  priceTiers    ProductPriceTier[]
 
   @@unique([productId, unitName])
+}
+
+// ============ Product Price Tiers (บันไดราคาตามจำนวน) ============
+model ProductPriceTier {
+  id            String       @id @default(cuid())
+  productId     String
+  productUnitId String?
+  minQuantity   Int
+  price         Decimal      @db.Decimal(12, 2)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  product       Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productUnit   ProductUnit? @relation(fields: [productUnitId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([productUnitId])
 }
 
 // ============ Customers ============
