@@ -7,20 +7,22 @@ interface SaleData {
     saleNumber: string;
     status: string;
     totalAmount: number;
+    discount: number;
     paymentMethod: string;
     creditDueDate: string | null;
     payments: { method: string; amount: number; dueDate?: string }[] | null;
     notes: string | null;
+    debtPaid: number;
     createdAt: string;
-    customer: { name: string; phone: string } | null;
+    customer: { name: string; phone: string; address?: string | null; taxId?: string | null } | null;
     createdBy: { name: string };
     items: {
         id: string;
         quantity: number;
         unitPrice: number;
         totalPrice: number;
-        discount: number;
-        unitName: string | null;
+        discount?: number;
+        unitName?: string | null;
         product: { name: string; code: string; unit: string };
         warehouse: { name: string; id: string };
     }[];
@@ -32,10 +34,11 @@ interface TemplateData {
     logoUrl: string | null;
     headerText: string;
     footerText: string;
+    specialNote: string | null;
     showBillNo: boolean;
     showVat: boolean;
     showQr: boolean;
-    qrCodeUrl: string | null;
+    qrCodeUrl?: string | null;
     showStaff: boolean;
     showCustomer: boolean;
 }
@@ -95,6 +98,25 @@ function numberToThaiText(num: number): string {
 export default function InvoicePrint({ sale, template }: { sale: SaleData; template: TemplateData | null }) {
     const [title, setTitle] = useState('ใบส่งของ');
     const [showChooser, setShowChooser] = useState(false);
+    const [itemsPerPage, setItemsPerPage] = useState<number>(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const saved = localStorage.getItem('invoice_items_per_page');
+                if (saved && !isNaN(parseInt(saved))) {
+                    return Math.max(3, Math.min(30, parseInt(saved)));
+                }
+            } catch (e) {}
+        }
+        return 10;
+    });
+
+    const handleItemsPerPageChange = (val: number) => {
+        const clamped = Math.max(3, Math.min(30, val));
+        setItemsPerPage(clamped);
+        try {
+            localStorage.setItem('invoice_items_per_page', clamped.toString());
+        } catch (e) {}
+    };
 
     // Auto print or show chooser based on URL parameters
     useEffect(() => {
@@ -138,15 +160,140 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
 
     // Payment info
     const payments = sale.payments as { method: string; amount: number; dueDate?: string }[] | null;
-    const totalPaid = payments?.filter(p => p.method !== 'CREDIT').reduce((s, p) => s + p.amount, 0) ?? (sale.paymentMethod !== 'CREDIT' ? sale.totalAmount : 0);
-    const totalCredit = sale.totalAmount - totalPaid;
+    const paidAtSale = payments?.filter(p => p.method !== 'CREDIT').reduce((s, p) => s + p.amount, 0) ?? (sale.paymentMethod !== 'CREDIT' ? sale.totalAmount : 0);
+    const totalPaid = paidAtSale + (sale.debtPaid || 0);
+    const totalCredit = Math.max(0, sale.totalAmount - totalPaid);
+
+    // Chunk items into separate pages
+    const pages: (typeof sale.items)[] = [];
+    if (sale.items.length === 0) {
+        pages.push([]);
+    } else {
+        for (let i = 0; i < sale.items.length; i += itemsPerPage) {
+            pages.push(sale.items.slice(i, i + itemsPerPage));
+        }
+    }
+    const totalPages = pages.length;
+
+    // Render Closing Summary and Signatures (shown on last page)
+    const renderClosingBlock = () => (
+        <div style={{ paddingTop: 4 }}>
+            {/* Discount Summary */}
+            {sale.discount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+                    <table style={{ borderCollapse: 'collapse', width: 280 }}>
+                        <tbody>
+                            <tr>
+                                <td style={{ padding: '2px 8px', fontSize: 11, textAlign: 'right', color: '#666' }}>ยอดรวมสินค้า</td>
+                                <td style={{ padding: '2px 8px', fontSize: 11, textAlign: 'right', width: 90 }}>{formatCurrency(sale.totalAmount + sale.discount)}</td>
+                            </tr>
+                            <tr>
+                                <td style={{ padding: '2px 8px', fontSize: 11, textAlign: 'right', color: '#dc2626' }}>ส่วนลด</td>
+                                <td style={{ padding: '2px 8px', fontSize: 11, textAlign: 'right', color: '#dc2626' }}>-{formatCurrency(sale.discount)}</td>
+                            </tr>
+                            <tr style={{ borderTop: '1px solid #ccc' }}>
+                                <td style={{ padding: '3px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700 }}>ยอดสุทธิ</td>
+                                <td style={{ padding: '3px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700 }}>{formatCurrency(sale.totalAmount)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* Notes */}
+            {sale.notes && (
+                <div style={{ marginBottom: 5, padding: '5px 10px', background: '#f9fafb', borderRadius: 6, border: '1px solid #e5e7eb' }}>
+                    <div style={{ fontSize: 10, color: '#888', marginBottom: 1 }}>หมายเหตุ:</div>
+                    <div style={{ fontSize: 11, color: '#333', whiteSpace: 'pre-wrap' }}>{sale.notes}</div>
+                </div>
+            )}
+
+            {/* Special Note (A4 only) */}
+            {template?.specialNote && (
+                <div style={{ marginBottom: 5, padding: '6px 12px', background: '#fffbeb', borderRadius: 6, border: '1px solid #fcd34d' }}>
+                    <div style={{ fontSize: 10, color: '#92400e', fontWeight: 700, marginBottom: 1 }}>โน๊ตพิเศษ:</div>
+                    <div style={{ fontSize: 11, color: '#78350f', whiteSpace: 'pre-wrap', lineHeight: 1.35 }}>{template.specialNote}</div>
+                </div>
+            )}
+
+            {/* VAT Summary */}
+            {template?.showVat && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 5 }}>
+                    <table style={{ borderCollapse: 'collapse', width: 280 }}>
+                        <tbody>
+                            <tr>
+                                <td style={{ padding: '2px 8px', fontSize: 11, textAlign: 'right', color: '#666' }}>มูลค่าก่อน VAT</td>
+                                <td style={{ padding: '2px 8px', fontSize: 11, textAlign: 'right', width: 90 }}>{formatCurrency(sale.totalAmount / 1.07)}</td>
+                            </tr>
+                            <tr>
+                                <td style={{ padding: '2px 8px', fontSize: 11, textAlign: 'right', color: '#666' }}>VAT 7%</td>
+                                <td style={{ padding: '2px 8px', fontSize: 11, textAlign: 'right' }}>{formatCurrency(sale.totalAmount - sale.totalAmount / 1.07)}</td>
+                            </tr>
+                            <tr style={{ borderTop: '1px solid #ccc' }}>
+                                <td style={{ padding: '3px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700 }}>รวมทั้งสิ้น</td>
+                                <td style={{ padding: '3px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700 }}>{formatCurrency(sale.totalAmount)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* Credit info */}
+            {totalCredit > 0 && sale.creditDueDate && (
+                <div style={{ fontSize: 11, color: '#dc2626', marginBottom: 5, fontWeight: 600 }}>
+                    กำหนดชำระเงิน: {new Date(sale.creditDueDate).toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                </div>
+            )}
+
+            {/* QR Code */}
+            {template?.showQr && template?.qrCodeUrl && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 5 }}>
+                    <div style={{ textAlign: 'center' }}>
+                        <img src={template.qrCodeUrl} alt="QR Code" style={{ width: 80, height: 80, objectFit: 'contain' }} />
+                        <div style={{ fontSize: 9, color: '#888', marginTop: 2 }}>สแกนเพื่อชำระเงิน</div>
+                    </div>
+                </div>
+            )}
+
+            {/* Footer Text */}
+            {template?.footerText && (
+                <div style={{ textAlign: 'center', fontSize: 10, color: '#6b7280', marginBottom: 8, whiteSpace: 'pre-wrap' }}>
+                    {template.footerText}
+                </div>
+            )}
+
+            {/* Signature Lines */}
+            <div style={{ paddingTop: 6, borderTop: '1px solid #e5e7eb' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 20 }}>
+                    {['ผู้รับของ', 'ผู้นำส่ง', 'ผู้รับเงิน', 'ผู้อนุมัติ'].map(label => (
+                        <div key={label} style={{ flex: 1, textAlign: 'center' }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 24 }}>{label}</div>
+                            <div style={{ borderTop: '1px dashed #9ca3af', paddingTop: 2 }}>
+                                <div style={{ fontSize: 9, color: '#9ca3af' }}>............................................</div>
+                                <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 2 }}>วันที่ ........................................</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
 
     return (
         <>
             <style jsx global>{`
                 @media print {
-                    body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    @page { size: A4; margin: 15mm; }
+                    html, body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: white !important;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    @page {
+                        size: A4 portrait;
+                        margin: 0;
+                    }
                     .no-print { display: none !important; }
                     .no-border-print {
                         border: none !important;
@@ -155,16 +302,61 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                         width: auto !important;
                         text-align: right !important;
                     }
+                    .invoice-page {
+                        width: 210mm !important;
+                        min-height: 294mm !important;
+                        height: 294mm !important;
+                        max-height: 295mm !important;
+                        margin: 0 !important;
+                        padding: 8mm 12mm 6mm 12mm !important;
+                        box-shadow: none !important;
+                        page-break-after: always !important;
+                        break-after: page !important;
+                        box-sizing: border-box !important;
+                        position: relative !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                        justify-content: space-between !important;
+                        overflow: hidden !important;
+                    }
+                    .invoice-page:last-child {
+                        page-break-after: avoid !important;
+                        break-after: avoid !important;
+                    }
+                    * {
+                        animation: none !important;
+                        transition: none !important;
+                    }
                 }
                 @media screen {
-                    body { background: #666; }
+                    body {
+                        background: #4b5563;
+                        margin: 0;
+                        padding: 20px 0 60px 0;
+                    }
+                    .invoice-page {
+                        width: 210mm;
+                        min-height: 297mm;
+                        margin: 20px auto;
+                        background: #fff;
+                        padding: 10mm 12mm;
+                        box-sizing: border-box;
+                        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: space-between;
+                        position: relative;
+                    }
+                    .invoice-page:first-of-type {
+                        margin-top: 85px;
+                    }
                 }
             `}</style>
 
             {/* Top Floating Toolbar (hidden in print) */}
             <div className="no-print" style={{
                 position: 'fixed',
-                top: 16,
+                top: 14,
                 left: 16,
                 right: 16,
                 zIndex: 50,
@@ -172,19 +364,19 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 flexWrap: 'wrap',
-                gap: 12,
-                background: 'rgba(255, 255, 255, 0.96)',
-                backdropFilter: 'blur(8px)',
-                padding: '10px 18px',
-                borderRadius: 16,
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.25)',
+                gap: 10,
+                background: 'rgba(255, 255, 255, 0.98)',
+                backdropFilter: 'blur(10px)',
+                padding: '8px 16px',
+                borderRadius: 14,
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
                 border: '1px solid rgba(229, 231, 235, 0.9)',
-                maxWidth: '960px',
+                maxWidth: '1000px',
                 margin: '0 auto',
             }}>
                 {/* Left: Quick Document Title Switcher */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
                         📋 หัวบิล:
                     </span>
                     {[
@@ -199,9 +391,9 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                                 type="button"
                                 onClick={() => setTitle(opt.value)}
                                 style={{
-                                    padding: '6px 14px',
-                                    borderRadius: 10,
-                                    fontSize: 13,
+                                    padding: '5px 12px',
+                                    borderRadius: 8,
+                                    fontSize: 12,
                                     fontWeight: active ? 700 : 500,
                                     cursor: 'pointer',
                                     border: active ? `2px solid ${opt.border}` : '1px solid #d1d5db',
@@ -217,39 +409,110 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                     })}
                 </div>
 
+                {/* Middle: Items per page selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f3f4f6', padding: '4px 10px', borderRadius: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#4b5563' }}>
+                        📄 รายการ/หน้า:
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => handleItemsPerPageChange(itemsPerPage - 1)}
+                        title="ลดจำนวนรายการต่อหน้า"
+                        style={{
+                            width: 24, height: 24, borderRadius: 5, border: '1px solid #d1d5db',
+                            background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#374151'
+                        }}
+                    >
+                        -
+                    </button>
+                    <input
+                        type="number"
+                        min={3}
+                        max={30}
+                        value={itemsPerPage}
+                        onChange={e => {
+                            const val = parseInt(e.target.value);
+                            if (!isNaN(val)) handleItemsPerPageChange(val);
+                        }}
+                        style={{
+                            width: 40,
+                            textAlign: 'center',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            border: '1px solid #d1d5db',
+                            borderRadius: 6,
+                            padding: '2px 0',
+                            color: '#111827',
+                            outline: 'none',
+                            background: '#fff',
+                        }}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => handleItemsPerPageChange(itemsPerPage + 1)}
+                        title="เพิ่มจำนวนรายการต่อหน้า"
+                        style={{
+                            width: 24, height: 24, borderRadius: 5, border: '1px solid #d1d5db',
+                            background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 14,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#374151'
+                        }}
+                    >
+                        +
+                    </button>
+                    <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
+                        {[6, 8, 10, 12, 14].map(n => (
+                            <button
+                                key={n}
+                                type="button"
+                                onClick={() => handleItemsPerPageChange(n)}
+                                style={{
+                                    padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: itemsPerPage === n ? 700 : 500,
+                                    border: itemsPerPage === n ? '1.5px solid #059669' : '1px solid #d1d5db',
+                                    background: itemsPerPage === n ? '#ecfdf5' : '#fff',
+                                    color: itemsPerPage === n ? '#065f46' : '#6b7280',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                {n}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 {/* Right: Actions */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <button
                         type="button"
                         onClick={() => window.print()}
                         style={{
-                            padding: '8px 20px',
+                            padding: '7px 18px',
                             background: 'linear-gradient(135deg, #10b981, #059669)',
                             color: '#fff',
                             border: 'none',
-                            borderRadius: 10,
+                            borderRadius: 8,
                             fontWeight: 600,
-                            fontSize: 13,
+                            fontSize: 12,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 6,
-                            boxShadow: '0 4px 10px rgba(16,185,129,0.3)',
+                            gap: 5,
+                            boxShadow: '0 3px 8px rgba(16,185,129,0.3)',
                         }}
                     >
-                        🖨️ พิมพ์ {title}
+                        🖨️ พิมพ์ {title} ({totalPages} หน้า)
                     </button>
                     <button
                         type="button"
                         onClick={() => window.history.back()}
                         style={{
-                            padding: '8px 16px',
+                            padding: '7px 14px',
                             background: '#fff',
                             color: '#4b5563',
                             border: '1px solid #d1d5db',
-                            borderRadius: 10,
+                            borderRadius: 8,
                             fontWeight: 500,
-                            fontSize: 13,
+                            fontSize: 12,
                             cursor: 'pointer',
                         }}
                     >
@@ -286,7 +549,7 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                             เลือกหัวบิลที่ต้องการพิมพ์
                         </h2>
                         <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 20px' }}>
-                            บิลเลขที่ <strong style={{ color: '#111827' }}>#{sale.saleNumber}</strong> — เลือกเพื่อสั่งพิมพ์ทันที
+                            บิลเลขที่ <strong style={{ color: '#111827' }}>#{sale.saleNumber}</strong> ({totalPages} หน้า) — เลือกเพื่อสั่งพิมพ์ทันที
                         </p>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -386,232 +649,192 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                 </div>
             )}
 
-            {/* A4 Page */}
-            <div style={{
-                width: '210mm', minHeight: '297mm', margin: '20px auto', background: '#fff',
-                padding: '15mm', fontFamily: '"Sarabun", "Inter", sans-serif', fontSize: 13,
-                color: '#222', lineHeight: 1.6, position: 'relative',
-                boxShadow: '0 0 20px rgba(0,0,0,0.3)',
-            }}>
+            {/* Paginated A4 Pages */}
+            {pages.map((pageItems, pageIdx) => {
+                const isFirstPage = pageIdx === 0;
+                const isLastPage = pageIdx === totalPages - 1;
 
-                {/* Top Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                    {/* Left: Logo + Company */}
-                    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flex: 1 }}>
-                        {template?.showLogo && template?.logoUrl && (
-                            <img src={template.logoUrl} alt="logo" style={{ height: 70, objectFit: 'contain' }} />
-                        )}
-                        <div>
-                            <div style={{ fontSize: 18, fontWeight: 700 }}>{companyName}</div>
-                            {addressLines.map((line, i) => (
-                                <div key={i} style={{ fontSize: 12, color: '#555' }}>{line}</div>
-                            ))}
-                        </div>
-                    </div>
+                return (
+                    <div
+                        key={`page-${pageIdx}`}
+                        className="invoice-page"
+                        style={{
+                            fontFamily: '"Sarabun", "Inter", sans-serif',
+                            fontSize: 12,
+                            color: '#222',
+                            lineHeight: 1.5,
+                        }}
+                    >
+                        {/* Upper Section: Header + Items Table */}
+                        <div style={{ flex: 1 }}>
+                            {/* ================= PAGE 1 HEADER ================= */}
+                            {isFirstPage ? (
+                                <>
+                                    {/* Top Header */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                                        {/* Left: Logo + Company */}
+                                        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flex: 1 }}>
+                                            {template?.showLogo && template?.logoUrl && (
+                                                <img src={template.logoUrl} alt="logo" style={{ height: 58, objectFit: 'contain' }} />
+                                            )}
+                                            <div>
+                                                <div style={{ fontSize: 17, fontWeight: 700, color: '#111827' }}>{companyName}</div>
+                                                {addressLines.map((line, i) => (
+                                                    <div key={i} style={{ fontSize: 11, color: '#555' }}>{line}</div>
+                                                ))}
+                                            </div>
+                                        </div>
 
-                    {/* Right: Bill No */}
-                    <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 12, color: '#888' }}># {sale.saleNumber}</div>
-                        <input
-                            type="text"
-                            value={title}
-                            onChange={e => setTitle(e.target.value)}
-                            style={{
-                                fontSize: 18,
-                                fontWeight: 700,
-                                marginTop: 4,
-                                textAlign: 'right',
-                                border: '1px dashed #ccc',
-                                padding: '2px 8px',
-                                borderRadius: 4,
-                                width: '220px',
-                                outline: 'none',
-                            }}
-                            className="no-border-print"
-                        />
-                    </div>
-                </div>
+                                        {/* Right: Bill No, Title & Page */}
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ fontSize: 12, color: '#888' }}># {sale.saleNumber}</div>
+                                            <input
+                                                type="text"
+                                                value={title}
+                                                onChange={e => setTitle(e.target.value)}
+                                                style={{
+                                                    fontSize: 17,
+                                                    fontWeight: 700,
+                                                    marginTop: 2,
+                                                    textAlign: 'right',
+                                                    border: '1px dashed #ccc',
+                                                    padding: '1px 6px',
+                                                    borderRadius: 4,
+                                                    width: '200px',
+                                                    outline: 'none',
+                                                }}
+                                                className="no-border-print"
+                                            />
+                                            <div style={{ fontSize: 12, color: '#1f2937', fontWeight: 700, marginTop: 2 }}>
+                                                หน้า {pageIdx + 1}/{totalPages}
+                                            </div>
+                                        </div>
+                                    </div>
 
-                {/* Info Box */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16, border: '1px solid #ccc' }}>
-                    <tbody>
-                        <tr>
-                            <td style={{ padding: '6px 12px', borderRight: '1px solid #ccc', borderBottom: '1px solid #ccc', fontSize: 12, color: '#666', width: '33%' }}>
-                                วันที่ออก<br /><strong style={{ color: '#222' }}>{formatDate(sale.createdAt)}</strong>
-                            </td>
-                            <td style={{ padding: '6px 12px', borderRight: '1px solid #ccc', borderBottom: '1px solid #ccc', fontSize: 12, color: '#666', width: '33%' }}>
-                                รวมเงินทั้งสิ้น<br /><strong style={{ color: '#222', fontSize: 16 }}>{formatCurrency(sale.totalAmount)}</strong>
-                            </td>
-                            <td rowSpan={2} style={{ padding: '6px 12px', fontSize: 11, color: '#666', textAlign: 'center', verticalAlign: 'middle', width: '33%' }}>
-                                {numberToThaiText(sale.totalAmount)}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style={{ padding: '6px 12px', borderRight: '1px solid #ccc', fontSize: 12, color: '#666' }}>
-                                จ่ายเงินแล้ว<br /><strong style={{ color: '#222' }}>{formatCurrency(totalPaid)}</strong>
-                            </td>
-                            <td style={{ padding: '6px 12px', borderRight: '1px solid #ccc', fontSize: 12, color: '#666' }}>
-                                ค้างชำระ<br /><strong style={{ color: totalCredit > 0 ? '#dc2626' : '#222' }}>{formatCurrency(totalCredit)}</strong>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                                    {/* Info Box */}
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8, border: '1px solid #ccc' }}>
+                                        <tbody>
+                                            <tr>
+                                                <td style={{ padding: '4px 10px', borderRight: '1px solid #ccc', borderBottom: '1px solid #ccc', fontSize: 11, color: '#666', width: '33%' }}>
+                                                    วันที่ออก<br /><strong style={{ color: '#222' }}>{formatDate(sale.createdAt)}</strong>
+                                                </td>
+                                                <td style={{ padding: '4px 10px', borderRight: '1px solid #ccc', borderBottom: '1px solid #ccc', fontSize: 11, color: '#666', width: '33%' }}>
+                                                    รวมเงินทั้งสิ้น<br /><strong style={{ color: '#222', fontSize: 15 }}>{formatCurrency(sale.totalAmount)}</strong>
+                                                </td>
+                                                <td rowSpan={2} style={{ padding: '4px 10px', fontSize: 11, color: '#666', textAlign: 'center', verticalAlign: 'middle', width: '33%' }}>
+                                                    {numberToThaiText(sale.totalAmount)}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style={{ padding: '4px 10px', borderRight: '1px solid #ccc', fontSize: 11, color: '#666' }}>
+                                                    จ่ายเงินแล้ว<br /><strong style={{ color: '#222' }}>{formatCurrency(totalPaid)}</strong>
+                                                </td>
+                                                <td style={{ padding: '4px 10px', borderRight: '1px solid #ccc', fontSize: 11, color: '#666' }}>
+                                                    ค้างชำระ<br /><strong style={{ color: totalCredit > 0 ? '#dc2626' : '#222' }}>{formatCurrency(totalCredit)}</strong>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
 
-                {/* Customer + Staff info */}
-                {(template?.showCustomer || template?.showStaff || !template) && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginBottom: 8 }}>
-                        {(template?.showCustomer || !template) && sale.customer && (
-                            <div>ลูกค้า: <strong style={{ color: '#222' }}>{sale.customer.name}</strong> {sale.customer.phone && `(${sale.customer.phone})`}</div>
-                        )}
-                        {(template?.showStaff || !template) && (
-                            <div>พนักงาน: <strong style={{ color: '#222' }}>{sale.createdBy.name}</strong></div>
-                        )}
-                    </div>
-                )}
-
-                {/* Items Table */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
-                    <thead>
-                        <tr style={{ borderTop: '2px solid #333', borderBottom: '2px solid #333' }}>
-                            <th style={{ textAlign: 'left', padding: '8px 8px', fontSize: 12, fontWeight: 600, width: 60 }}>บาร์โค้ด</th>
-                            <th style={{ textAlign: 'left', padding: '8px 8px', fontSize: 12, fontWeight: 600 }}>สินค้า</th>
-                            <th style={{ textAlign: 'center', padding: '8px 8px', fontSize: 12, fontWeight: 600, width: 60 }}>จำนวน</th>
-                            <th style={{ textAlign: 'center', padding: '8px 8px', fontSize: 12, fontWeight: 600, width: 70 }}>หน่วยนับ</th>
-                            <th style={{ textAlign: 'right', padding: '8px 8px', fontSize: 12, fontWeight: 600, width: 90 }}>ราคาขาย</th>
-                            <th style={{ textAlign: 'right', padding: '8px 8px', fontSize: 12, fontWeight: 600, width: 90 }}>ส่วนลด</th>
-                            <th style={{ textAlign: 'right', padding: '8px 8px', fontSize: 12, fontWeight: 600, width: 100 }}>จำนวนเงิน</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sale.items.map((item, idx) => (
-                            <tr key={item.id} style={{ borderBottom: '1px solid #eee' }}>
-                                <td style={{ padding: '8px 8px', fontSize: 12 }}>{item.product.code}</td>
-                                <td style={{ padding: '8px 8px', fontSize: 12 }}>{item.product.name}</td>
-                                <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'center' }}>{item.quantity}</td>
-                                <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'center' }}>{item.unitName || item.product.unit}</td>
-                                <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'right' }}>{formatCurrency(item.unitPrice)}</td>
-                                <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'right' }}>{formatCurrency(item.discount || 0)}</td>
-                                <td style={{ padding: '8px 8px', fontSize: 12, textAlign: 'right' }}>{formatCurrency(item.totalPrice)}</td>
-                            </tr>
-                        ))}
-                        {/* Empty rows to fill at least 8 rows total */}
-                        {Array.from({ length: Math.max(0, 8 - sale.items.length) }).map((_, i) => (
-                            <tr key={`empty-${i}`}>
-                                <td style={{ padding: '8px 8px', fontSize: 12 }}>&nbsp;</td>
-                                <td style={{ padding: '8px 8px' }}></td>
-                                <td style={{ padding: '8px 8px' }}></td>
-                                <td style={{ padding: '8px 8px' }}></td>
-                                <td style={{ padding: '8px 8px' }}></td>
-                                <td style={{ padding: '8px 8px' }}></td>
-                                <td style={{ padding: '8px 8px' }}></td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-
-                {/* Notes */}
-                {sale.notes && (
-                    <div style={{ marginBottom: 12, padding: '8px 12px', background: '#f9fafb', borderRadius: 6, border: '1px solid #e5e7eb' }}>
-                        <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>หมายเหตุ:</div>
-                        <div style={{ fontSize: 12, color: '#333', whiteSpace: 'pre-wrap' }}>{sale.notes}</div>
-                    </div>
-                )}
-
-                {/* VAT Summary */}
-                {template?.showVat && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-                        <table style={{ borderCollapse: 'collapse', width: 300 }}>
-                            <tbody>
-                                <tr>
-                                    <td style={{ padding: '4px 8px', fontSize: 12, textAlign: 'right', color: '#666' }}>มูลค่าก่อน VAT</td>
-                                    <td style={{ padding: '4px 8px', fontSize: 12, textAlign: 'right', width: 100 }}>{formatCurrency(sale.totalAmount / 1.07)}</td>
-                                </tr>
-                                <tr>
-                                    <td style={{ padding: '4px 8px', fontSize: 12, textAlign: 'right', color: '#666' }}>VAT 7%</td>
-                                    <td style={{ padding: '4px 8px', fontSize: 12, textAlign: 'right' }}>{formatCurrency(sale.totalAmount - sale.totalAmount / 1.07)}</td>
-                                </tr>
-                                <tr style={{ borderTop: '1px solid #ccc' }}>
-                                    <td style={{ padding: '4px 8px', fontSize: 13, textAlign: 'right', fontWeight: 700 }}>รวมทั้งสิ้น</td>
-                                    <td style={{ padding: '4px 8px', fontSize: 13, textAlign: 'right', fontWeight: 700 }}>{formatCurrency(sale.totalAmount)}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                {/* Outstanding Balance Summary */}
-                {totalCredit > 0 && (
-                    <div style={{ marginBottom: 12 }}>
-                        <table style={{ borderCollapse: 'collapse', width: '100%', border: '1px solid #fecaca', borderRadius: 6 }}>
-                            <tbody>
-                                <tr style={{ background: '#fef2f2' }}>
-                                    <td style={{ padding: '8px 12px', fontSize: 12, color: '#666', width: '50%' }}>
-                                        รวมเงินทั้งสิ้น
-                                    </td>
-                                    <td style={{ padding: '8px 12px', fontSize: 13, fontWeight: 700, textAlign: 'right' }}>
-                                        {formatCurrency(sale.totalAmount)}
-                                    </td>
-                                </tr>
-                                <tr style={{ background: '#fef2f2' }}>
-                                    <td style={{ padding: '8px 12px', fontSize: 12, color: '#666' }}>
-                                        ชำระแล้ว
-                                    </td>
-                                    <td style={{ padding: '8px 12px', fontSize: 13, fontWeight: 600, textAlign: 'right', color: '#16a34a' }}>
-                                        {formatCurrency(totalPaid)}
-                                    </td>
-                                </tr>
-                                <tr style={{ background: '#fee2e2', borderTop: '1px solid #fecaca' }}>
-                                    <td style={{ padding: '8px 12px', fontSize: 13, fontWeight: 700, color: '#dc2626' }}>
-                                        ยอดค้างชำระ
-                                    </td>
-                                    <td style={{ padding: '8px 12px', fontSize: 16, fontWeight: 700, textAlign: 'right', color: '#dc2626' }}>
-                                        {formatCurrency(totalCredit)}
-                                    </td>
-                                </tr>
-                                {sale.creditDueDate && (
-                                    <tr style={{ background: '#fef2f2' }}>
-                                        <td colSpan={2} style={{ padding: '6px 12px', fontSize: 11, color: '#dc2626', textAlign: 'center' }}>
-                                            กำหนดชำระเงิน: {new Date(sale.creditDueDate).toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                {/* QR Code */}
-                {template?.showQr && template?.qrCodeUrl && (
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-                        <div style={{ textAlign: 'center' }}>
-                            <img src={template.qrCodeUrl} alt="QR Code" style={{ width: 120, height: 120, objectFit: 'contain' }} />
-                            <div style={{ fontSize: 10, color: '#888', marginTop: 4 }}>สแกนเพื่อชำระเงิน</div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Footer */}
-                {template?.footerText && (
-                    <div style={{ textAlign: 'center', fontSize: 11, color: '#888', marginBottom: 20, whiteSpace: 'pre-wrap' }}>
-                        {template.footerText}
-                    </div>
-                )}
-
-                {/* Signature Lines */}
-                <div style={{ position: 'absolute', bottom: '15mm', left: '15mm', right: '15mm' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 32 }}>
-                        {['ผู้รับของ', 'ผู้นำส่ง', 'ผู้รับเงิน', 'ผู้อนุมัติ'].map(label => (
-                            <div key={label} style={{ flex: 1, textAlign: 'center' }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 40 }}>{label}</div>
-                                <div style={{ borderTop: '1px dashed #999', paddingTop: 6 }}>
-                                    <div style={{ fontSize: 10, color: '#aaa' }}>............................................</div>
-                                    <div style={{ fontSize: 10, color: '#aaa' }}>วันที่ ........................................</div>
+                                    {/* Customer + Staff info */}
+                                    {(template?.showCustomer || template?.showStaff || !template) && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#555', marginBottom: 8, alignItems: 'flex-start' }}>
+                                            {(template?.showCustomer || !template) && sale.customer && (
+                                                <div>
+                                                    <div>ลูกค้า: <strong style={{ color: '#222' }}>{sale.customer.name}</strong> {sale.customer.phone && `(${sale.customer.phone})`}</div>
+                                                    {sale.customer.address && <div style={{ marginTop: 1 }}>ที่อยู่: {sale.customer.address}</div>}
+                                                    {sale.customer.taxId && <div style={{ marginTop: 1 }}>เลขประจำตัวผู้เสียภาษี: {sale.customer.taxId}</div>}
+                                                </div>
+                                            )}
+                                            {(template?.showStaff || !template) && (
+                                                <div style={{ textAlign: 'right' }}>พนักงาน: <strong style={{ color: '#222' }}>{sale.createdBy.name}</strong></div>
+                                            )}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                /* ================= PAGE 2+ REPEATED HEADER ================= */
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, borderBottom: '2px solid #111827', paddingBottom: 6 }}>
+                                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                        {template?.showLogo && template?.logoUrl && (
+                                            <img src={template.logoUrl} alt="logo" style={{ height: 38, objectFit: 'contain' }} />
+                                        )}
+                                        <div>
+                                            <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>{companyName}</div>
+                                            <div style={{ fontSize: 11, color: '#4b5563', marginTop: 1 }}>
+                                                ลูกค้า: <strong style={{ color: '#111827' }}>{sale.customer?.name || 'ลูกค้าทั่วไป'}</strong>
+                                                {sale.customer?.phone && ` (${sale.customer.phone})`} | วันที่: {formatDate(sale.createdAt)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ fontSize: 11, color: '#6b7280' }}># {sale.saleNumber}</div>
+                                        <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 1 }}>{title}</div>
+                                        <div style={{ fontSize: 12, color: '#1f2937', fontWeight: 700, marginTop: 1 }}>
+                                            หน้า {pageIdx + 1}/{totalPages}
+                                        </div>
+                                    </div>
                                 </div>
+                            )}
+
+                            {/* Items Table for this page */}
+                            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 6 }}>
+                                <thead>
+                                    <tr style={{ borderTop: '2px solid #333', borderBottom: '2px solid #333', background: '#f9fafb' }}>
+                                        <th style={{ textAlign: 'left', padding: '5px 8px', fontSize: 11, fontWeight: 600, width: 65 }}>บาร์โค้ด</th>
+                                        <th style={{ textAlign: 'left', padding: '5px 8px', fontSize: 11, fontWeight: 600 }}>สินค้า</th>
+                                        <th style={{ textAlign: 'center', padding: '5px 8px', fontSize: 11, fontWeight: 600, width: 55 }}>จำนวน</th>
+                                        <th style={{ textAlign: 'center', padding: '5px 8px', fontSize: 11, fontWeight: 600, width: 65 }}>หน่วยนับ</th>
+                                        <th style={{ textAlign: 'right', padding: '5px 8px', fontSize: 11, fontWeight: 600, width: 85 }}>ราคาขาย</th>
+                                        <th style={{ textAlign: 'right', padding: '5px 8px', fontSize: 11, fontWeight: 600, width: 75 }}>ส่วนลด</th>
+                                        <th style={{ textAlign: 'right', padding: '5px 8px', fontSize: 11, fontWeight: 600, width: 95 }}>จำนวนเงิน</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {pageItems.map((item) => (
+                                        <tr key={item.id} style={{ borderBottom: '1px solid #eee' }}>
+                                            <td style={{ padding: '4px 8px', fontSize: 11 }}>{item.product.code}</td>
+                                            <td style={{ padding: '4px 8px', fontSize: 11 }}>{item.product.name}</td>
+                                            <td style={{ padding: '4px 8px', fontSize: 11, textAlign: 'center' }}>{item.quantity}</td>
+                                            <td style={{ padding: '4px 8px', fontSize: 11, textAlign: 'center' }}>{item.unitName || item.product.unit}</td>
+                                            <td style={{ padding: '4px 8px', fontSize: 11, textAlign: 'right' }}>{formatCurrency(item.unitPrice)}</td>
+                                            <td style={{ padding: '4px 8px', fontSize: 11, textAlign: 'right' }}>{formatCurrency(item.discount || 0)}</td>
+                                            <td style={{ padding: '4px 8px', fontSize: 11, textAlign: 'right' }}>{formatCurrency(item.totalPrice)}</td>
+                                        </tr>
+                                    ))}
+                                    {/* Empty rows to fill at least 5 rows if only 1 page */}
+                                    {totalPages === 1 && Array.from({ length: Math.max(0, 5 - pageItems.length) }).map((_, i) => (
+                                        <tr key={`empty-${i}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                            <td style={{ padding: '4px 8px', fontSize: 11 }}>&nbsp;</td>
+                                            <td style={{ padding: '4px 8px' }}></td>
+                                            <td style={{ padding: '4px 8px' }}></td>
+                                            <td style={{ padding: '4px 8px' }}></td>
+                                            <td style={{ padding: '4px 8px' }}></td>
+                                            <td style={{ padding: '4px 8px' }}></td>
+                                            <td style={{ padding: '4px 8px' }}></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Bottom Section: Closing block on last page + Page footer */}
+                        <div style={{ marginTop: 'auto' }}>
+                            {isLastPage && renderClosingBlock()}
+
+                            {/* Page Footer Counter */}
+                            <div style={{
+                                textAlign: 'center',
+                                fontSize: 10,
+                                color: '#9ca3af',
+                                paddingTop: 4,
+                            }}>
+                                - หน้า {pageIdx + 1}/{totalPages} -
                             </div>
-                        ))}
+                        </div>
                     </div>
-                </div>
-            </div>
+                );
+            })}
         </>
     );
 }

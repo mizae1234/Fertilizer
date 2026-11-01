@@ -66,6 +66,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             ...item,
             unitPrice: Number(item.unitPrice),
             totalPrice: Number(item.totalPrice),
+            discount: Number(item.discount || 0),
+            unitName: item.unitName || null,
         })),
     }));
 
