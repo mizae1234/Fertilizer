@@ -94,18 +94,6 @@ export default async function ProductsPage({ searchParams }: Props) {
 
     const totalPages = Math.ceil(total / perPage);
 
-    const buildUrl = (params: Record<string, string>) => {
-        const p = new URLSearchParams();
-        const merged = { page: String(page), search, warehouse: warehouseFilter, group: groupFilter, sort, order, ...params };
-        if (merged.search) p.set('search', merged.search);
-        if (merged.warehouse) p.set('warehouse', merged.warehouse);
-        if (merged.group) p.set('group', merged.group);
-        if (merged.sort && merged.sort !== 'createdAt') p.set('sort', merged.sort);
-        if (merged.order && merged.order !== 'desc') p.set('order', merged.order);
-        if (merged.page !== '1') p.set('page', merged.page);
-        return `/products?${p}`;
-    };
-
     const serializedProducts = products.map(p => ({
         ...p,
         cost: Number(p.cost),
@@ -147,9 +135,11 @@ export default async function ProductsPage({ searchParams }: Props) {
                     availableBrands={availableBrands}
                     adminUser={adminUser}
                     warehouseFilter={warehouseFilter}
+                    groupFilter={groupFilter}
+                    search={search}
+                    page={page}
                     sort={sort}
                     order={order}
-                    buildUrl={buildUrl}
                 />
 
                 {/* Pagination */}

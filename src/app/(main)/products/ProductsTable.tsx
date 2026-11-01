@@ -47,9 +47,11 @@ interface ProductsTableProps {
     availableBrands: string[];
     adminUser: boolean;
     warehouseFilter: string;
+    groupFilter: string;
+    search: string;
+    page: number;
     sort: string;
     order: string;
-    buildUrl: (params: Record<string, string>) => string;
 }
 
 export default function ProductsTable({
@@ -58,13 +60,27 @@ export default function ProductsTable({
     availableBrands,
     adminUser,
     warehouseFilter,
+    groupFilter,
+    search,
+    page,
     sort,
     order,
-    buildUrl,
 }: ProductsTableProps) {
     // Local optimistic state for products
     const [products, setProducts] = useState<TableProduct[]>(initialProducts);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+    const buildUrl = (params: Record<string, string>) => {
+        const p = new URLSearchParams();
+        const merged = { page: String(page), search, warehouse: warehouseFilter, group: groupFilter, sort, order, ...params };
+        if (merged.search) p.set('search', merged.search);
+        if (merged.warehouse) p.set('warehouse', merged.warehouse);
+        if (merged.group) p.set('group', merged.group);
+        if (merged.sort && merged.sort !== 'createdAt') p.set('sort', merged.sort);
+        if (merged.order && merged.order !== 'desc') p.set('order', merged.order);
+        if (merged.page !== '1') p.set('page', merged.page);
+        return `/products?${p}`;
+    };
 
     // Sync when initialProducts change (e.g. URL page/filter change)
     useEffect(() => {
