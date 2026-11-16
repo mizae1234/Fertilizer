@@ -135,18 +135,34 @@ export default function PrintGoodsReceiveButton({ id }: { id: string }) {
     </div>
     ` : ''}
 
-    <div style="margin-top:50px;display:flex;justify-content:space-around;">
-        <div style="text-align:center;width:200px;">
-            <div style="height:20px;"></div>
-            <div style="border-top:1px dashed #999;padding-top:6px;font-size:11px;">ผู้ตรวจสอบ/รับสินค้า</div>
-            <div style="font-size:10px;color:#888;margin-top:6px;">วันที่ ____/____/____</div>
-        </div>
-        <div style="text-align:center;width:200px;">
-            <div style="height:20px;"></div>
-            <div style="border-top:1px dashed #999;padding-top:6px;font-size:11px;">ผู้อนุมัติ</div>
-            <div style="font-size:10px;color:#888;margin-top:6px;">วันที่ ____/____/____</div>
-        </div>
-    </div>
+    <table style="width:100%;table-layout:fixed;border-collapse:collapse;margin-top:52px;border:none;">
+        <tbody>
+            <tr>
+                <td style="border:none;padding:0 36px;text-align:center;height:48px;vertical-align:bottom;">
+                    <div style="border-bottom:1px dashed #6b7280;margin:0 8px;"></div>
+                </td>
+                <td style="border:none;padding:0 36px;text-align:center;height:48px;vertical-align:bottom;">
+                    <div style="border-bottom:1px dashed #6b7280;margin:0 8px;"></div>
+                </td>
+            </tr>
+            <tr>
+                <td style="border:none;padding:7px 12px 2px;text-align:center;font-size:11px;color:#111827;">
+                    (................................................)
+                </td>
+                <td style="border:none;padding:7px 12px 2px;text-align:center;font-size:11px;color:#111827;">
+                    (................................................)
+                </td>
+            </tr>
+            <tr>
+                <td style="border:none;padding:2px 12px;text-align:center;font-size:11px;font-weight:700;color:#374151;">ผู้ตรวจสอบ/รับสินค้า</td>
+                <td style="border:none;padding:2px 12px;text-align:center;font-size:11px;font-weight:700;color:#374151;">ผู้อนุมัติ</td>
+            </tr>
+            <tr>
+                <td style="border:none;padding:4px 12px 0;text-align:center;font-size:10px;color:#6b7280;">วันที่ ......../......../........</td>
+                <td style="border:none;padding:4px 12px 0;text-align:center;font-size:10px;color:#6b7280;">วันที่ ......../......../........</td>
+            </tr>
+        </tbody>
+    </table>
 </div>`;
 
             // Create a temporary container

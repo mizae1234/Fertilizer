@@ -49,7 +49,11 @@ export default function PrintWithdrawalButton({ id }: { id: string }) {
             const copyLabels: ('ต้นฉบับ' | 'สำเนา')[] =
                 copyMode === 'both' ? ['ต้นฉบับ', 'สำเนา'] : copyMode === 'original' ? ['ต้นฉบับ'] : ['สำเนา'];
 
-            const receiverSignName = data.withdrawerName || data.requesterName || '';
+            const receiverSignName = (data.withdrawerName || data.requesterName || '').trim();
+            const packerSignName = (data.packerName || '').trim();
+            // If legacy record stored shopTitle in approverName by old default, leave blank so approver has a clean signature block
+            const rawApprover = (data.approverName || '').trim();
+            const approverSignName = rawApprover && rawApprover !== shopTitle.trim() ? rawApprover : '';
             const doc = new jsPDF('p', 'mm', 'a4');
 
             for (let cIdx = 0; cIdx < copyLabels.length; cIdx++) {
@@ -118,23 +122,42 @@ export default function PrintWithdrawalButton({ id }: { id: string }) {
         </tbody>
     </table>
 
-    <div style="margin-top:50px;display:flex;justify-content:space-between;gap:16px;">
-        <div style="text-align:center;flex:1;">
-            ${data.approverName ? `<div style="font-weight:700;margin-bottom:4px;">${data.approverName}</div>` : '<div style="height:20px;"></div>'}
-            <div style="border-top:1px dashed #999;padding-top:6px;font-size:11px;">ผู้อนุมัติการเบิก</div>
-            <div style="font-size:10px;color:#888;margin-top:6px;">วันที่ ____/____/____</div>
-        </div>
-        <div style="text-align:center;flex:1;">
-            ${data.packerName ? `<div style="font-weight:700;margin-bottom:4px;">${data.packerName}</div>` : '<div style="height:20px;"></div>'}
-            <div style="border-top:1px dashed #999;padding-top:6px;font-size:11px;">ผู้จัดสินค้า</div>
-            <div style="font-size:10px;color:#888;margin-top:6px;">วันที่ ____/____/____</div>
-        </div>
-        <div style="text-align:center;flex:1;">
-            ${receiverSignName ? `<div style="font-weight:700;margin-bottom:4px;">${receiverSignName}</div>` : '<div style="height:20px;"></div>'}
-            <div style="border-top:1px dashed #999;padding-top:6px;font-size:11px;">ผู้รับสินค้า</div>
-            <div style="font-size:10px;color:#888;margin-top:6px;">วันที่ ____/____/____</div>
-        </div>
-    </div>
+    <table style="width:100%;table-layout:fixed;border-collapse:collapse;margin-top:52px;border:none;">
+        <tbody>
+            <tr>
+                <td style="border:none;padding:0 12px;text-align:center;height:48px;vertical-align:bottom;">
+                    <div style="border-bottom:1px dashed #6b7280;margin:0 6px;"></div>
+                </td>
+                <td style="border:none;padding:0 12px;text-align:center;height:48px;vertical-align:bottom;">
+                    <div style="border-bottom:1px dashed #6b7280;margin:0 6px;"></div>
+                </td>
+                <td style="border:none;padding:0 12px;text-align:center;height:48px;vertical-align:bottom;">
+                    <div style="border-bottom:1px dashed #6b7280;margin:0 6px;"></div>
+                </td>
+            </tr>
+            <tr>
+                <td style="border:none;padding:7px 6px 2px;text-align:center;font-size:11px;color:#111827;vertical-align:top;word-break:break-word;">
+                    (${receiverSignName ? ` ${receiverSignName} ` : '............................................'})
+                </td>
+                <td style="border:none;padding:7px 6px 2px;text-align:center;font-size:11px;color:#111827;vertical-align:top;word-break:break-word;">
+                    (${packerSignName ? ` ${packerSignName} ` : '............................................'})
+                </td>
+                <td style="border:none;padding:7px 6px 2px;text-align:center;font-size:11px;color:#111827;vertical-align:top;word-break:break-word;">
+                    (${approverSignName ? ` ${approverSignName} ` : '............................................'})
+                </td>
+            </tr>
+            <tr>
+                <td style="border:none;padding:2px 6px;text-align:center;font-size:11px;font-weight:700;color:#374151;">ผู้รับสินค้า</td>
+                <td style="border:none;padding:2px 6px;text-align:center;font-size:11px;font-weight:700;color:#374151;">ผู้จัดสินค้า</td>
+                <td style="border:none;padding:2px 6px;text-align:center;font-size:11px;font-weight:700;color:#374151;">ผู้อนุมัติการเบิก</td>
+            </tr>
+            <tr>
+                <td style="border:none;padding:4px 6px 0;text-align:center;font-size:10px;color:#6b7280;">วันที่ ......../......../........</td>
+                <td style="border:none;padding:4px 6px 0;text-align:center;font-size:10px;color:#6b7280;">วันที่ ......../......../........</td>
+                <td style="border:none;padding:4px 6px 0;text-align:center;font-size:10px;color:#6b7280;">วันที่ ......../......../........</td>
+            </tr>
+        </tbody>
+    </table>
 </div>`;
 
                 const container = document.createElement('div');

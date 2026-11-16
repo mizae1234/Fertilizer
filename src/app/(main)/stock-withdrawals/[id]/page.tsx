@@ -118,29 +118,26 @@ export default async function StockWithdrawalDetailPage({ params }: Props) {
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5">
                 <h2 className="text-base font-bold text-gray-800 mb-4">✍️ ลงชื่อ</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-                    <div className="text-center">
-                        <div className="h-16 flex items-end justify-center">
-                            <p className="text-sm font-medium text-gray-800">{wd.approverName || '___________________'}</p>
-                        </div>
-                        <div className="border-t border-gray-300 pt-2 mt-2">
-                            <p className="text-xs text-gray-500">ผู้อนุมัติการเบิก</p>
-                        </div>
+                    <div className="text-center flex flex-col justify-end">
+                        <div className="h-12 border-b border-dashed border-gray-300 mx-4" />
+                        <p className="text-sm text-gray-700 mt-2">
+                            ({wd.withdrawerName || wd.requesterName || '........................................'})
+                        </p>
+                        <p className="text-xs font-semibold text-gray-500 mt-1">ผู้รับสินค้า</p>
                     </div>
-                    <div className="text-center">
-                        <div className="h-16 flex items-end justify-center">
-                            <p className="text-sm font-medium text-gray-800">{wd.packerName || '___________________'}</p>
-                        </div>
-                        <div className="border-t border-gray-300 pt-2 mt-2">
-                            <p className="text-xs text-gray-500">ผู้จัดสินค้า</p>
-                        </div>
+                    <div className="text-center flex flex-col justify-end">
+                        <div className="h-12 border-b border-dashed border-gray-300 mx-4" />
+                        <p className="text-sm text-gray-700 mt-2">
+                            ({wd.packerName || '........................................'})
+                        </p>
+                        <p className="text-xs font-semibold text-gray-500 mt-1">ผู้จัดสินค้า</p>
                     </div>
-                    <div className="text-center">
-                        <div className="h-16 flex items-end justify-center">
-                            <p className="text-sm font-medium text-gray-800">{wd.withdrawerName || wd.requesterName || '___________________'}</p>
-                        </div>
-                        <div className="border-t border-gray-300 pt-2 mt-2">
-                            <p className="text-xs text-gray-500">ผู้รับสินค้า</p>
-                        </div>
+                    <div className="text-center flex flex-col justify-end">
+                        <div className="h-12 border-b border-dashed border-gray-300 mx-4" />
+                        <p className="text-sm text-gray-700 mt-2">
+                            ({wd.approverName || '........................................'})
+                        </p>
+                        <p className="text-xs font-semibold text-gray-500 mt-1">ผู้อนุมัติการเบิก</p>
                     </div>
                 </div>
             </div>

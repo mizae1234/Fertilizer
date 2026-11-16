@@ -119,29 +119,25 @@ export default async function FactoryReturnDetailPage({ params }: Props) {
             </div>
 
             {/* Signatures */}
-            {(fr.senderName || fr.receiverName) && (
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5">
-                    <h2 className="text-base font-bold text-gray-800 mb-4">✍️ ลงชื่อ</h2>
-                    <div className="grid grid-cols-2 gap-8">
-                        <div className="text-center">
-                            <div className="h-16 flex items-end justify-center">
-                                <p className="text-sm font-medium text-gray-800">{fr.senderName || '___________________'}</p>
-                            </div>
-                            <div className="border-t border-gray-300 pt-2 mt-2">
-                                <p className="text-xs text-gray-500">ผู้ส่งสินค้าคืน</p>
-                            </div>
-                        </div>
-                        <div className="text-center">
-                            <div className="h-16 flex items-end justify-center">
-                                <p className="text-sm font-medium text-gray-800">{fr.receiverName || '___________________'}</p>
-                            </div>
-                            <div className="border-t border-gray-300 pt-2 mt-2">
-                                <p className="text-xs text-gray-500">ผู้ตรวจนับและรับสินค้าคืน</p>
-                            </div>
-                        </div>
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5">
+                <h2 className="text-base font-bold text-gray-800 mb-4">✍️ ลงชื่อ</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                    <div className="text-center flex flex-col justify-end">
+                        <div className="h-12 border-b border-dashed border-gray-300 mx-8" />
+                        <p className="text-sm text-gray-700 mt-2">
+                            ({fr.senderName || '........................................'})
+                        </p>
+                        <p className="text-xs font-semibold text-gray-500 mt-1">ผู้ส่งสินค้าคืน</p>
+                    </div>
+                    <div className="text-center flex flex-col justify-end">
+                        <div className="h-12 border-b border-dashed border-gray-300 mx-8" />
+                        <p className="text-sm text-gray-700 mt-2">
+                            ({fr.receiverName || '........................................'})
+                        </p>
+                        <p className="text-xs font-semibold text-gray-500 mt-1">ผู้ตรวจนับและรับสินค้าคืน</p>
                     </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 }
