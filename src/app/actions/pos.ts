@@ -37,7 +37,7 @@ export async function createSaleFromPOS(data: {
         0
     );
     const billDiscount = data.discount || 0;
-    const totalAmount = Math.round((subtotal - itemDiscountsTotal - billDiscount) * 100) / 100;
+    const totalAmount = Math.max(0, Math.round((subtotal - itemDiscountsTotal - billDiscount) * 100) / 100);
 
     // Validate payments sum
     const paymentSum = Math.round(data.payments.reduce((s, p) => s + p.amount, 0) * 100) / 100;

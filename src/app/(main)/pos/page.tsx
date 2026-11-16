@@ -116,14 +116,17 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
         }).catch(console.error);
     }, []);
 
-    const paid = lines.reduce((s, l) => s + (l.amount || 0), 0);
-    const remaining = total - paid;
-    const hasCash = lines.some(l => l.method === 'CASH' && l.amount > 0);
-    const cashTotal = lines.filter(l => l.method === 'CASH').reduce((s, l) => s + (l.amount || 0), 0);
+    const isFreeOrder = total <= 0;
+    const paid = isFreeOrder ? 0 : lines.reduce((s, l) => s + (l.amount || 0), 0);
+    const remaining = isFreeOrder ? 0 : total - paid;
+    const hasCash = !isFreeOrder && lines.some(l => l.method === 'CASH' && l.amount > 0);
+    const cashTotal = isFreeOrder ? 0 : lines.filter(l => l.method === 'CASH').reduce((s, l) => s + (l.amount || 0), 0);
     const cashReceivedValid = !hasCash || (typeof cashReceived === 'number' && cashReceived >= cashTotal);
-    const isValid = Math.abs(remaining) < 0.01 && lines.every(l =>
-        l.amount > 0 && (l.method !== 'CREDIT' || l.dueDate)
-    ) && cashReceivedValid;
+    const isValid = isFreeOrder || (
+        Math.abs(remaining) < 0.01 &&
+        lines.every(l => l.amount > 0 && (l.method !== 'CREDIT' || l.dueDate)) &&
+        cashReceivedValid
+    );
 
     const updateLine = (idx: number, patch: Partial<PaymentLine>) => {
         setLines(lines.map((l, i) => i === idx ? { ...l, ...patch } : l));
@@ -155,6 +158,10 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
     };
 
     const handleConfirm = () => {
+        if (isFreeOrder) {
+            onConfirm([{ method: 'CASH', amount: 0 }], printType, undefined, printType === 'invoice' ? invoiceTitle : undefined);
+            return;
+        }
         const payments = lines.map(l => ({
             method: l.method,
             amount: l.amount,
@@ -184,6 +191,12 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
 
                 {/* Payment Lines */}
                 <div className="p-4 space-y-3 max-h-[50vh] overflow-y-auto">
+                    {isFreeOrder ? (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-center">
+                            <p className="text-sm font-bold text-emerald-800">🎁 บิลของแถม / ยอดสุทธิ 0 บาท</p>
+                            <p className="text-xs text-emerald-600 mt-1">ไม่ต้องรับชำระเงิน สามารถเลือกรูปแบบการพิมพ์และกดยืนยันออกบิลได้ทันที</p>
+                        </div>
+                    ) : (<>
                     {lines.map((line, idx) => (
                         <div key={idx} className="rounded-xl border border-gray-200 p-3 space-y-2 bg-gray-50/50">
                             {/* Method selector */}
@@ -276,6 +289,7 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
                         className="w-full py-2 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 text-xs font-medium hover:border-emerald-400 hover:text-emerald-500 transition-colors">
                         + เพิ่มช่องทางชำระ (แยกจ่าย)
                     </button>
+                    </>)}
 
                     {/* Print type selector */}
                     <div className="rounded-xl border border-gray-200 p-3 bg-gray-50/50">
@@ -366,7 +380,7 @@ function PaymentModal({ total, loading, onConfirm, onClose, defaultPrintType, al
                         disabled={!isValid || loading}
                         className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-base hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     >
-                        {loading ? 'กำลังดำเนินการ...' : '✅ ยืนยันชำระเงิน'}
+                        {loading ? 'กำลังดำเนินการ...' : (isFreeOrder ? '✅ ยืนยันออกบิล (0 บาท)' : '✅ ยืนยันชำระเงิน')}
                     </button>
                 </div>
             </div>
@@ -864,7 +878,7 @@ export default function POSPage() {
 
     const subtotal = cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
     const itemDiscountsTotal = cart.reduce((s, i) => s + (i.itemDiscount || 0), 0);
-    const total = subtotal - itemDiscountsTotal - billDiscount;
+    const total = Math.max(0, Math.round((subtotal - itemDiscountsTotal - billDiscount) * 100) / 100);
     const totalPoints = cart.reduce((s, i) => s + i.points, 0);
     const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 

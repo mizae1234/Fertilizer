@@ -54,7 +54,7 @@ function formatDate(d: string) {
 
 // Thai number to text
 function numberToThaiText(num: number): string {
-    if (num === 0) return 'ศูนย์บาทถ้วน';
+    if (num === 0) return '(ศูนย์บาทถ้วน)';
     const digits = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
     const positions = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'];
 
