@@ -314,12 +314,6 @@ export default function NewGoodsReceivePage() {
         }
     };
 
-    // Products not yet in the cart (to avoid duplicates)
-    const availableProducts = (currentProductId: string) => {
-        const usedIds = items.map(i => i.productId).filter(id => id && id !== currentProductId);
-        return products.filter(p => !usedIds.includes(p.id));
-    };
-
     if (!user) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -436,7 +430,7 @@ export default function NewGoodsReceivePage() {
                                                 <div className="flex-1 min-w-0">
                                                     <label className="block text-xs text-gray-500 mb-1">สินค้า</label>
                                                     <ProductPicker
-                                                        products={availableProducts(item.productId)}
+                                                        products={products}
                                                         value={item.productId}
                                                         onChange={(pid, product) => handleProductSelect(idx, pid, product)}
                                                     />
@@ -544,7 +538,7 @@ export default function NewGoodsReceivePage() {
                                             <div>
                                                 <label className="block text-xs text-gray-500 mb-1">สินค้า</label>
                                                 <ProductPicker
-                                                    products={availableProducts(item.productId)}
+                                                    products={products}
                                                     value={item.productId}
                                                     onChange={(pid, product) => handleProductSelect(idx, pid, product)}
                                                 />

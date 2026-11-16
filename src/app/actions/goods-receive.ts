@@ -232,26 +232,23 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
         });
         const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 
-        // Update stock for each item — fetch all existing stocks in one query
-        const existingStocks = await tx.productStock.findMany({
-            where: {
-                OR: gr.items.map(item => ({
-                    productId: item.productId,
-                    warehouseId: item.warehouseId,
-                })),
-            },
-        });
+        // Run stock updates + transaction creates sequentially so duplicate products in the same GR accumulate accurately
+        for (const item of gr.items) {
+            const existing = await tx.productStock.findUnique({
+                where: {
+                    productId_warehouseId: {
+                        productId: item.productId,
+                        warehouseId: item.warehouseId,
+                    },
+                },
+            });
 
-        // Run stock updates + transaction creates in parallel per item
-        await Promise.all(gr.items.map(async (item) => {
-            const key = `${item.productId}_${item.warehouseId}`;
-            const existing = existingStocks.find(s => `${s.productId}_${s.warehouseId}` === key);
+            const newQty = roundQty(item.quantity);
+            const newCost = Number(item.unitCost);
 
             if (existing) {
                 const oldQty = existing.quantity;
                 const oldCost = Number(existing.avgCost);
-                const newQty = roundQty(item.quantity);
-                const newCost = Number(item.unitCost);
                 const totalQty = roundQty(oldQty + newQty);
                 const avgCost = totalQty > 0
                     ? ((oldQty * oldCost) + (newQty * newCost)) / totalQty
@@ -262,7 +259,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     data: {
                         quantity: totalQty,
                         avgCost: parseFloat(avgCost.toFixed(2)),
-                        lastCost: Number(item.unitCost),
+                        lastCost: newCost > 0 || Number(existing.lastCost) === 0 ? newCost : existing.lastCost,
                     },
                 });
             } else {
@@ -270,9 +267,9 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     data: {
                         productId: item.productId,
                         warehouseId: item.warehouseId,
-                        quantity: roundQty(item.quantity),
-                        avgCost: Number(item.unitCost),
-                        lastCost: Number(item.unitCost),
+                        quantity: newQty,
+                        avgCost: newCost,
+                        lastCost: newCost,
                     },
                 });
             }
@@ -282,8 +279,8 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     productId: item.productId,
                     warehouseId: item.warehouseId,
                     type: 'GOODS_RECEIVE',
-                    quantity: roundQty(item.quantity),
-                    unitCost: Number(item.unitCost),
+                    quantity: newQty,
+                    unitCost: newCost,
                     reference: gr.grNumber,
                     lotNo: item.lotNo || null,
                     userId: gr.createdById,
@@ -301,40 +298,44 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     data: dateUpdates,
                 });
             }
-        }));
+        }
 
-        // Update product.cost based on costMethod for each product
+        // Update product.cost based on costMethod for each product (aggregating all lines of the same product in this GR)
         for (const productId of productIds) {
             const prod = productMap[productId];
             if (!prod) continue;
+
+            const grItemsForProduct = gr.items.filter(i => i.productId === productId);
+            if (grItemsForProduct.length === 0) continue;
 
             const method = prod.costMethod || 'MANUAL';
             console.log(`[GR APPROVE] Product "${prod.name}" (${productId}): costMethod=${prod.costMethod}, resolved=${method}, cost=${Number(prod.cost)}`);
 
             const oldCost = Number(prod.cost);
+            const totalNewQty = roundQty(grItemsForProduct.reduce((s, i) => s + roundQty(i.quantity), 0));
+            const totalNewValue = grItemsForProduct.reduce((s, i) => s + roundQty(i.quantity) * Number(i.unitCost), 0);
+            const blendedNewCost = totalNewQty > 0 ? totalNewValue / totalNewQty : 0;
+
+            // For LAST / MANUAL when a GR has both a paid line and a 0-cost freebie line, prefer the last positive-cost line
+            const nonZeroItems = grItemsForProduct.filter(i => Number(i.unitCost) > 0);
+            const representativeCostItem = nonZeroItems.length > 0
+                ? nonZeroItems[nonZeroItems.length - 1]
+                : grItemsForProduct[grItemsForProduct.length - 1];
 
             if (method === 'AVG') {
-                // Moving Weighted Average: use current product.cost + current stock balance
-                const grItem = gr.items.find(i => i.productId === productId);
-                if (!grItem) continue;
-
                 // Get total current stock across all warehouses for this product
                 const stockAgg = await tx.productStock.aggregate({
                     where: { productId },
                     _sum: { quantity: true },
                 });
-                // Stock BEFORE this GR was added (subtract the GR qty we just added above)
-                const currentStock = (stockAgg._sum.quantity ?? 0) - grItem.quantity;
-                const newQty = grItem.quantity;
-                const newCost = Number(grItem.unitCost);
+                // Stock BEFORE this GR was added (subtract ALL GR qtys for this product we just added above)
+                const currentStock = roundQty((stockAgg._sum.quantity ?? 0) - totalNewQty);
 
                 let newAvgCost: number;
                 if (currentStock <= 0) {
-                    // Stock was zero or negative — use the new incoming cost directly
-                    newAvgCost = newCost;
+                    newAvgCost = blendedNewCost;
                 } else {
-                    // Moving weighted average
-                    newAvgCost = ((currentStock * oldCost) + (newQty * newCost)) / (currentStock + newQty);
+                    newAvgCost = ((currentStock * oldCost) + totalNewValue) / (currentStock + totalNewQty);
                 }
                 newAvgCost = Math.round(newAvgCost * 100) / 100;
 
@@ -351,14 +352,11 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                         field: 'cost',
                         oldValue: String(oldCost),
                         newValue: String(parseFloat(newAvgCost.toFixed(2))),
-                        details: `อัพเดตต้นทุนเฉลี่ย จาก ฿${oldCost} → ฿${parseFloat(newAvgCost.toFixed(2))} (คงเหลือ ${currentStock} + รับใหม่ ${newQty} @ ฿${newCost}) (GR ${gr.grNumber})`,
+                        details: `อัพเดตต้นทุนเฉลี่ย จาก ฿${oldCost} → ฿${parseFloat(newAvgCost.toFixed(2))} (คงเหลือ ${currentStock} + รับใหม่ ${totalNewQty} @ เฉลี่ย ฿${Math.round(blendedNewCost * 100) / 100}) (GR ${gr.grNumber})`,
                     },
                 });
             } else if (method === 'LAST') {
-                // Use latest cost from GR items for this product
-                const grItem = gr.items.find(i => i.productId === productId);
-                if (!grItem) continue;
-                const newCost = Number(grItem.unitCost);
+                const newCost = Number(representativeCostItem.unitCost);
 
                 await tx.product.update({
                     where: { id: productId },
@@ -377,10 +375,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     },
                 });
             } else if (method === 'MANUAL') {
-                // Use the unitCost from GR item as the manually specified cost
-                const grItem = gr.items.find(i => i.productId === productId);
-                if (!grItem) continue;
-                const newCost = Number(grItem.unitCost);
+                const newCost = Number(representativeCostItem.unitCost);
 
                 if (newCost !== oldCost) {
                     await tx.product.update({
