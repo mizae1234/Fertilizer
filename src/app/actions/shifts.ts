@@ -134,30 +134,43 @@ export async function getShiftSummary(shiftId: string): Promise<{
     shift: any;
     summary: ShiftSummaryData;
 }> {
-    const shift = await prisma.cashierShift.findUnique({
-        where: { id: shiftId },
-        include: {
-            user: { select: { id: true, name: true, username: true } },
-            sales: {
-                where: {
-                    status: 'APPROVED',
-                    deletedAt: null,
-                },
-                select: {
-                    id: true,
-                    saleNumber: true,
-                    totalAmount: true,
-                    paymentMethod: true,
-                    payments: true,
-                    createdAt: true,
+    const [shift, shopInfo, defaultTemplate] = await Promise.all([
+        prisma.cashierShift.findUnique({
+            where: { id: shiftId },
+            include: {
+                user: { select: { id: true, name: true, username: true } },
+                sales: {
+                    where: {
+                        status: 'APPROVED',
+                        deletedAt: null,
+                    },
+                    select: {
+                        id: true,
+                        saleNumber: true,
+                        totalAmount: true,
+                        paymentMethod: true,
+                        payments: true,
+                        createdAt: true,
+                    },
                 },
             },
-        },
-    });
+        }),
+        prisma.shopInfo.findUnique({ where: { id: 'shop-info' }, select: { name: true } }),
+        prisma.receiptTemplate.findFirst({
+            orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+            select: { name: true, headerText: true },
+        }),
+    ]);
 
     if (!shift) {
         throw new Error('ไม่พบข้อมูลกะ');
     }
+
+    const resolvedShopName =
+        shopInfo?.name?.trim() ||
+        defaultTemplate?.headerText?.split('\n').map(l => l.trim()).find(Boolean) ||
+        (defaultTemplate?.name && defaultTemplate.name !== 'Default' ? defaultTemplate.name.trim() : '') ||
+        'ร้านค้า';
 
     let cashSales = 0;
     let transferSales = 0;
@@ -218,6 +231,7 @@ export async function getShiftSummary(shiftId: string): Promise<{
             shiftNumber: shift.shiftNumber,
             userId: shift.userId,
             userName: shift.user.name,
+            shopName: resolvedShopName,
             status: shift.status,
             openedAt: shift.openedAt.toISOString(),
             closedAt: shift.closedAt?.toISOString() || null,

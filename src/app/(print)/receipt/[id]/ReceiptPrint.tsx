@@ -7,6 +7,7 @@ interface SaleItem {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    discount?: number;
     unitName?: string;
 }
 
@@ -42,7 +43,7 @@ type Template = TemplateData | null;
 
 function formatCurrency(n: number) {
     const rounded = Math.round(n * 100) / 100;
-    return rounded.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    return rounded.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatDate(d: string) {
@@ -69,12 +70,17 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
         return () => clearTimeout(timer);
     }, []);
 
-    const shopName = template?.shopName || 'Fertilizer POS';
+    const shopName = template?.shopName || 'ร้านค้า';
     const is58mm = template?.paperSize === '58mm';
     // 80mm thermal paper has ~72mm printable width (576 dots at 203 DPI)
     // 58mm thermal paper has ~48mm printable width (384 dots at 203 DPI)
     const paperWidth = is58mm ? '58mm' : '80mm';
     const contentWidth = is58mm ? '48mm' : '72mm';
+    const contentPadding = is58mm ? '2.5mm 2.5mm 4mm 2.5mm' : '3mm 4mm 5mm 4mm';
+    const baseFontSize = is58mm ? '11.5px' : '13px';
+    const smallFontSize = is58mm ? '10.5px' : '12px';
+    const titleFontSize = is58mm ? '14px' : '16px';
+    const numColWidth = is58mm ? '16px' : '20px';
 
     const paidAtSale = (sale.payments || [])
         .filter(p => p.method !== 'CREDIT')
@@ -110,7 +116,7 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                         width: ${contentWidth} !important;
                         max-width: ${contentWidth} !important;
                         margin: 0 auto !important;
-                        padding: 0 1mm !important;
+                        padding: ${contentPadding} !important;
                     }
                     .no-print {
                         display: none !important;
@@ -119,8 +125,8 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
 
                 body {
                     font-family: 'Sarabun', 'Tahoma', sans-serif;
-                    font-size: ${is58mm ? '13px' : '15px'};
-                    line-height: 1.35;
+                    font-size: ${baseFontSize};
+                    line-height: 1.38;
                     color: #000;
                     background: #fff;
                 }
@@ -136,12 +142,12 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                 </button>
             </div>
 
-            <div className="receipt-container" style={{ width: contentWidth, maxWidth: contentWidth, margin: '0 auto', padding: '1mm 0', boxSizing: 'border-box' }}>
+            <div className="receipt-container" style={{ width: contentWidth, maxWidth: contentWidth, margin: '0 auto', padding: contentPadding, boxSizing: 'border-box' }}>
                 {/* Logo */}
                 {template?.showLogo && template?.logoUrl && (
-                    <div style={{ textAlign: 'center', marginBottom: '4px' }}>
+                    <div style={{ textAlign: 'center', marginBottom: '5px' }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={template.logoUrl} alt="logo" style={{ maxHeight: '120px', maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />
+                        <img src={template.logoUrl} alt="logo" style={{ maxHeight: '96px', maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />
                     </div>
                 )}
 
@@ -149,28 +155,27 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                 <div style={{ textAlign: 'center', marginBottom: '6px' }}>
                     {template?.headerText ? (
                         template.headerText.split('\n').map((line, i) => (
-                            <div key={i} style={{ fontSize: i === 0 ? '20px' : '14px', fontWeight: i === 0 ? 'bold' : 'normal' }}>{line}</div>
+                            <div key={i} style={{ fontSize: i === 0 ? titleFontSize : smallFontSize, fontWeight: i === 0 ? 'bold' : 'normal', lineHeight: 1.35 }}>{line}</div>
                         ))
                     ) : (
-                        <div style={{ fontSize: '20px', fontWeight: 'bold' }}>{shopName}</div>
+                        <div style={{ fontSize: titleFontSize, fontWeight: 'bold' }}>{shopName}</div>
                     )}
                 </div>
 
-                <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
-
                 {/* Bill Info */}
-                <div style={{ fontSize: '14px', marginBottom: '4px' }}>
+                <div style={{ fontSize: smallFontSize, marginTop: '6px', marginBottom: '4px' }}>
                     {(template?.showBillNo !== false) && (
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span>บิลเลขที่: {sale.saleNumber}</span>
+                            {(template?.showStaff !== false) && <span>พนง: {sale.createdBy?.name || '-'}</span>}
                         </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>{formatDate(sale.createdAt)}</span>
-                        {(template?.showStaff !== false) && <span>พนง: {sale.createdBy?.name || '-'}</span>}
+                        {(template?.showBillNo === false) && (template?.showStaff !== false) && <span>พนง: {sale.createdBy?.name || '-'}</span>}
                     </div>
                     {(template?.showCustomer !== false) && sale.customer && (
-                        <div style={{ borderBottom: '1px dashed #000', paddingBottom: '4px', marginBottom: '4px' }}>
+                        <div style={{ marginTop: '2px' }}>
                             <div>ลูกค้า: {sale.customer.name}</div>
                             {sale.customer.phone && <div>โทร: {sale.customer.phone}</div>}
                             {sale.customer.address && <div>ที่อยู่: {sale.customer.address}</div>}
@@ -179,65 +184,59 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                     )}
                 </div>
 
-                <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
+                <div style={{ borderTop: '1px solid #000', margin: '5px 0' }} />
 
-                {/* Items */}
-                <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid #000' }}>
-                            <th style={{ textAlign: 'left', paddingBottom: '2px' }}>สินค้า</th>
-                            <th style={{ textAlign: 'right', paddingBottom: '2px', width: '35px' }}>จำนวน</th>
-                            <th style={{ textAlign: 'right', paddingBottom: '2px', width: '50px' }}>ราคา</th>
-                            <th style={{ textAlign: 'right', paddingBottom: '2px', width: '55px' }}>รวม</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sale.items.map((item, i) => (
-                            <tr key={i}>
-                                <td style={{ paddingTop: '2px' }}>
-                                    <div style={{ fontSize: '14px' }}>{item.product.name}</div>
-                                </td>
-                                <td style={{ textAlign: 'right', paddingTop: '2px' }}>{item.quantity} {item.unitName || item.product.unit}</td>
-                                <td style={{ textAlign: 'right', paddingTop: '2px' }}>{formatCurrency(item.unitPrice)}</td>
-                                <td style={{ textAlign: 'right', paddingTop: '2px' }}>{formatCurrency(item.totalPrice)}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                {/* Numbered 2-line Items List */}
+                <div style={{ fontSize: baseFontSize }}>
+                    {sale.items.map((item, i) => (
+                        <div key={i} style={{ marginBottom: '3px' }}>
+                            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                                <span style={{ minWidth: numColWidth, display: 'inline-block' }}>{i + 1}</span>
+                                <span style={{ flex: 1, wordBreak: 'break-word' }}>{item.product.name}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: numColWidth }}>
+                                <span>
+                                    {item.quantity} {item.unitName || item.product.unit} x{formatCurrency(item.unitPrice)}
+                                    {item.discount && item.discount > 0 ? ` (-${formatCurrency(item.discount)})` : ''}
+                                </span>
+                                <span>{formatCurrency(item.totalPrice)}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
 
-                <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+                <div style={{ borderTop: '1px solid #000', margin: '5px 0' }} />
 
                 {/* Totals */}
-                <div style={{ fontSize: '16px' }}>
-                    {sale.discount > 0 && (<>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                            <span>ยอดรวมสินค้า</span>
-                            <span>{formatCurrency(sale.totalAmount + sale.discount)}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                <div style={{ fontSize: baseFontSize }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>รวมเงิน</span>
+                        <span style={{ fontWeight: 'bold' }}>{formatCurrency(sale.totalAmount + sale.discount)}</span>
+                    </div>
+                    {sale.discount > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span>ส่วนลด</span>
                             <span>-{formatCurrency(sale.discount)}</span>
                         </div>
-                    </>)}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '18px' }}>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: titleFontSize, marginTop: '2px', marginBottom: '2px' }}>
                         <span>รวมทั้งสิ้น</span>
                         <span>{formatCurrency(sale.totalAmount)}</span>
                     </div>
 
                     {/* Payment breakdown */}
                     {(sale.payments || []).map((p, i) => {
-                        // For CREDIT line, show remaining debt (original credit minus debt payments)
                         if (p.method === 'CREDIT') {
                             const remaining = Math.max(0, p.amount - (sale.debtPaid || 0));
                             return (
-                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: smallFontSize }}>
                                     <span>{remaining > 0 ? 'ค้างชำระ' : 'ชำระแล้ว (เครดิต)'}</span>
                                     <span>{formatCurrency(remaining)}</span>
                                 </div>
                             );
                         }
                         return (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: smallFontSize }}>
                                 <span>{methodLabel(p.method)}{p.chequeNo ? ` (${p.chequeNo})` : ''}</span>
                                 <span>{formatCurrency(p.amount)}</span>
                             </div>
@@ -246,17 +245,17 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
 
                     {cashReceived && cashReceived > 0 ? (
                         <>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginTop: '2px' }}>
-                                <span>รับเงินมา</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: smallFontSize, marginTop: '1px' }}>
+                                <span>รับเงินสด</span>
                                 <span>{formatCurrency(cashReceived)}</span>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '2px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: smallFontSize, fontWeight: 'bold', marginTop: '1px' }}>
                                 <span>เงินทอน</span>
                                 <span>{formatCurrency(cashReceived - cashTotal)}</span>
                             </div>
                         </>
                     ) : change > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', marginTop: '2px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: smallFontSize, fontWeight: 'bold', marginTop: '1px' }}>
                             <span>เงินทอน</span>
                             <span>{formatCurrency(change)}</span>
                         </div>
@@ -267,24 +266,24 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
 
                 {/* QR Code */}
                 {template?.showQr && template?.qrCodeUrl && (
-                    <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                    <div style={{ textAlign: 'center', marginBottom: '6px' }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={template.qrCodeUrl} alt="QR Code" style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }} />
+                        <img src={template.qrCodeUrl} alt="QR Code" style={{ width: '90px', height: '90px', objectFit: 'contain', margin: '0 auto' }} />
                     </div>
                 )}
 
                 {/* Notes */}
                 {sale.notes && (
-                    <div style={{ fontSize: '14px', marginBottom: '4px' }}>
+                    <div style={{ fontSize: smallFontSize, marginBottom: '4px' }}>
                         หมายเหตุ: {sale.notes}
                     </div>
                 )}
 
                 {/* Footer */}
-                <div style={{ textAlign: 'center', fontSize: '13px', marginTop: '8px', whiteSpace: 'pre-wrap' }}>
+                <div style={{ textAlign: 'center', fontSize: smallFontSize, marginTop: '6px', whiteSpace: 'pre-wrap' }}>
                     {template?.footer || 'ขอบคุณที่ใช้บริการ'}
                 </div>
-                <div style={{ textAlign: 'center', fontSize: '12px', color: '#000', marginTop: '4px' }}>
+                <div style={{ textAlign: 'center', fontSize: '11px', color: '#000', marginTop: '3px' }}>
                     {sale.saleNumber}
                 </div>
             </div>

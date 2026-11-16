@@ -47,10 +47,12 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
         })
         .filter(item => item.quantity > 0);
 
-    // Find default receipt template
-    let template = await prisma.receiptTemplate.findFirst({
-        where: { isDefault: true },
-    });
+    // Find default receipt template & shop info
+    const [defaultTemplate, shopInfo] = await Promise.all([
+        prisma.receiptTemplate.findFirst({ where: { isDefault: true } }),
+        prisma.shopInfo.findUnique({ where: { id: 'shop-info' } }),
+    ]);
+    let template = defaultTemplate;
     if (!template) {
         template = await prisma.receiptTemplate.findFirst({
             orderBy: { createdAt: 'asc' },
@@ -65,12 +67,19 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
         items: adjustedItems.map(item => ({
             ...item,
             unitPrice: Number(item.unitPrice),
-            totalPrice: Number(item.totalPrice),
+            totalPrice: Math.round(Number(item.totalPrice) * 100) / 100,
+            discount: Number(item.discount || 0),
         })),
     }));
 
+    const resolvedShopName =
+        shopInfo?.name?.trim() ||
+        template?.headerText?.split('\n').map(l => l.trim()).find(Boolean) ||
+        (template?.name && template.name !== 'Default' ? template.name : '') ||
+        'ร้านค้า';
+
     const templateData = template ? {
-        shopName: template.name || 'Fertilizer POS',
+        shopName: resolvedShopName,
         headerText: template.headerText || null,
         footer: template.footerText || null,
         showLogo: template.showLogo ?? false,
@@ -81,7 +90,19 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
         showStaff: template.showStaff ?? true,
         showCustomer: template.showCustomer ?? true,
         paperSize: template.paperSize || '80mm',
-    } : null;
+    } : {
+        shopName: resolvedShopName,
+        headerText: null,
+        footer: null,
+        showLogo: false,
+        logoUrl: null,
+        showQr: false,
+        qrCodeUrl: null,
+        showBillNo: true,
+        showStaff: true,
+        showCustomer: true,
+        paperSize: '80mm',
+    };
 
     const cashReceived = sale.cashReceived ? Number(sale.cashReceived) : cashReceivedParam;
 

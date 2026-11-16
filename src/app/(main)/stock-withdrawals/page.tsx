@@ -7,16 +7,24 @@ import PageHeader from '@/components/PageHeader';
 import Pagination from '@/components/Pagination';
 import StatusBadge from '@/components/StatusBadge';
 
-interface Props { searchParams: Promise<{ page?: string; from?: string; to?: string }> }
+interface Props { searchParams: Promise<{ page?: string; search?: string; from?: string; to?: string }> }
 
 export default async function StockWithdrawalsPage({ searchParams }: Props) {
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
+    const search = sp.search || '';
     const defaultFrom = () => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); };
-    const from = sp.from || defaultFrom();
+    const from = sp.from || (search ? '' : defaultFrom());
     const to = sp.to || '';
 
-    const { records, totalPages, total } = await getStockWithdrawals(page, from, to);
+    const { records, totalPages, total } = await getStockWithdrawals(page, from, to, search);
+
+    const buildUrl = (params: Record<string, string>) => {
+        const p = new URLSearchParams();
+        const vals = { page: String(page), search, from, to, ...params };
+        Object.entries(vals).forEach(([k, v]) => { if (v) p.set(k, v); });
+        return `/stock-withdrawals?${p.toString()}`;
+    };
 
     return (
         <div className="animate-fade-in">
@@ -33,6 +41,25 @@ export default async function StockWithdrawalsPage({ searchParams }: Props) {
             {/* Filters */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">
                 <div className="flex flex-wrap items-end gap-3">
+                    <form method="get" action="/stock-withdrawals" className="flex gap-2">
+                        {from && <input type="hidden" name="from" value={from} />}
+                        {to && <input type="hidden" name="to" value={to} />}
+                        <input
+                            type="text"
+                            name="search"
+                            defaultValue={search}
+                            placeholder="🔍 ค้นหาเลขบิล, ผู้รับสินค้า, สินค้า..."
+                            className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-violet-500 outline-none w-56 sm:w-64"
+                        />
+                        <button type="submit" className="px-3 py-1.5 rounded-lg bg-violet-500 text-white text-sm font-medium hover:bg-violet-600">
+                            ค้นหา
+                        </button>
+                        {search && (
+                            <a href={buildUrl({ search: '', page: '1' })} className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200">
+                                ล้าง
+                            </a>
+                        )}
+                    </form>
                     <Suspense fallback={<div className="ml-auto h-9 w-64 bg-gray-100 rounded-lg animate-pulse" />}>
                         <DateRangeFilter />
                     </Suspense>
@@ -45,7 +72,7 @@ export default async function StockWithdrawalsPage({ searchParams }: Props) {
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เลขที่</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้เบิกสินค้า</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ผู้รับสินค้า</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">รายการ</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สถานะ</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สร้างโดย</th>
@@ -71,7 +98,7 @@ export default async function StockWithdrawalsPage({ searchParams }: Props) {
                 </table>
 
                 {totalPages > 1 && (
-                    <Pagination page={page} totalPages={totalPages} basePath="/stock-withdrawals" params={{ from, to }} />
+                    <Pagination page={page} totalPages={totalPages} basePath="/stock-withdrawals" params={{ search, from, to }} />
                 )}
             </div>
 
@@ -87,7 +114,7 @@ export default async function StockWithdrawalsPage({ searchParams }: Props) {
                                 <span className="text-sm font-semibold text-violet-600">{r.withdrawalNumber}</span>
                                 <StatusBadge status={r.status} />
                             </div>
-                            <p className="text-sm font-medium text-gray-800 mb-1">ผู้เบิก: {r.requesterName}</p>
+                            <p className="text-sm font-medium text-gray-800 mb-1">ผู้รับสินค้า: {r.requesterName}</p>
                             <div className="flex items-center justify-between text-xs text-gray-500">
                                 <span>{r._count.items} รายการ</span>
                                 <span>{formatDateTime(r.createdAt)}</span>
@@ -96,7 +123,7 @@ export default async function StockWithdrawalsPage({ searchParams }: Props) {
                     ))
                 )}
                 {totalPages > 1 && (
-                    <Pagination page={page} totalPages={totalPages} basePath="/stock-withdrawals" params={{ from, to }} />
+                    <Pagination page={page} totalPages={totalPages} basePath="/stock-withdrawals" params={{ search, from, to }} />
                 )}
             </div>
         </div>

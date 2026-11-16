@@ -21,6 +21,85 @@ interface LineItem {
     expDate?: string;
 }
 
+// ── Searchable Vendor Picker ──────────────────────────────
+function VendorPicker({
+    vendors,
+    value,
+    onChange,
+}: {
+    vendors: Vendor[];
+    value: string;
+    onChange: (vendorId: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const ref = useRef<HTMLDivElement>(null);
+    const selected = vendors.find(v => v.id === value);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const q = search.toLowerCase().trim();
+    const filtered = vendors.filter(v => {
+        if (!q) return true;
+        return v.name.toLowerCase().includes(q) || (v.phone || '').toLowerCase().includes(q);
+    });
+
+    return (
+        <div ref={ref} className={`relative ${open ? 'z-50' : ''}`}>
+            <div className="relative">
+                <input
+                    type="text"
+                    value={open ? search : (selected ? `${selected.name}${selected.phone ? ` (${selected.phone})` : ''}` : '')}
+                    placeholder="🔍 พิมพ์ค้นหาผู้ขาย/โรงงาน/บริษัท..."
+                    onFocus={() => { setOpen(true); setSearch(''); }}
+                    onChange={e => { setSearch(e.target.value); setOpen(true); }}
+                    className="w-full px-3 sm:px-4 py-2.5 pr-8 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm bg-white"
+                />
+                {selected && !open ? (
+                    <button
+                        type="button"
+                        onClick={() => { onChange(''); setSearch(''); setOpen(true); }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                        title="ล้างค่า"
+                    >
+                        ✕
+                    </button>
+                ) : (
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▼</span>
+                )}
+            </div>
+
+            {open && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto">
+                    {filtered.length === 0 ? (
+                        <div className="px-4 py-4 text-center text-sm text-gray-400">ไม่พบผู้ขาย/โรงงาน/บริษัท</div>
+                    ) : (
+                        filtered.map(v => (
+                            <button
+                                key={v.id}
+                                type="button"
+                                onClick={() => { onChange(v.id); setOpen(false); setSearch(''); }}
+                                className={`w-full text-left px-3.5 py-2.5 text-sm hover:bg-emerald-50 transition-colors flex items-center justify-between gap-2 ${
+                                    value === v.id ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700'
+                                }`}
+                            >
+                                <span className="truncate">{v.name}</span>
+                                {v.phone && <span className="text-xs text-gray-400 shrink-0">{v.phone}</span>}
+                            </button>
+                        ))
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ── Searchable Product Picker ─────────────────────────────
 function ProductPicker({
     products,
@@ -260,17 +339,11 @@ export default function NewGoodsReceivePage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">ผู้ขาย/โรงงาน/บริษัท *</label>
-                            <select
+                            <VendorPicker
+                                vendors={vendors}
                                 value={vendorId}
-                                onChange={(e) => setVendorId(e.target.value)}
-                                className="w-full px-3 sm:px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm bg-white"
-                                required
-                            >
-                                <option value="">-- เลือกผู้ขาย/โรงงาน/บริษัท --</option>
-                                {vendors.map(v => (
-                                    <option key={v.id} value={v.id}>{v.name} {v.phone ? `(${v.phone})` : ''}</option>
-                                ))}
-                            </select>
+                                onChange={(id) => setVendorId(id)}
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">

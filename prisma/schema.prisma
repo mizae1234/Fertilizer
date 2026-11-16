@@ -671,7 +671,8 @@ model StockWithdrawal {
   totalAmount      Decimal     @default(0) @db.Decimal(12, 2)
   notes            String?
   approverName     String?     // ผู้อนุมัติการเบิก
-  withdrawerName   String?     // ผู้ขอเบิกสินค้า
+  packerName       String?     // ผู้จัดสินค้า
+  withdrawerName   String?     // ผู้รับสินค้า
   createdById      String
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface QuotationData {
     id: string;
@@ -78,6 +78,8 @@ function numberToThaiText(num: number): string {
 }
 
 export default function QuotationPrint({ quotation, template, shopInfo }: { quotation: QuotationData; template: TemplateData | null; shopInfo: ShopInfoData | null }) {
+    const [copyMode, setCopyMode] = useState<'both' | 'original' | 'copy'>('both');
+
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         if (params.get('silent') === '1') return;
@@ -90,6 +92,8 @@ export default function QuotationPrint({ quotation, template, shopInfo }: { quot
     const addressLines = shopInfo?.address ? shopInfo.address.split('\n') : headerLines.slice(1);
     const custName = quotation.customer?.name || quotation.customerName || '-';
     const subtotal = quotation.totalAmount + quotation.discount;
+    const copyLabels: ('ต้นฉบับ' | 'สำเนา')[] =
+        copyMode === 'both' ? ['ต้นฉบับ', 'สำเนา'] : copyMode === 'original' ? ['ต้นฉบับ'] : ['สำเนา'];
 
     return (
         <>
@@ -98,16 +102,57 @@ export default function QuotationPrint({ quotation, template, shopInfo }: { quot
                     html, body { margin: 0 !important; padding: 0 !important; background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                     @page { size: A4; margin: 0; }
                     .no-print { display: none !important; }
-                    .qt-page { width: 100% !important; min-height: 100% !important; margin: 0 !important; box-shadow: none !important; padding: 15mm !important; }
+                    .qt-page {
+                        width: 210mm !important;
+                        min-height: 294mm !important;
+                        margin: 0 !important;
+                        box-shadow: none !important;
+                        padding: 15mm !important;
+                        box-sizing: border-box !important;
+                        page-break-after: always !important;
+                        break-after: page !important;
+                    }
+                    .qt-page:last-child {
+                        page-break-after: avoid !important;
+                        break-after: avoid !important;
+                    }
                     * { animation: none !important; transition: none !important; }
                 }
                 @media screen { body { background: #666; } }
             `}</style>
 
-            <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 50, display: 'flex', gap: 8 }}>
+            <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 50, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.96)', padding: '5px 8px', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                    {([
+                        { label: 'ต้นฉบับ + สำเนา', value: 'both' as const },
+                        { label: 'เฉพาะต้นฉบับ', value: 'original' as const },
+                        { label: 'เฉพาะสำเนา', value: 'copy' as const },
+                    ]).map(opt => {
+                        const active = copyMode === opt.value;
+                        return (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setCopyMode(opt.value)}
+                                style={{
+                                    padding: '5px 10px',
+                                    borderRadius: 8,
+                                    fontSize: 12,
+                                    fontWeight: active ? 700 : 500,
+                                    border: active ? '1.5px solid #10b981' : '1px solid transparent',
+                                    background: active ? '#ecfdf5' : 'transparent',
+                                    color: active ? '#065f46' : '#4b5563',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                {opt.label}
+                            </button>
+                        );
+                    })}
+                </div>
                 <button onClick={() => window.print()}
                     style={{ padding: '10px 24px', background: 'linear-gradient(135deg, #10b981, #14b8a6)', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}>
-                    🖨️ พิมพ์ / บันทึก PDF
+                    🖨️ พิมพ์ / บันทึก PDF ({copyLabels.length} ชุด)
                 </button>
                 <button onClick={() => window.history.back()}
                     style={{ padding: '10px 20px', background: '#fff', color: '#333', border: '1px solid #ddd', borderRadius: 12, fontWeight: 500, fontSize: 14, cursor: 'pointer' }}>
@@ -115,7 +160,10 @@ export default function QuotationPrint({ quotation, template, shopInfo }: { quot
                 </button>
             </div>
 
-            <div className="qt-page" style={{
+            {copyLabels.map((copyLabel) => {
+                const isOriginal = copyLabel === 'ต้นฉบับ';
+                return (
+            <div key={copyLabel} className="qt-page" style={{
                 width: '210mm', minHeight: '297mm', margin: '20px auto', background: '#fff',
                 padding: '15mm', fontFamily: '"Sarabun", "Inter", sans-serif', fontSize: 13,
                 color: '#222', lineHeight: 1.6,
@@ -137,6 +185,20 @@ export default function QuotationPrint({ quotation, template, shopInfo }: { quot
                         </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
+                        <div style={{ marginBottom: 4 }}>
+                            <span style={{
+                                display: 'inline-block',
+                                padding: '2px 12px',
+                                borderRadius: 4,
+                                fontSize: 12,
+                                fontWeight: 700,
+                                border: isOriginal ? '1.5px solid #10b981' : '1.5px solid #6b7280',
+                                background: isOriginal ? '#10b981' : '#f3f4f6',
+                                color: isOriginal ? '#ffffff' : '#374151',
+                            }}>
+                                {copyLabel}
+                            </span>
+                        </div>
                         <div style={{ fontSize: 12, color: '#888' }}># {quotation.quotationNumber}</div>
                         <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4, color: '#10b981' }}>ใบเสนอราคา</div>
                         <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>QUOTATION</div>
@@ -261,6 +323,8 @@ export default function QuotationPrint({ quotation, template, shopInfo }: { quot
                     </div>
                 </div>
             </div>
+                );
+            })}
         </>
     );
 }

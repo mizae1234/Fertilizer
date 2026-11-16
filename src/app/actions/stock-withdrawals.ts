@@ -13,11 +13,12 @@ export async function createStockWithdrawal(data: {
         unitCost: number;
     }[];
     approverName?: string;
+    packerName?: string;
     withdrawerName?: string;
     notes?: string;
     userId: string;
 }) {
-    if (!data.requesterName.trim()) throw new Error('กรุณาระบุชื่อผู้เบิกสินค้า');
+    if (!data.requesterName.trim()) throw new Error('กรุณาระบุชื่อผู้รับสินค้า');
     if (!data.items.length) throw new Error('กรุณาเพิ่มรายการสินค้า');
     if (!data.userId) throw new Error('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่');
 
@@ -47,6 +48,7 @@ export async function createStockWithdrawal(data: {
                 totalAmount,
                 notes: data.notes || null,
                 approverName: data.approverName || null,
+                packerName: data.packerName || null,
                 withdrawerName: data.withdrawerName || null,
                 createdById: data.userId,
                 items: {
@@ -117,7 +119,7 @@ export async function createStockWithdrawal(data: {
     return { id: result.id, withdrawalNumber: result.withdrawalNumber };
 }
 
-export async function getStockWithdrawals(page = 1, from = '', to = '') {
+export async function getStockWithdrawals(page = 1, from = '', to = '', search = '') {
     const perPage = 15;
     const where: Record<string, unknown> = { deletedAt: null };
 
@@ -125,6 +127,34 @@ export async function getStockWithdrawals(page = 1, from = '', to = '') {
         where.createdAt = {};
         if (from) (where.createdAt as Record<string, unknown>).gte = new Date(from);
         if (to) (where.createdAt as Record<string, unknown>).lte = new Date(to + 'T23:59:59');
+    }
+
+    const trimmedSearch = search.trim();
+    if (trimmedSearch) {
+        const tokens = trimmedSearch.split(/\s+/).filter(Boolean);
+        where.AND = tokens.map(token => ({
+            OR: [
+                { withdrawalNumber: { contains: token, mode: 'insensitive' } },
+                { requesterName: { contains: token, mode: 'insensitive' } },
+                { approverName: { contains: token, mode: 'insensitive' } },
+                { packerName: { contains: token, mode: 'insensitive' } },
+                { withdrawerName: { contains: token, mode: 'insensitive' } },
+                { notes: { contains: token, mode: 'insensitive' } },
+                { createdBy: { name: { contains: token, mode: 'insensitive' } } },
+                {
+                    items: {
+                        some: {
+                            product: {
+                                OR: [
+                                    { name: { contains: token, mode: 'insensitive' } },
+                                    { code: { contains: token, mode: 'insensitive' } },
+                                ],
+                            },
+                        },
+                    },
+                },
+            ],
+        }));
     }
 
     const [records, total, totalCostAgg] = await Promise.all([

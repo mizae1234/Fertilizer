@@ -475,12 +475,18 @@ export default function ReceiptTemplatePage() {
                                                 )}
                                                 {editing.showStaff && <div className="text-[10px] text-gray-500 mb-1">พนักงาน: สมชาย</div>}
                                                 {editing.showCustomer && <div className="text-[10px] text-gray-500 mb-1">ลูกค้า: คุณสมหญิง</div>}
-                                                <div className="border-t border-dashed border-gray-400 my-2" />
-                                                <div className="space-y-1">
-                                                    <div className="flex justify-between"><span>ปุ๋ยยูเรีย 50kg</span><span>x2</span><span className="text-right w-20">1,600.00</span></div>
-                                                    <div className="flex justify-between"><span>ดินปลูก 20L</span><span>x1</span><span className="text-right w-20">290.00</span></div>
+                                                <div className="border-t border-gray-800 my-2" />
+                                                <div className="space-y-1.5 text-[11px]">
+                                                    <div>
+                                                        <div className="flex"><span className="w-4">1</span><span className="flex-1">ปุ๋ยยูเรีย 50kg</span></div>
+                                                        <div className="flex justify-between pl-4 text-gray-700"><span>2 กระสอบ x800.00</span><span>1,600.00</span></div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex"><span className="w-4">2</span><span className="flex-1">ดินปลูก 20L</span></div>
+                                                        <div className="flex justify-between pl-4 text-gray-700"><span>1 ถุง x290.00</span><span>290.00</span></div>
+                                                    </div>
                                                 </div>
-                                                <div className="border-t border-dashed border-gray-400 my-2" />
+                                                <div className="border-t border-gray-800 my-2" />
                                                 <div className="flex justify-between font-bold"><span>รวมทั้งสิ้น</span><span>1,890.00</span></div>
                                                 {editing.showVat && (
                                                     <>

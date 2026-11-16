@@ -1847,22 +1847,18 @@ export default function POSPage() {
                     open={showCloseShiftModal}
                     shiftId={currentShift.id}
                     onClose={() => setShowCloseShiftModal(false)}
-                    onConfirm={async (data) => {
+                    onConfirm={async (data, shiftSummary) => {
                         const closed = await handleCloseShift(data);
-                        setAlertModal({
-                            open: true,
-                            message: `ปิดกะ ${closed.shiftNumber} เรียบร้อยแล้ว`,
-                            type: 'success',
-                            title: 'ปิดกะสำเร็จ'
-                        });
-                    }}
-                    onPrint={(data) => {
                         setPrintSlipData({
                             open: true,
-                            shift: data.shift,
-                            summary: data.summary,
-                            closingCash: data.closingCash,
-                            difference: data.difference,
+                            shift: {
+                                ...shiftSummary.shift,
+                                status: 'CLOSED',
+                                closedAt: closed?.closedAt || new Date().toISOString(),
+                            },
+                            summary: shiftSummary.summary,
+                            closingCash: shiftSummary.closingCash,
+                            difference: shiftSummary.difference,
                         });
                     }}
                 />

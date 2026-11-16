@@ -72,7 +72,7 @@ function ProductSearchSelect({ products, value, onChange }: {
                     {filtered.length === 0 ? (
                         <div className="px-3 py-3 text-sm text-gray-400 text-center">ไม่พบสินค้า</div>
                     ) : (
-                        filtered.map(p => (
+                        filtered.slice(0, 150).map(p => (
                             <button
                                 key={p.id}
                                 onClick={() => { onChange(p.id); setOpen(false); setSearch(''); }}
@@ -106,10 +106,10 @@ export default function NewStockAdjustmentPage() {
 
     useEffect(() => {
         Promise.all([
-            fetch('/api/products').then(r => r.json()),
+            fetch('/api/products?includeInactive=1&lite=1').then(r => r.json()),
             fetch('/api/warehouses').then(r => r.json()),
         ]).then(([p, w]) => {
-            setProducts(p);
+            setProducts(Array.isArray(p) ? p : []);
             setWarehouses(w);
             if (w.length > 0) {
                 setItems(prev => prev.map(item => ({ ...item, warehouseId: w[0].id, warehouseName: w[0].name })));

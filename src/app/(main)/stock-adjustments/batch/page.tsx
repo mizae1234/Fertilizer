@@ -64,6 +64,7 @@ export default function BatchStockAdjustmentPage() {
     const [search, setSearch] = useState<string>('');
     const [showOnlyModified, setShowOnlyModified] = useState<boolean>(false);
     const [hideZeroStock, setHideZeroStock] = useState<boolean>(false);
+    const [displayLimit, setDisplayLimit] = useState<number>(200);
 
     // Products & Edits State
     const [products, setProducts] = useState<Product[]>([]);
@@ -113,16 +114,17 @@ export default function BatchStockAdjustmentPage() {
         initMetadata();
     }, []);
 
-    // 2. Fetch Products whenever warehouse, group, or brand changes
+    // 2. Fetch Products whenever warehouse, group, or brand changes (ALL products, no 1000-row cap)
     const fetchProducts = async (warehouseId: string, groupId: string, brand: string) => {
         if (!warehouseId) return;
         setLoading(true);
         try {
             const params = new URLSearchParams();
             params.set('warehouseId', warehouseId);
+            params.set('includeInactive', '1');
+            params.set('lite', '1');
             if (groupId) params.set('productGroupId', groupId);
             if (brand) params.set('brand', brand);
-            params.set('limit', '1000');
 
             const res = await fetch(`/api/products?${params.toString()}`);
             const data = await res.json();
@@ -135,6 +137,10 @@ export default function BatchStockAdjustmentPage() {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        setDisplayLimit(200);
+    }, [search, selectedWarehouseId, selectedGroupId, selectedBrand, showOnlyModified, hideZeroStock]);
 
     useEffect(() => {
         if (selectedWarehouseId) {
@@ -312,10 +318,25 @@ export default function BatchStockAdjustmentPage() {
     const totalAdded = modifiedList.filter(m => m.diff > 0).reduce((sum, m) => sum + m.diff, 0);
     const totalDeducted = modifiedList.filter(m => m.diff < 0).reduce((sum, m) => sum + Math.abs(m.diff), 0);
 
+    const visibleProducts = useMemo(() => {
+        return filteredProducts.slice(0, displayLimit);
+    }, [filteredProducts, displayLimit]);
+
     // Keyboard navigation (Enter / ArrowDown / ArrowUp)
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
         if (e.key === 'Enter' || e.key === 'ArrowDown') {
             e.preventDefault();
+            if (index + 1 >= displayLimit && filteredProducts.length > displayLimit) {
+                setDisplayLimit(prev => prev + 200);
+                setTimeout(() => {
+                    const nextProduct = filteredProducts[index + 1];
+                    if (nextProduct && inputRefs.current[nextProduct.id]) {
+                        inputRefs.current[nextProduct.id]?.focus();
+                        inputRefs.current[nextProduct.id]?.select();
+                    }
+                }, 50);
+                return;
+            }
             const nextProduct = filteredProducts[index + 1];
             if (nextProduct && inputRefs.current[nextProduct.id]) {
                 inputRefs.current[nextProduct.id]?.focus();
@@ -466,6 +487,7 @@ export default function BatchStockAdjustmentPage() {
                             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                         >
                             <option value="">ทั้งหมด ({productGroups.length} หมวดหมู่)</option>
+                            <option value="__NONE__">— ไม่ระบุหมวดหมู่ —</option>
                             {productGroups.map(g => (
                                 <option key={g.id} value={g.id}>
                                     {g.name}
@@ -485,6 +507,7 @@ export default function BatchStockAdjustmentPage() {
                             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                         >
                             <option value="">ทั้งหมด ({brands.length} ยี่ห้อ)</option>
+                            <option value="__NONE__">— ไม่ระบุยี่ห้อ —</option>
                             {brands.map(b => (
                                 <option key={b} value={b}>
                                     {b}
@@ -611,7 +634,7 @@ export default function BatchStockAdjustmentPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredProducts.map((p, idx) => {
+                                visibleProducts.map((p, idx) => {
                                     const currentStock = getCurrentStock(p);
                                     const edit = edits[p.id];
                                     const isEdited = edit !== undefined && edit.countedStock !== currentStock;
@@ -787,6 +810,27 @@ export default function BatchStockAdjustmentPage() {
                         </tbody>
                     </table>
                 </div>
+                {filteredProducts.length > displayLimit && (
+                    <div className="p-4 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-center gap-3">
+                        <span className="text-xs text-gray-500">
+                            แสดงอยู่ {visibleProducts.length.toLocaleString()} จาก {filteredProducts.length.toLocaleString()} รายการ
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setDisplayLimit(prev => prev + 200)}
+                            className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-50 transition-colors shadow-xs"
+                        >
+                            แสดงเพิ่มอีก 200 รายการ
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setDisplayLimit(filteredProducts.length)}
+                            className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors shadow-xs"
+                        >
+                            แสดงทั้งหมด ({filteredProducts.length.toLocaleString()})
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Bottom Sticky Action Bar */}

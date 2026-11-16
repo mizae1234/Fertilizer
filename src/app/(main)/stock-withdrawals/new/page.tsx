@@ -26,6 +26,7 @@ export default function NewStockWithdrawalPage() {
     const [items, setItems] = useState<WithdrawalItem[]>([]);
     const [notes, setNotes] = useState('');
     const [approverName, setApproverName] = useState('');
+    const [packerName, setPackerName] = useState('');
     const [withdrawerName, setWithdrawerName] = useState('');
 
     // Product search
@@ -110,7 +111,7 @@ export default function NewStockWithdrawalPage() {
 
     const handleSubmit = async () => {
         if (!requesterName.trim()) {
-            setAlertModal({ show: true, title: 'ข้อผิดพลาด', message: 'กรุณาระบุชื่อผู้เบิกสินค้า', type: 'error' });
+            setAlertModal({ show: true, title: 'ข้อผิดพลาด', message: 'กรุณาระบุชื่อผู้รับสินค้า', type: 'error' });
             return;
         }
         if (items.length === 0) {
@@ -144,7 +145,8 @@ export default function NewStockWithdrawalPage() {
                     unitCost: i.unitCost, // ส่งต้นทุน ณ ตอนนั้นไปเก็บในระบบ
                 })),
                 approverName: approverName || undefined,
-                withdrawerName: withdrawerName || undefined,
+                packerName: packerName || undefined,
+                withdrawerName: withdrawerName || requesterName.trim() || undefined,
                 notes: notes || undefined,
                 userId,
             });
@@ -177,13 +179,13 @@ export default function NewStockWithdrawalPage() {
                 <p className="text-sm text-gray-500 mt-1">บันทึกการเบิกสินค้าออกจากคลัง</p>
             </div>
 
-            {/* Requester & Notes */}
+            {/* Receiver & Notes */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">ผู้เบิกสินค้า <span className="text-red-500">*</span></label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">ผู้รับสินค้า <span className="text-red-500">*</span></label>
                         <input type="text" value={requesterName} onChange={e => setRequesterName(e.target.value)}
-                            placeholder="พิมพ์ชื่อผู้เบิกสินค้า..."
+                            placeholder="พิมพ์ชื่อผู้รับสินค้า..."
                             className="w-full px-4 py-2.5 border-0 border-b-2 border-gray-200 focus:border-violet-500 outline-none text-sm bg-gray-50/50 rounded-t-lg transition-colors" />
                     </div>
                     <div>
@@ -316,7 +318,7 @@ export default function NewStockWithdrawalPage() {
             {/* Signatures */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-4">
                 <h2 className="text-lg font-bold text-gray-800 mb-4">✍️ ลงชื่อ</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">ผู้อนุมัติการเบิก</label>
                         <input type="text" value={approverName} onChange={e => setApproverName(e.target.value)}
@@ -324,9 +326,15 @@ export default function NewStockWithdrawalPage() {
                             className="w-full px-4 py-2.5 border-0 border-b-2 border-gray-200 focus:border-violet-500 outline-none text-sm bg-gray-50/50 rounded-t-lg transition-colors" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">ผู้ขอเบิกสินค้า</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">ผู้จัดสินค้า</label>
+                        <input type="text" value={packerName} onChange={e => setPackerName(e.target.value)}
+                            placeholder="ชื่อผู้จัดสินค้า"
+                            className="w-full px-4 py-2.5 border-0 border-b-2 border-gray-200 focus:border-violet-500 outline-none text-sm bg-gray-50/50 rounded-t-lg transition-colors" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">ผู้รับสินค้า</label>
                         <input type="text" value={withdrawerName} onChange={e => setWithdrawerName(e.target.value)}
-                            placeholder="ชื่อผู้ขอเบิกสินค้า"
+                            placeholder="ชื่อผู้รับสินค้า (เว้นว่างใช้ชื่อด้านบน)"
                             className="w-full px-4 py-2.5 border-0 border-b-2 border-gray-200 focus:border-violet-500 outline-none text-sm bg-gray-50/50 rounded-t-lg transition-colors" />
                     </div>
                 </div>

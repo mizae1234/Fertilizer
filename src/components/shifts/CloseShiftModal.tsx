@@ -8,8 +8,10 @@ interface CloseShiftModalProps {
     open: boolean;
     shiftId: string;
     onClose: () => void;
-    onConfirm: (data: { shiftId: string; closingCash?: number; notes?: string }) => Promise<void>;
-    onPrint?: (shiftSummary: { shift: any; summary: ShiftSummaryData; closingCash: number; difference: number }) => void;
+    onConfirm: (
+        data: { shiftId: string; closingCash?: number; notes?: string },
+        shiftSummary: { shift: any; summary: ShiftSummaryData; closingCash: number; difference: number }
+    ) => Promise<void>;
     loading?: boolean;
 }
 
@@ -18,7 +20,6 @@ export default function CloseShiftModal({
     shiftId,
     onClose,
     onConfirm,
-    onPrint,
     loading = false,
 }: CloseShiftModalProps) {
     const [fetching, setFetching] = useState(true);
@@ -52,26 +53,24 @@ export default function CloseShiftModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!shiftData) return;
         setError('');
         try {
-            await onConfirm({
-                shiftId,
-                closingCash: typeof closingCash === 'number' ? closingCash : undefined,
-                notes: notes.trim() || undefined,
-            });
+            await onConfirm(
+                {
+                    shiftId,
+                    closingCash: typeof closingCash === 'number' ? closingCash : undefined,
+                    notes: notes.trim() || undefined,
+                },
+                {
+                    shift: shiftData.shift,
+                    summary: shiftData.summary,
+                    closingCash: actualCash,
+                    difference,
+                }
+            );
         } catch (err: any) {
             setError(err.message || 'เกิดข้อผิดพลาดในการปิดกะ');
-        }
-    };
-
-    const handlePrintClick = () => {
-        if (onPrint && shiftData) {
-            onPrint({
-                shift: shiftData.shift,
-                summary: shiftData.summary,
-                closingCash: actualCash,
-                difference,
-            });
         }
     };
 
@@ -250,21 +249,12 @@ export default function CloseShiftModal({
                                 >
                                     ยกเลิก
                                 </button>
-                                {onPrint && (
-                                    <button
-                                        type="button"
-                                        onClick={handlePrintClick}
-                                        className="px-4 py-3 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold hover:bg-gray-200 transition-colors flex items-center gap-1.5"
-                                    >
-                                        🖨️ สลิปสรุป
-                                    </button>
-                                )}
                                 <button
                                     type="submit"
                                     disabled={loading}
                                     className="flex-1 py-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 text-white text-sm font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50"
                                 >
-                                    {loading ? 'กำลังปิดกะ...' : 'ยืนยันปิดกะ'}
+                                    {loading ? 'กำลังปิดกะ...' : 'ยืนยันปิดกะ (และพิมพ์ใบสรุป)'}
                                 </button>
                             </div>
                         </form>

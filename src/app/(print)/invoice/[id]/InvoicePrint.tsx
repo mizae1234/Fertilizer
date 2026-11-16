@@ -97,6 +97,7 @@ function numberToThaiText(num: number): string {
 
 export default function InvoicePrint({ sale, template }: { sale: SaleData; template: TemplateData | null }) {
     const [title, setTitle] = useState('ใบส่งของ');
+    const [copyMode, setCopyMode] = useState<'both' | 'original' | 'copy'>('both');
     const [showChooser, setShowChooser] = useState(false);
     const [itemsPerPage, setItemsPerPage] = useState<number>(() => {
         if (typeof window !== 'undefined') {
@@ -174,6 +175,9 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
         }
     }
     const totalPages = pages.length;
+    const copyLabels: ('ต้นฉบับ' | 'สำเนา')[] =
+        copyMode === 'both' ? ['ต้นฉบับ', 'สำเนา'] : copyMode === 'original' ? ['ต้นฉบับ'] : ['สำเนา'];
+    const totalPrintSheets = totalPages * copyLabels.length;
 
     // Render Closing Summary and Signatures (shown on last page)
     const renderClosingBlock = () => (
@@ -480,6 +484,36 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                     </div>
                 </div>
 
+                {/* Copy Mode Selector (ต้นฉบับ / สำเนา) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f3f4f6', padding: '4px 8px', borderRadius: 8 }}>
+                    {([
+                        { label: 'ต้นฉบับ + สำเนา', value: 'both' as const },
+                        { label: 'เฉพาะต้นฉบับ', value: 'original' as const },
+                        { label: 'เฉพาะสำเนา', value: 'copy' as const },
+                    ]).map(opt => {
+                        const active = copyMode === opt.value;
+                        return (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setCopyMode(opt.value)}
+                                style={{
+                                    padding: '3px 9px',
+                                    borderRadius: 6,
+                                    fontSize: 11,
+                                    fontWeight: active ? 700 : 500,
+                                    border: active ? '1.5px solid #111827' : '1px solid transparent',
+                                    background: active ? '#ffffff' : 'transparent',
+                                    color: active ? '#111827' : '#6b7280',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                {opt.label}
+                            </button>
+                        );
+                    })}
+                </div>
+
                 {/* Right: Actions */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <button
@@ -500,7 +534,7 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                             boxShadow: '0 3px 8px rgba(16,185,129,0.3)',
                         }}
                     >
-                        🖨️ พิมพ์ {title} ({totalPages} หน้า)
+                        🖨️ พิมพ์ {title} ({totalPrintSheets} แผ่น)
                     </button>
                     <button
                         type="button"
@@ -649,67 +683,84 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                 </div>
             )}
 
-            {/* Paginated A4 Pages */}
-            {pages.map((pageItems, pageIdx) => {
-                const isFirstPage = pageIdx === 0;
-                const isLastPage = pageIdx === totalPages - 1;
+            {/* Paginated A4 Pages across Copy Sets (ต้นฉบับ / สำเนา) */}
+            {copyLabels.map((copyLabel) =>
+                pages.map((pageItems, pageIdx) => {
+                    const isFirstPage = pageIdx === 0;
+                    const isLastPage = pageIdx === totalPages - 1;
+                    const isOriginal = copyLabel === 'ต้นฉบับ';
+                    const copyBadgeStyle: React.CSSProperties = {
+                        display: 'inline-block',
+                        padding: '1px 10px',
+                        borderRadius: 4,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        border: isOriginal ? '1.5px solid #111827' : '1.5px solid #6b7280',
+                        background: isOriginal ? '#111827' : '#f3f4f6',
+                        color: isOriginal ? '#ffffff' : '#374151',
+                        marginBottom: 3,
+                        letterSpacing: 0.5,
+                    };
 
-                return (
-                    <div
-                        key={`page-${pageIdx}`}
-                        className="invoice-page"
-                        style={{
-                            fontFamily: '"Sarabun", "Inter", sans-serif',
-                            fontSize: 12,
-                            color: '#222',
-                            lineHeight: 1.5,
-                        }}
-                    >
-                        {/* Upper Section: Header + Items Table */}
-                        <div style={{ flex: 1 }}>
-                            {/* ================= PAGE 1 HEADER ================= */}
-                            {isFirstPage ? (
-                                <>
-                                    {/* Top Header */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                                        {/* Left: Logo + Company */}
-                                        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flex: 1 }}>
-                                            {template?.showLogo && template?.logoUrl && (
-                                                <img src={template.logoUrl} alt="logo" style={{ height: 58, objectFit: 'contain' }} />
-                                            )}
-                                            <div>
-                                                <div style={{ fontSize: 17, fontWeight: 700, color: '#111827' }}>{companyName}</div>
-                                                {addressLines.map((line, i) => (
-                                                    <div key={i} style={{ fontSize: 11, color: '#555' }}>{line}</div>
-                                                ))}
+                    return (
+                        <div
+                            key={`${copyLabel}-page-${pageIdx}`}
+                            className="invoice-page"
+                            style={{
+                                fontFamily: '"Sarabun", "Inter", sans-serif',
+                                fontSize: 12,
+                                color: '#222',
+                                lineHeight: 1.5,
+                            }}
+                        >
+                            {/* Upper Section: Header + Items Table */}
+                            <div style={{ flex: 1 }}>
+                                {/* ================= PAGE 1 HEADER ================= */}
+                                {isFirstPage ? (
+                                    <>
+                                        {/* Top Header */}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                                            {/* Left: Logo + Company */}
+                                            <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flex: 1 }}>
+                                                {template?.showLogo && template?.logoUrl && (
+                                                    <img src={template.logoUrl} alt="logo" style={{ height: 58, objectFit: 'contain' }} />
+                                                )}
+                                                <div>
+                                                    <div style={{ fontSize: 17, fontWeight: 700, color: '#111827' }}>{companyName}</div>
+                                                    {addressLines.map((line, i) => (
+                                                        <div key={i} style={{ fontSize: 11, color: '#555' }}>{line}</div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Right: Copy Badge, Bill No, Title & Page */}
+                                            <div style={{ textAlign: 'right' }}>
+                                                <div>
+                                                    <span style={copyBadgeStyle}>{copyLabel}</span>
+                                                </div>
+                                                <div style={{ fontSize: 12, color: '#888' }}># {sale.saleNumber}</div>
+                                                <input
+                                                    type="text"
+                                                    value={title}
+                                                    onChange={e => setTitle(e.target.value)}
+                                                    style={{
+                                                        fontSize: 17,
+                                                        fontWeight: 700,
+                                                        marginTop: 2,
+                                                        textAlign: 'right',
+                                                        border: '1px dashed #ccc',
+                                                        padding: '1px 6px',
+                                                        borderRadius: 4,
+                                                        width: '200px',
+                                                        outline: 'none',
+                                                    }}
+                                                    className="no-border-print"
+                                                />
+                                                <div style={{ fontSize: 12, color: '#1f2937', fontWeight: 700, marginTop: 2 }}>
+                                                    หน้า {pageIdx + 1}/{totalPages}
+                                                </div>
                                             </div>
                                         </div>
-
-                                        {/* Right: Bill No, Title & Page */}
-                                        <div style={{ textAlign: 'right' }}>
-                                            <div style={{ fontSize: 12, color: '#888' }}># {sale.saleNumber}</div>
-                                            <input
-                                                type="text"
-                                                value={title}
-                                                onChange={e => setTitle(e.target.value)}
-                                                style={{
-                                                    fontSize: 17,
-                                                    fontWeight: 700,
-                                                    marginTop: 2,
-                                                    textAlign: 'right',
-                                                    border: '1px dashed #ccc',
-                                                    padding: '1px 6px',
-                                                    borderRadius: 4,
-                                                    width: '200px',
-                                                    outline: 'none',
-                                                }}
-                                                className="no-border-print"
-                                            />
-                                            <div style={{ fontSize: 12, color: '#1f2937', fontWeight: 700, marginTop: 2 }}>
-                                                หน้า {pageIdx + 1}/{totalPages}
-                                            </div>
-                                        </div>
-                                    </div>
 
                                     {/* Info Box */}
                                     <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8, border: '1px solid #ccc' }}>
@@ -768,6 +819,9 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                                         </div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
+                                        <div>
+                                            <span style={copyBadgeStyle}>{copyLabel}</span>
+                                        </div>
                                         <div style={{ fontSize: 11, color: '#6b7280' }}># {sale.saleNumber}</div>
                                         <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 1 }}>{title}</div>
                                         <div style={{ fontSize: 12, color: '#1f2937', fontWeight: 700, marginTop: 1 }}>
@@ -829,12 +883,13 @@ export default function InvoicePrint({ sale, template }: { sale: SaleData; templ
                                 color: '#9ca3af',
                                 paddingTop: 4,
                             }}>
-                                - หน้า {pageIdx + 1}/{totalPages} -
+                                - {copyLabel} • หน้า {pageIdx + 1}/{totalPages} -
                             </div>
                         </div>
                     </div>
                 );
-            })}
+            })
+            )}
         </>
     );
 }

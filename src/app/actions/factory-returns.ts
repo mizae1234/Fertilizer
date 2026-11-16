@@ -117,7 +117,7 @@ export async function createFactoryReturn(data: {
     return { id: result.id, returnNumber: result.returnNumber };
 }
 
-export async function getFactoryReturns(page = 1, from = '', to = '') {
+export async function getFactoryReturns(page = 1, from = '', to = '', search = '') {
     const perPage = 15;
     const where: Record<string, unknown> = { deletedAt: null };
 
@@ -125,6 +125,33 @@ export async function getFactoryReturns(page = 1, from = '', to = '') {
         where.createdAt = {};
         if (from) (where.createdAt as Record<string, unknown>).gte = new Date(from);
         if (to) (where.createdAt as Record<string, unknown>).lte = new Date(to + 'T23:59:59');
+    }
+
+    const trimmedSearch = search.trim();
+    if (trimmedSearch) {
+        const tokens = trimmedSearch.split(/\s+/).filter(Boolean);
+        where.AND = tokens.map(token => ({
+            OR: [
+                { returnNumber: { contains: token, mode: 'insensitive' } },
+                { vendor: { name: { contains: token, mode: 'insensitive' } } },
+                { senderName: { contains: token, mode: 'insensitive' } },
+                { receiverName: { contains: token, mode: 'insensitive' } },
+                { notes: { contains: token, mode: 'insensitive' } },
+                { createdBy: { name: { contains: token, mode: 'insensitive' } } },
+                {
+                    items: {
+                        some: {
+                            product: {
+                                OR: [
+                                    { name: { contains: token, mode: 'insensitive' } },
+                                    { code: { contains: token, mode: 'insensitive' } },
+                                ],
+                            },
+                        },
+                    },
+                },
+            ],
+        }));
     }
 
     const [records, total] = await Promise.all([
