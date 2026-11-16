@@ -176,6 +176,7 @@ export default function ProductDetailPage() {
     // Product info editing
     const [infoForm, setInfoForm] = useState({ code: '', barcode: '', name: '', description: '', brand: '', packaging: '', productGroupId: '', minStock: 10, mfgDate: '', expDate: '' });
     const [savingInfo, setSavingInfo] = useState(false);
+    const [dupBarcodeProduct, setDupBarcodeProduct] = useState<{ id: string; code: string; name: string } | null>(null);
     const [productGroups, setProductGroups] = useState<{ id: string; name: string }[]>([]);
     const [brands, setBrands] = useState<string[]>([]);
     const [packagings, setPackagings] = useState<string[]>([]);
@@ -197,6 +198,21 @@ export default function ProductDetailPage() {
     const showAlert = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'error', title?: string) => {
         setAlertModal({ open: true, message, type, title });
     }, []);
+
+    useEffect(() => {
+        const trimmed = infoForm.barcode.trim();
+        if (!trimmed || (product?.barcode && trimmed.toLowerCase() === product.barcode.toLowerCase())) {
+            setDupBarcodeProduct(null);
+            return;
+        }
+        const timer = setTimeout(() => {
+            fetch(`/api/products?checkBarcode=${encodeURIComponent(trimmed)}&excludeId=${encodeURIComponent(id)}`)
+                .then(r => r.json())
+                .then(data => setDupBarcodeProduct(data?.duplicate || null))
+                .catch(() => setDupBarcodeProduct(null));
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [infoForm.barcode, id, product?.barcode]);
 
     const refetchTransactions = useCallback(async (from?: string, to?: string) => {
         if (!id) return;
@@ -257,6 +273,7 @@ export default function ProductDetailPage() {
                 mfgDate: product.mfgDate ? product.mfgDate.slice(0, 10) : '',
                 expDate: product.expDate ? product.expDate.slice(0, 10) : '',
             });
+            setDupBarcodeProduct(null);
             setSellingPriceValue(String(Number(product.price)));
             setPointsValue(String(product.pointsPerUnit));
             setUnitValue(product.unit);
@@ -596,8 +613,17 @@ export default function ProductDetailPage() {
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">บาร์โค้ด (Barcode)</label>
                         <input type="text" value={infoForm.barcode} onChange={e => setInfoForm({ ...infoForm, barcode: e.target.value })}
-                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm font-mono"
+                            className={`w-full px-4 py-2.5 rounded-xl border outline-none text-sm font-mono ${
+                                dupBarcodeProduct
+                                    ? 'border-red-400 bg-red-50/40 focus:ring-2 focus:ring-red-500 focus:border-transparent'
+                                    : 'border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent'
+                            }`}
                             placeholder="ระบุบาร์โค้ด หรือสแกน" />
+                        {dupBarcodeProduct && (
+                            <p className="text-xs text-red-600 mt-1 font-medium">
+                                ⚠️ บาร์โค้ดซ้ำกับสินค้า &ldquo;{dupBarcodeProduct.name}&rdquo; (รหัส: {dupBarcodeProduct.code})
+                            </p>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">ชื่อสินค้า *</label>
@@ -740,6 +766,14 @@ export default function ProductDetailPage() {
                 <button onClick={async () => {
                     if (!infoForm.code.trim()) { showAlert('กรุณาระบุรหัสสินค้า', 'error', 'ผิดพลาด'); return; }
                     if (!infoForm.name.trim()) { showAlert('กรุณาระบุชื่อสินค้า', 'error', 'ผิดพลาด'); return; }
+                    if (dupBarcodeProduct && infoForm.barcode.trim()) {
+                        showAlert(
+                            `ไม่สามารถบันทึกได้ บาร์โค้ด "${infoForm.barcode.trim()}" ซ้ำกับสินค้า "${dupBarcodeProduct.name}" (รหัส: ${dupBarcodeProduct.code})`,
+                            'error',
+                            'บาร์โค้ดซ้ำ'
+                        );
+                        return;
+                    }
                     setSavingInfo(true);
                     try {
                         let costVal = Number(product.cost);
@@ -781,7 +815,10 @@ export default function ProductDetailPage() {
                         }
                         await refreshProduct();
                         showAlert('บันทึกข้อมูลสินค้าเรียบร้อย', 'success', 'สำเร็จ');
-                    } catch (e: any) { showAlert(e.message || 'เกิดข้อผิดพลาด', 'error', 'ผิดพลาด'); }
+                    } catch (e: any) {
+                        const errMsg = e.message || 'เกิดข้อผิดพลาด';
+                        showAlert(errMsg, 'error', errMsg.includes('บาร์โค้ด') ? 'บาร์โค้ดซ้ำ' : 'ผิดพลาด');
+                    }
                     finally { setSavingInfo(false); }
                 }} disabled={savingInfo}
                     className="w-full py-3 rounded-xl bg-emerald-500 text-white font-medium hover:bg-emerald-600 disabled:opacity-50 transition-colors">

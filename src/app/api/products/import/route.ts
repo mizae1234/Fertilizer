@@ -155,6 +155,23 @@ export async function POST(request: Request) {
             };
 
             try {
+                if (barcode) {
+                    await prisma.product.updateMany({
+                        where: { barcode: { equals: barcode, mode: 'insensitive' }, deletedAt: { not: null } },
+                        data: { barcode: null },
+                    });
+                }
+                const deletedWithCode = await prisma.product.findMany({
+                    where: { code: { equals: code, mode: 'insensitive' }, deletedAt: { not: null } },
+                    select: { id: true, code: true },
+                });
+                for (const dp of deletedWithCode) {
+                    await prisma.product.update({
+                        where: { id: dp.id },
+                        data: { code: `${dp.code}_DEL_${dp.id.slice(-6)}` },
+                    });
+                }
+
                 await prisma.product.create({
                     data: {
                         code,
@@ -219,7 +236,18 @@ export async function POST(request: Request) {
                     }
                 }
             } catch (error: any) {
-                results.errors.push(`แถว ${i + 1}: ${error.message?.substring(0, 100)}`);
+                const msg = String(error?.message || '');
+                if (error?.code === 'P2002' || msg.includes('Unique constraint failed')) {
+                    if (msg.includes('barcode')) {
+                        results.errors.push(`แถว ${i + 1}: บาร์โค้ด "${barcode}" ซ้ำกับสินค้าอื่นในระบบ — ข้าม`);
+                    } else if (msg.includes('code')) {
+                        results.errors.push(`แถว ${i + 1}: รหัสสินค้า "${code}" ซ้ำกับสินค้าอื่นในระบบ — ข้าม`);
+                    } else {
+                        results.errors.push(`แถว ${i + 1}: ข้อมูลซ้ำในระบบ — ข้าม`);
+                    }
+                } else {
+                    results.errors.push(`แถว ${i + 1}: ${msg.substring(0, 100)}`);
+                }
                 results.skipped++;
             }
         }

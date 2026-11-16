@@ -221,7 +221,9 @@ export async function PATCH(
     const data: Record<string, any> = {};
     for (const key of allowedFields) {
         if (key in body) {
-            if (key === 'barcode') {
+            if (key === 'code') {
+                data.code = body.code ? String(body.code).trim() : '';
+            } else if (key === 'barcode') {
                 data.barcode = body.barcode ? (String(body.barcode).trim() || null) : null;
             } else if (key === 'mfgDate' || key === 'expDate') {
                 data[key] = body[key] ? new Date(body[key]) : null;
@@ -240,29 +242,45 @@ export async function PATCH(
         // Check for duplicate code if code is being updated
         if (data.code) {
             const existing = await prisma.product.findFirst({
-                where: { code: data.code, id: { not: id } },
-                select: { id: true, name: true },
+                where: { code: { equals: data.code, mode: 'insensitive' }, id: { not: id }, deletedAt: null },
+                select: { id: true, name: true, code: true },
             });
             if (existing) {
                 return NextResponse.json(
-                    { error: `รหัสสินค้า "${data.code}" ถูกใช้แล้วโดยสินค้า "${existing.name}"` },
+                    { error: `ไม่สามารถบันทึกได้ รหัสสินค้า "${data.code}" ซ้ำกับสินค้า "${existing.name}"` },
                     { status: 400 }
                 );
+            }
+            // Free up code if held by a soft-deleted product
+            const deletedWithCode = await prisma.product.findMany({
+                where: { code: { equals: data.code, mode: 'insensitive' }, id: { not: id }, deletedAt: { not: null } },
+                select: { id: true, code: true },
+            });
+            for (const dp of deletedWithCode) {
+                await prisma.product.update({
+                    where: { id: dp.id },
+                    data: { code: `${dp.code}_DEL_${dp.id.slice(-6)}` },
+                });
             }
         }
 
         // Check for duplicate barcode if barcode is being updated
         if (data.barcode) {
             const existingBarcode = await prisma.product.findFirst({
-                where: { barcode: data.barcode, id: { not: id }, deletedAt: null },
+                where: { barcode: { equals: data.barcode, mode: 'insensitive' }, id: { not: id }, deletedAt: null },
                 select: { id: true, name: true, code: true },
             });
             if (existingBarcode) {
                 return NextResponse.json(
-                    { error: `บาร์โค้ด "${data.barcode}" ถูกใช้แล้วโดยสินค้า "${existingBarcode.name}" (${existingBarcode.code})` },
+                    { error: `ไม่สามารถบันทึกได้ บาร์โค้ด "${data.barcode}" ซ้ำกับสินค้า "${existingBarcode.name}" (รหัส: ${existingBarcode.code})` },
                     { status: 400 }
                 );
             }
+            // Release barcode if still held by any soft-deleted product
+            await prisma.product.updateMany({
+                where: { barcode: { equals: data.barcode, mode: 'insensitive' }, id: { not: id }, deletedAt: { not: null } },
+                data: { barcode: null },
+            });
         }
 
         // Fetch old product data for comparison
@@ -316,6 +334,33 @@ export async function PATCH(
         return NextResponse.json(JSON.parse(JSON.stringify(updated)));
     } catch (error: any) {
         console.error('Product PATCH error:', error.message, JSON.stringify(data));
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const target = Array.isArray(error?.meta?.target) ? error.meta.target.join(',') : String(error?.meta?.target || '');
+        const msg = String(error?.message || '');
+        if (error?.code === 'P2002' || msg.includes('Unique constraint failed')) {
+            if (target.includes('barcode') || msg.includes('barcode')) {
+                const dup = data.barcode
+                    ? await prisma.product.findFirst({
+                        where: { barcode: { equals: data.barcode, mode: 'insensitive' }, id: { not: id } },
+                        select: { name: true, code: true, deletedAt: true },
+                    }).catch(() => null)
+                    : null;
+                const detail = dup && !dup.deletedAt ? ` ซ้ำกับสินค้า "${dup.name}" (รหัส: ${dup.code})` : ' มีอยู่ในระบบแล้ว';
+                return NextResponse.json(
+                    { error: `ไม่สามารถบันทึกได้ บาร์โค้ด "${data.barcode || ''}"${detail}` },
+                    { status: 400 }
+                );
+            }
+            if (target.includes('code') || msg.includes('(`code`)')) {
+                return NextResponse.json(
+                    { error: `ไม่สามารถบันทึกได้ รหัสสินค้า "${data.code || ''}" ซ้ำกับสินค้าอื่นในระบบ` },
+                    { status: 400 }
+                );
+            }
+            return NextResponse.json(
+                { error: 'ไม่สามารถบันทึกได้ เนื่องจากข้อมูลรหัสสินค้าหรือบาร์โค้ดซ้ำในระบบ' },
+                { status: 400 }
+            );
+        }
+        return NextResponse.json({ error: error.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' }, { status: 500 });
     }
 }

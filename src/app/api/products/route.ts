@@ -7,6 +7,25 @@ export async function GET(request: Request) {
         const user = await getServerUser();
         const isStaff = user?.role === 'STAFF';
         const { searchParams } = new URL(request.url);
+        const checkBarcode = searchParams.get('checkBarcode');
+        const excludeId = searchParams.get('excludeId') || '';
+
+        if (checkBarcode !== null) {
+            const trimmedBarcode = checkBarcode.trim();
+            if (!trimmedBarcode) {
+                return NextResponse.json({ duplicate: null });
+            }
+            const duplicate = await prisma.product.findFirst({
+                where: {
+                    barcode: { equals: trimmedBarcode, mode: 'insensitive' },
+                    deletedAt: null,
+                    ...(excludeId ? { id: { not: excludeId } } : {}),
+                },
+                select: { id: true, code: true, name: true, barcode: true },
+            });
+            return NextResponse.json({ duplicate: duplicate || null });
+        }
+
         const search = searchParams.get('search') || '';
         const exactCode = searchParams.get('exactCode') || '';
         const warehouseId = searchParams.get('warehouseId') || '';

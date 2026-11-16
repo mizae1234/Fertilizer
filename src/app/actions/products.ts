@@ -93,58 +93,96 @@ export async function createProduct(data: {
             nextNum++;
             code = String(nextNum).padStart(5, '0');
         }
+    } else {
+        const existingCode = await prisma.product.findFirst({
+            where: { code: { equals: code, mode: 'insensitive' }, deletedAt: null },
+            select: { id: true, name: true, code: true },
+        });
+        if (existingCode) {
+            return { error: `ไม่สามารถบันทึกได้ รหัสสินค้า "${code}" ซ้ำกับสินค้า "${existingCode.name}"` };
+        }
+        const deletedWithCode = await prisma.product.findMany({
+            where: { code: { equals: code, mode: 'insensitive' }, deletedAt: { not: null } },
+            select: { id: true, code: true },
+        });
+        for (const dp of deletedWithCode) {
+            await prisma.product.update({
+                where: { id: dp.id },
+                data: { code: `${dp.code}_DEL_${dp.id.slice(-6)}` },
+            });
+        }
     }
 
     const barcode = data.barcode?.trim() || null;
     if (barcode) {
         const existingBarcode = await prisma.product.findFirst({
-            where: { barcode, deletedAt: null },
+            where: { barcode: { equals: barcode, mode: 'insensitive' }, deletedAt: null },
             select: { id: true, name: true, code: true },
         });
         if (existingBarcode) {
-            throw new Error(`บาร์โค้ด "${barcode}" ถูกใช้แล้วโดยสินค้า "${existingBarcode.name}" (${existingBarcode.code})`);
+            return { error: `ไม่สามารถบันทึกได้ บาร์โค้ด "${barcode}" ซ้ำกับสินค้า "${existingBarcode.name}" (รหัส: ${existingBarcode.code})` };
         }
+        // Release barcode if still held by any soft-deleted product
+        await prisma.product.updateMany({
+            where: { barcode: { equals: barcode, mode: 'insensitive' }, deletedAt: { not: null } },
+            data: { barcode: null },
+        });
     }
 
-    const product = await prisma.product.create({
-        data: {
-            code,
-            barcode,
-            name: data.name,
-            description: data.description,
-            unit: data.unit || 'bag',
-            cost: data.cost || 0,
-            price: data.price || 0,
-            brand: data.brand || null,
-            packaging: data.packaging || null,
-            productGroupId: data.productGroupId || null,
-            pointsPerUnit: data.pointsPerUnit || 0,
-            minStock: data.minStock || 10,
-            imageUrl: data.imageUrl || null,
-            mfgDate: data.mfgDate ? new Date(data.mfgDate) : null,
-            expDate: data.expDate ? new Date(data.expDate) : null,
-            productPrices: data.prices
-                ? {
-                    create: data.prices.map((p) => ({
-                        customerGroupId: p.customerGroupId,
-                        price: p.price,
-                    })),
-                }
-                : undefined,
-            productUnits: data.units && data.units.length > 0
-                ? {
-                    create: data.units.map((u) => ({
-                        unitName: u.unitName,
-                        conversionRate: u.conversionRate,
-                        sellingPrice: u.sellingPrice,
-                        isBaseUnit: u.isBaseUnit,
-                    })),
-                }
-                : undefined,
-        },
-    });
-    revalidatePath('/products');
-    return product;
+    try {
+        const product = await prisma.product.create({
+            data: {
+                code,
+                barcode,
+                name: data.name,
+                description: data.description,
+                unit: data.unit || 'bag',
+                cost: data.cost || 0,
+                price: data.price || 0,
+                brand: data.brand || null,
+                packaging: data.packaging || null,
+                productGroupId: data.productGroupId || null,
+                pointsPerUnit: data.pointsPerUnit || 0,
+                minStock: data.minStock || 10,
+                imageUrl: data.imageUrl || null,
+                mfgDate: data.mfgDate ? new Date(data.mfgDate) : null,
+                expDate: data.expDate ? new Date(data.expDate) : null,
+                productPrices: data.prices
+                    ? {
+                        create: data.prices.map((p) => ({
+                            customerGroupId: p.customerGroupId,
+                            price: p.price,
+                        })),
+                    }
+                    : undefined,
+                productUnits: data.units && data.units.length > 0
+                    ? {
+                        create: data.units.map((u) => ({
+                            unitName: u.unitName,
+                            conversionRate: u.conversionRate,
+                            sellingPrice: u.sellingPrice,
+                            isBaseUnit: u.isBaseUnit,
+                        })),
+                    }
+                    : undefined,
+            },
+        });
+        revalidatePath('/products');
+        return { product };
+    } catch (error: any) {
+        const target = Array.isArray(error?.meta?.target) ? error.meta.target.join(',') : String(error?.meta?.target || '');
+        const msg = String(error?.message || '');
+        if (error?.code === 'P2002' || msg.includes('Unique constraint failed')) {
+            if (target.includes('barcode') || msg.includes('barcode')) {
+                return { error: `ไม่สามารถบันทึกได้ บาร์โค้ด "${barcode || ''}" ซ้ำกับสินค้าอื่นในระบบ` };
+            }
+            if (target.includes('code') || msg.includes('(`code`)')) {
+                return { error: `ไม่สามารถบันทึกได้ รหัสสินค้า "${code || ''}" ซ้ำกับสินค้าอื่นในระบบ` };
+            }
+            return { error: 'ไม่สามารถบันทึกได้ เนื่องจากข้อมูลรหัสสินค้าหรือบาร์โค้ดซ้ำในระบบ' };
+        }
+        return { error: error?.message || 'เกิดข้อผิดพลาดในการบันทึกสินค้า' };
+    }
 }
 
 export async function updateProduct(
@@ -171,12 +209,16 @@ export async function updateProduct(
         const barcode = data.barcode?.trim() || null;
         if (barcode) {
             const existingBarcode = await prisma.product.findFirst({
-                where: { barcode, id: { not: id }, deletedAt: null },
+                where: { barcode: { equals: barcode, mode: 'insensitive' }, id: { not: id }, deletedAt: null },
                 select: { id: true, name: true, code: true },
             });
             if (existingBarcode) {
-                throw new Error(`บาร์โค้ด "${barcode}" ถูกใช้แล้วโดยสินค้า "${existingBarcode.name}" (${existingBarcode.code})`);
+                throw new Error(`ไม่สามารถบันทึกได้ บาร์โค้ด "${barcode}" ซ้ำกับสินค้า "${existingBarcode.name}" (รหัส: ${existingBarcode.code})`);
             }
+            await prisma.product.updateMany({
+                where: { barcode: { equals: barcode, mode: 'insensitive' }, id: { not: id }, deletedAt: { not: null } },
+                data: { barcode: null },
+            });
         }
     }
 
@@ -239,7 +281,7 @@ export async function deleteProduct(id: string) {
 
     await prisma.product.update({
         where: { id },
-        data: { deletedAt: new Date() },
+        data: { deletedAt: new Date(), barcode: null },
     });
     revalidatePath('/products');
 }

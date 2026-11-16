@@ -41,7 +41,8 @@ export default function NewProductPage() {
     });
     const [prices, setPrices] = useState<{ customerGroupId: string; productUnitId: string; price: number }[]>([]);
     const [units, setUnits] = useState<{ unitName: string; conversionRate: number; sellingPrice: number; isBaseUnit: boolean }[]>([]);
-    const [alertModal, setAlertModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
+    const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; title?: string }>({ open: false, message: '' });
+    const [dupBarcodeProduct, setDupBarcodeProduct] = useState<{ id: string; code: string; name: string } | null>(null);
     const [brands, setBrands] = useState<string[]>([]);
     const [packagings, setPackagings] = useState<string[]>([]);
     const [unitNames, setUnitNames] = useState<string[]>([]);
@@ -64,11 +65,34 @@ export default function NewProductPage() {
         });
     }, []);
 
+    useEffect(() => {
+        const trimmed = form.barcode.trim();
+        if (!trimmed) {
+            setDupBarcodeProduct(null);
+            return;
+        }
+        const timer = setTimeout(() => {
+            fetch(`/api/products?checkBarcode=${encodeURIComponent(trimmed)}`)
+                .then(r => r.json())
+                .then(data => setDupBarcodeProduct(data?.duplicate || null))
+                .catch(() => setDupBarcodeProduct(null));
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [form.barcode]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (dupBarcodeProduct && form.barcode.trim()) {
+            setAlertModal({
+                open: true,
+                title: 'บาร์โค้ดซ้ำ',
+                message: `ไม่สามารถบันทึกได้ บาร์โค้ด "${form.barcode.trim()}" ซ้ำกับสินค้า "${dupBarcodeProduct.name}" (รหัส: ${dupBarcodeProduct.code})`,
+            });
+            return;
+        }
         setLoading(true);
         try {
-            await createProduct({
+            const result = await createProduct({
                 ...form,
                 imageUrl: imageUrl || undefined,
                 productGroupId: form.productGroupId || undefined,
@@ -77,9 +101,17 @@ export default function NewProductPage() {
                 prices: prices.filter((p) => p.price > 0),
                 units: units.filter((u) => u.unitName.trim() !== ''),
             });
+            if (result && 'error' in result && result.error) {
+                setAlertModal({
+                    open: true,
+                    title: result.error.includes('บาร์โค้ด') ? 'บาร์โค้ดซ้ำ' : 'เกิดข้อผิดพลาด',
+                    message: result.error,
+                });
+                return;
+            }
             router.push('/products');
         } catch (error) {
-            setAlertModal({ open: true, message: (error as Error).message });
+            setAlertModal({ open: true, title: 'เกิดข้อผิดพลาด', message: (error as Error).message });
         } finally {
             setLoading(false);
         }
@@ -155,9 +187,18 @@ export default function NewProductPage() {
                                 type="text"
                                 value={form.barcode}
                                 onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm font-mono"
+                                className={`w-full px-4 py-2.5 rounded-xl border outline-none text-sm font-mono ${
+                                    dupBarcodeProduct
+                                        ? 'border-red-400 bg-red-50/40 focus:ring-2 focus:ring-red-500 focus:border-transparent'
+                                        : 'border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent'
+                                }`}
                                 placeholder="เช่น 8851234567890 (เว้นว่างได้)"
                             />
+                            {dupBarcodeProduct && (
+                                <p className="text-xs text-red-600 mt-1 font-medium">
+                                    ⚠️ บาร์โค้ดซ้ำกับสินค้า &ldquo;{dupBarcodeProduct.name}&rdquo; (รหัส: {dupBarcodeProduct.code})
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -477,7 +518,7 @@ export default function NewProductPage() {
                     </button>
                 </div>
             </form>
-            <AlertModal open={alertModal.open} onClose={() => setAlertModal({ open: false, message: '' })} message={alertModal.message} type="error" title="เกิดข้อผิดพลาด" />
+            <AlertModal open={alertModal.open} onClose={() => setAlertModal({ open: false, message: '' })} message={alertModal.message} type="error" title={alertModal.title || 'เกิดข้อผิดพลาด'} />
         </div>
     );
 }
