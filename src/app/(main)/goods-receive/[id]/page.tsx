@@ -526,10 +526,10 @@ export default function GoodsReceiveDetailPage() {
                             const productCostMethod = gr?.items.find(i => i.productId === item.productId)?.product?.costMethod;
                             const currentMethod = costMethodOverrides[item.productId] ?? productCostMethod ?? 'LAST';
                             return (
-                            <div key={idx} className="p-4 sm:px-6">
+                            <div key={idx} className="p-4 sm:px-6 space-y-2.5">
                                 <div className="flex flex-wrap lg:flex-nowrap gap-3 items-end">
                                     {/* Product */}
-                                    <div className="w-full lg:w-auto lg:flex-[3]">
+                                    <div className="w-full lg:flex-1 lg:min-w-0">
                                         <label className="text-xs text-gray-400 mb-1 block">สินค้า</label>
                                         <GRProductPicker
                                             products={products}
@@ -538,72 +538,46 @@ export default function GoodsReceiveDetailPage() {
                                         />
                                     </div>
                                     {/* Warehouse */}
-                                    <div className="w-1/2 lg:w-auto lg:flex-[2]">
+                                    <div className="w-[calc(50%-6px)] sm:w-44 lg:w-48 shrink-0">
                                         <label className="text-xs text-gray-400 mb-1 block">คลัง</label>
                                         <select
                                             value={item.warehouseId}
                                             onChange={e => updateItem(idx, 'warehouseId', e.target.value)}
-                                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
                                         >
                                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                                         </select>
                                     </div>
                                     {/* Qty */}
-                                    <div className="w-20 lg:w-auto lg:flex-[1]">
+                                    <div className="w-28 lg:w-32 shrink-0">
                                         <label className="text-xs text-gray-400 mb-1 block">จำนวน</label>
                                         <input
                                             type="number" min={1} value={item.quantity}
+                                            onFocus={e => e.target.select()}
                                             onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 1)}
-                                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 outline-none"
+                                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-right tabular-nums focus:ring-2 focus:ring-emerald-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         />
                                     </div>
                                     {/* Unit Cost */}
                                     {user?.role === 'ADMIN' && (
-                                        <div className="w-24 lg:w-auto lg:flex-[1]">
+                                        <div className="w-40 lg:w-48 shrink-0">
                                             <label className="text-xs text-gray-400 mb-1 block">ต้นทุน/หน่วย</label>
                                             <input
                                                 type="number" min={0} step="0.01" value={item.unitCost}
+                                                onFocus={e => e.target.select()}
                                                 onChange={e => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
-                                                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-right tabular-nums font-medium focus:ring-2 focus:ring-emerald-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
                                     )}
-                                    {/* Lot No */}
-                                    <div className="w-28 lg:w-auto lg:flex-[1.5]">
-                                        <label className="text-xs text-gray-400 mb-1 block">Lot No.</label>
-                                        <input
-                                            type="text" value={item.lotNo}
-                                            onChange={e => updateItem(idx, 'lotNo', e.target.value)}
-                                            placeholder="ถ้ามี"
-                                            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        />
-                                    </div>
-                                    {/* MFG Date */}
-                                    <div className="w-36 lg:w-auto lg:flex-[1.5]">
-                                        <label className="text-xs text-gray-400 mb-1 block">📅 วันผลิต</label>
-                                        <input
-                                            type="date" value={item.mfgDate || ''}
-                                            onChange={e => updateItem(idx, 'mfgDate', e.target.value)}
-                                            className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-gray-700"
-                                        />
-                                    </div>
-                                    {/* EXP Date */}
-                                    <div className="w-36 lg:w-auto lg:flex-[1.5]">
-                                        <label className="text-xs text-gray-400 mb-1 block">⏳ วันหมดอายุ</label>
-                                        <input
-                                            type="date" value={item.expDate || ''}
-                                            onChange={e => updateItem(idx, 'expDate', e.target.value)}
-                                            className="w-full px-2.5 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-gray-700"
-                                        />
-                                    </div>
                                     {/* Cost Method */}
                                     {user?.role === 'ADMIN' && (
-                                        <div className="w-32 lg:w-auto lg:flex-[1.5]">
+                                        <div className="w-36 lg:w-40 shrink-0">
                                             <label className="text-xs text-gray-400 mb-1 block">ประเภทต้นทุน</label>
                                             <select
                                                 value={currentMethod}
                                                 onChange={e => setCostMethodOverrides(prev => ({ ...prev, [item.productId]: e.target.value }))}
-                                                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
                                             >
                                                 <option value="AVG">📊 เฉลี่ย</option>
                                                 <option value="LAST">🕐 ล่าสุด</option>
@@ -613,18 +587,18 @@ export default function GoodsReceiveDetailPage() {
                                     )}
                                     {/* Manual cost input */}
                                     {user?.role === 'ADMIN' && currentMethod === 'MANUAL' && (
-                                        <div className="w-28 lg:w-auto lg:flex-[1]">
+                                        <div className="w-40 lg:w-44 shrink-0">
                                             <label className="text-xs text-gray-400 mb-1 block">ต้นทุนเอง</label>
                                             <input
                                                 type="number" min={0} step="0.01" value={item.unitCost}
                                                 onChange={e => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
                                                 onFocus={e => e.target.select()}
-                                                className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 text-sm text-right focus:ring-2 focus:ring-amber-500 outline-none font-medium"
+                                                className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 text-sm text-right tabular-nums focus:ring-2 focus:ring-amber-500 outline-none font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
                                     )}
-                                    {/* Remove + Total */}
-                                    <div className="flex items-end gap-2">
+                                    {/* Remove */}
+                                    <div className="flex items-end gap-2 shrink-0">
                                         {items.length > 1 && (
                                             <button onClick={() => removeItem(idx)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบรายการ">
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -634,12 +608,40 @@ export default function GoodsReceiveDetailPage() {
                                         )}
                                     </div>
                                 </div>
-                                {user?.role === 'ADMIN' && (
-                                    <div className="text-right mt-1">
-                                        <span className="text-xs text-gray-400">รวม: </span>
-                                        <span className="text-sm font-semibold text-gray-700">{formatCurrency(item.quantity * item.unitCost)}</span>
+                                {/* Row 2: Lot No., MFG Date, EXP Date, Total */}
+                                <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100 text-xs">
+                                    <div className="flex items-center gap-1.5 w-44">
+                                        <span className="shrink-0 text-gray-400 font-medium">Lot:</span>
+                                        <input
+                                            type="text" value={item.lotNo}
+                                            onChange={e => updateItem(idx, 'lotNo', e.target.value)}
+                                            placeholder="ถ้ามี"
+                                            className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        />
                                     </div>
-                                )}
+                                    <div className="flex items-center gap-1.5 w-48">
+                                        <span className="shrink-0 text-gray-500 font-medium">📅 วันผลิต:</span>
+                                        <input
+                                            type="date" value={item.mfgDate || ''}
+                                            onChange={e => updateItem(idx, 'mfgDate', e.target.value)}
+                                            className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-gray-700"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-1.5 w-48">
+                                        <span className="shrink-0 text-gray-500 font-medium">⏳ วันหมดอายุ:</span>
+                                        <input
+                                            type="date" value={item.expDate || ''}
+                                            onChange={e => updateItem(idx, 'expDate', e.target.value)}
+                                            className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-emerald-500 outline-none bg-white text-gray-700"
+                                        />
+                                    </div>
+                                    {user?.role === 'ADMIN' && (
+                                        <div className="ml-auto text-right">
+                                            <span className="text-xs text-gray-400">รวม: </span>
+                                            <span className="text-sm font-semibold text-gray-700">{formatCurrency(item.quantity * item.unitCost)}</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             );
                         })}

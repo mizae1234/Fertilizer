@@ -163,17 +163,14 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                 </div>
 
                 {/* Bill Info */}
-                <div style={{ fontSize: smallFontSize, marginTop: '6px', marginBottom: '4px' }}>
+                <div style={{ fontSize: smallFontSize, marginTop: '6px', marginBottom: '4px', lineHeight: 1.4 }}>
                     {(template?.showBillNo !== false) && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span>บิลเลขที่: {sale.saleNumber}</span>
-                            {(template?.showStaff !== false) && <span>พนง: {sale.createdBy?.name || '-'}</span>}
-                        </div>
+                        <div>บิลเลขที่: {sale.saleNumber}</div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>{formatDate(sale.createdAt)}</span>
-                        {(template?.showBillNo === false) && (template?.showStaff !== false) && <span>พนง: {sale.createdBy?.name || '-'}</span>}
-                    </div>
+                    <div>{formatDate(sale.createdAt)}</div>
+                    {(template?.showStaff !== false) && (
+                        <div>พนง: {sale.createdBy?.name || '-'}</div>
+                    )}
                     {(template?.showCustomer !== false) && sale.customer && (
                         <div style={{ marginTop: '2px' }}>
                             <div>ลูกค้า: {sale.customer.name}</div>

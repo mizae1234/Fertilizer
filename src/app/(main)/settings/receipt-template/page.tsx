@@ -469,12 +469,11 @@ export default function ReceiptTemplatePage() {
                                                 )}
                                                 <div className="border-t border-dashed border-gray-400 my-2" />
                                                 {editing.showBillNo && (
-                                                    <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                                                        <span>เลขที่: SALE-20260001</span><span>21/02/2569</span>
-                                                    </div>
+                                                    <div className="text-[10px] text-gray-500">เลขที่: SALE-20260001</div>
                                                 )}
-                                                {editing.showStaff && <div className="text-[10px] text-gray-500 mb-1">พนักงาน: สมชาย</div>}
-                                                {editing.showCustomer && <div className="text-[10px] text-gray-500 mb-1">ลูกค้า: คุณสมหญิง</div>}
+                                                <div className="text-[10px] text-gray-500">21/02/2569 14:30</div>
+                                                {editing.showStaff && <div className="text-[10px] text-gray-500">พนง: สมชาย</div>}
+                                                {editing.showCustomer && <div className="text-[10px] text-gray-500 mt-0.5">ลูกค้า: คุณสมหญิง</div>}
                                                 <div className="border-t border-gray-800 my-2" />
                                                 <div className="space-y-1.5 text-[11px]">
                                                     <div>

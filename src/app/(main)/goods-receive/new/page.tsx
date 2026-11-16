@@ -329,7 +329,7 @@ export default function NewGoodsReceivePage() {
     }
 
     return (
-        <div className="animate-fade-in max-w-4xl mx-auto">
+        <div className="animate-fade-in max-w-7xl mx-auto">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-6">บันทึกนำเข้าสินค้า</h1>
 
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
@@ -432,7 +432,7 @@ export default function NewGoodsReceivePage() {
                                     <div key={idx} className="p-3 sm:p-4 bg-gray-50 rounded-xl space-y-2.5">
                                         {/* ─── Desktop: clean 2-level row ─── */}
                                         <div className="hidden sm:block space-y-2">
-                                            <div className="flex items-end gap-2">
+                                            <div className="flex items-end gap-3">
                                                 <div className="flex-1 min-w-0">
                                                     <label className="block text-xs text-gray-500 mb-1">สินค้า</label>
                                                     <ProductPicker
@@ -441,39 +441,39 @@ export default function NewGoodsReceivePage() {
                                                         onChange={(pid, product) => handleProductSelect(idx, pid, product)}
                                                     />
                                                 </div>
-                                                <div className="w-24 shrink-0">
+                                                <div className="w-28 lg:w-32 shrink-0">
                                                     <label className="block text-xs text-gray-500 mb-1">จำนวน</label>
                                                     <input
                                                         type="number"
                                                         value={item.quantity}
                                                         onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
                                                         onFocus={(e) => e.target.select()}
-                                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
+                                                        className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-right tabular-nums bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                         min="1"
                                                         required
                                                     />
                                                 </div>
                                                 {user?.role === 'ADMIN' && (
-                                                    <div className="w-28 shrink-0">
+                                                    <div className="w-40 lg:w-48 shrink-0">
                                                         <label className="block text-xs text-gray-500 mb-1">ต้นทุน/หน่วย</label>
                                                         <input
                                                             type="number"
                                                             value={item.unitCost}
                                                             onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
                                                             onFocus={(e) => e.target.select()}
-                                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white"
+                                                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-right tabular-nums font-medium bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                             min="0"
                                                             step="0.01"
                                                             required
                                                         />
                                                     </div>
                                                 )}
-                                                <div className="w-36 shrink-0">
+                                                <div className="w-40 lg:w-48 shrink-0">
                                                     <label className="block text-xs text-gray-500 mb-1">เข้าคลัง</label>
                                                     <select
                                                         value={item.warehouseId}
                                                         onChange={(e) => updateItem(idx, 'warehouseId', e.target.value)}
-                                                        className={`w-full px-2 py-2 rounded-lg border text-sm bg-white ${isCustomWarehouse
+                                                        className={`w-full px-2.5 py-2 rounded-lg border text-sm bg-white ${isCustomWarehouse
                                                             ? 'border-orange-300 text-orange-700 font-medium'
                                                             : 'border-gray-200 text-gray-600'
                                                             }`}
@@ -556,7 +556,7 @@ export default function NewGoodsReceivePage() {
                                                         value={item.quantity}
                                                         onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
                                                         onFocus={(e) => e.target.select()}
-                                                        className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-white"
+                                                        className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm text-right tabular-nums bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                         min="1"
                                                         required
                                                     />
@@ -569,7 +569,7 @@ export default function NewGoodsReceivePage() {
                                                             value={item.unitCost}
                                                             onChange={(e) => updateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)}
                                                             onFocus={(e) => e.target.select()}
-                                                            className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-white"
+                                                            className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm text-right tabular-nums font-medium bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                             min="0"
                                                             step="0.01"
                                                             required
