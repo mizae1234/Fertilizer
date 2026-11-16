@@ -524,10 +524,15 @@ export default function POSPage() {
     }, [search, defaultWarehouseId]);
 
     useEffect(() => {
-        if (customerSearch) {
-            fetch(`/api/customers?search=${customerSearch}`).then(r => r.json()).then(setCustomers);
-        }
-    }, [customerSearch]);
+        if (!showCustomerPicker && !customerSearch) return;
+        const timer = setTimeout(() => {
+            fetch(`/api/customers?search=${encodeURIComponent(customerSearch)}`, { cache: 'no-store' })
+                .then(r => r.json())
+                .then(data => { if (Array.isArray(data)) setCustomers(data); })
+                .catch(() => {});
+        }, 120);
+        return () => clearTimeout(timer);
+    }, [customerSearch, showCustomerPicker]);
 
     // Persist cart to sessionStorage
     useEffect(() => {
@@ -1408,16 +1413,26 @@ export default function POSPage() {
                                         </button>
                                     )}
                                     {showCustomerPicker && (
-                                        <div className="absolute right-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
-                                            <input type="text" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
-                                                placeholder="ค้นหาชื่อหรือเบอร์โทร..." className="w-full px-3 py-2.5 text-sm border-b border-gray-100 outline-none" autoFocus />
-                                            <div className="max-h-48 overflow-y-auto">
-                                                {customers.map(c => (
-                                                    <button key={c.id} onClick={() => { setSelectedCustomer(c); setShowCustomerPicker(false); }}
-                                                        className="w-full text-left px-3 py-2.5 hover:bg-emerald-50 text-sm transition-colors">
-                                                        {c.name} · {c.phone} <span className="text-xs text-gray-400 ml-1">({c.customerGroup.name})</span>
-                                                    </button>
-                                                ))}
+                                        <div className="absolute right-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 overflow-hidden">
+                                            <div className="relative border-b border-gray-100">
+                                                <input type="text" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
+                                                    placeholder="🔍 พิมพ์หรือวางชื่อ/เบอร์โทร..." className="w-full px-3 py-2.5 pr-7 text-sm outline-none" autoFocus />
+                                                {customerSearch && (
+                                                    <button type="button" onClick={() => setCustomerSearch('')}
+                                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                                                )}
+                                            </div>
+                                            <div className="max-h-56 overflow-y-auto">
+                                                {customers.length === 0 ? (
+                                                    <div className="px-3 py-4 text-center text-xs text-gray-400">ไม่พบลูกค้าที่ตรงกับคำค้นหา</div>
+                                                ) : (
+                                                    customers.map(c => (
+                                                        <button key={c.id} onClick={() => { setSelectedCustomer(c); setShowCustomerPicker(false); }}
+                                                            className="w-full text-left px-3 py-2.5 hover:bg-emerald-50 text-sm transition-colors border-b border-gray-50 last:border-0">
+                                                            {c.name} · {c.phone} <span className="text-xs text-gray-400 ml-1">({c.customerGroup.name})</span>
+                                                        </button>
+                                                    ))
+                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -1546,16 +1561,26 @@ export default function POSPage() {
                                         </button>
                                     )}
                                     {showCustomerPicker && (
-                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
-                                            <input type="text" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
-                                                placeholder="ค้นหาชื่อหรือเบอร์โทร..." className="w-full px-3 py-2 text-sm border-b border-gray-100 outline-none" autoFocus />
-                                            <div className="max-h-48 overflow-y-auto">
-                                                {customers.map(c => (
-                                                    <button key={c.id} onClick={() => { setSelectedCustomer(c); setShowCustomerPicker(false); }}
-                                                        className="w-full text-left px-3 py-2 hover:bg-emerald-50 text-sm transition-colors">
-                                                        {c.name} · {c.phone} <span className="text-xs text-gray-400">({c.customerGroup.name})</span>
-                                                    </button>
-                                                ))}
+                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 overflow-hidden">
+                                            <div className="relative border-b border-gray-100">
+                                                <input type="text" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
+                                                    placeholder="🔍 พิมพ์หรือวางชื่อ/เบอร์โทร..." className="w-full px-3 py-2 pr-7 text-sm outline-none" autoFocus />
+                                                {customerSearch && (
+                                                    <button type="button" onClick={() => setCustomerSearch('')}
+                                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                                                )}
+                                            </div>
+                                            <div className="max-h-56 overflow-y-auto">
+                                                {customers.length === 0 ? (
+                                                    <div className="px-3 py-4 text-center text-xs text-gray-400">ไม่พบลูกค้าที่ตรงกับคำค้นหา</div>
+                                                ) : (
+                                                    customers.map(c => (
+                                                        <button key={c.id} onClick={() => { setSelectedCustomer(c); setShowCustomerPicker(false); }}
+                                                            className="w-full text-left px-3 py-2 hover:bg-emerald-50 text-sm transition-colors border-b border-gray-50 last:border-0">
+                                                            {c.name} · {c.phone} <span className="text-xs text-gray-400">({c.customerGroup.name})</span>
+                                                        </button>
+                                                    ))
+                                                )}
                                             </div>
                                         </div>
                                     )}

@@ -2,17 +2,25 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { cleanSearchText, parseCustomerSearchTokens } from '@/lib/utils';
 
 export async function getCustomers(page = 1, search = '') {
     const perPage = 10;
+    const tokens = parseCustomerSearchTokens(search);
     const where = {
         deletedAt: null,
-        ...(search
+        ...(tokens.length > 0
             ? {
-                OR: [
-                    { name: { contains: search, mode: 'insensitive' as const } },
-                    { phone: { contains: search } },
-                ],
+                AND: tokens.map(token => {
+                    const digits = token.replace(/\D/g, '');
+                    return {
+                        OR: [
+                            { name: { contains: token, mode: 'insensitive' as const } },
+                            { phone: { contains: token } },
+                            ...(digits.length >= 3 && digits !== token ? [{ phone: { contains: digits } }] : []),
+                        ],
+                    };
+                }),
             }
             : {}),
     };
@@ -40,11 +48,11 @@ export async function createCustomer(data: {
 }) {
     const customer = await prisma.customer.create({
         data: {
-            name: data.name,
-            phone: data.phone,
+            name: cleanSearchText(data.name),
+            phone: cleanSearchText(data.phone),
             customerGroupId: data.customerGroupId,
-            address: data.address || null,
-            taxId: data.taxId || null,
+            address: data.address ? cleanSearchText(data.address) : null,
+            taxId: data.taxId ? cleanSearchText(data.taxId) : null,
         },
     });
     revalidatePath('/customers');
@@ -58,11 +66,11 @@ export async function updateCustomer(
     await prisma.customer.update({
         where: { id },
         data: {
-            name: data.name,
-            phone: data.phone,
+            name: cleanSearchText(data.name),
+            phone: cleanSearchText(data.phone),
             customerGroupId: data.customerGroupId,
-            address: data.address || null,
-            taxId: data.taxId || null,
+            address: data.address ? cleanSearchText(data.address) : null,
+            taxId: data.taxId ? cleanSearchText(data.taxId) : null,
         },
     });
     revalidatePath('/customers');

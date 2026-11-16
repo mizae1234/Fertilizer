@@ -7,7 +7,7 @@ import { createSaleReturn } from '@/app/actions/sale-returns';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
-import { formatCurrency, formatDateTime, formatNumber, roundQty } from '@/lib/utils';
+import { formatCurrency, formatDateTime, formatNumber, roundQty, cleanSearchText } from '@/lib/utils';
 import { useUser } from '@/hooks/useUser';
 
 interface SaleReturnData {
@@ -106,13 +106,13 @@ function SaleItemProductPicker({
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    const searchTokens = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const searchTokens = cleanSearchText(search).toLowerCase().split(/\s+/).filter(Boolean);
     const filtered = products.filter(p => {
         if (searchTokens.length === 0) return true;
-        const name = (p.name || '').toLowerCase();
+        const name = cleanSearchText(p.name).toLowerCase();
         const code = (p.code || '').toLowerCase();
         const barcode = (p.barcode || '').toLowerCase();
-        const brand = (p.brand || '').toLowerCase();
+        const brand = cleanSearchText(p.brand).toLowerCase();
         return searchTokens.every(t => {
             const padded = /^\d+$/.test(t) ? t.padStart(5, '0') : t;
             return name.includes(t) || code.includes(t) || code.includes(padded) || barcode.includes(t) || brand.includes(t);
@@ -231,30 +231,45 @@ export default function SaleDetailPage() {
             .catch(() => {});
     }, []);
 
-    // Live search customers from API when typing in edit mode
+    // Live search customers from API when typing/pasting in edit mode
     const customerSearchTimer = useRef<NodeJS.Timeout | null>(null);
+    const customerDropdownRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (customerDropdownRef.current && !customerDropdownRef.current.contains(e.target as Node)) {
+                setShowCustomerDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
     useEffect(() => {
         if (!isEditing) return;
         if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current);
+        const query = selectedCustomerId ? '' : cleanSearchText(customerSearchText);
         customerSearchTimer.current = setTimeout(async () => {
             try {
-                const res = await fetch(`/api/customers?search=${encodeURIComponent(customerSearchText)}`);
+                const res = await fetch(`/api/customers?search=${encodeURIComponent(query)}`, { cache: 'no-store' });
                 const data = await res.json();
-                setCustomers(data);
+                if (Array.isArray(data)) setCustomers(data);
             } catch { /* ignore */ }
-        }, 300);
+        }, 120);
         return () => { if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); };
-    }, [customerSearchText, isEditing]);
+    }, [customerSearchText, selectedCustomerId, isEditing]);
 
     const startEditing = async () => {
         if (!sale) return;
-        const [prods, whs] = await Promise.all([
+        const [prods, whs, custs] = await Promise.all([
             fetch('/api/products?includeInactive=1').then(r => r.json()),
             fetch('/api/warehouses').then(r => r.json()),
+            fetch('/api/customers', { cache: 'no-store' }).then(r => r.json()).catch(() => []),
         ]);
         const prodList: Product[] = Array.isArray(prods) ? prods : [];
         setProducts(prodList);
         setWarehouses(whs);
+        if (Array.isArray(custs)) setCustomers(custs);
         // Load current sale's customer for display
         setSelectedCustomerId(sale.customerId || '');
         if (sale.customerId && sale.customer) {
@@ -625,49 +640,77 @@ export default function SaleDetailPage() {
             </div>
 
             {/* Summary */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6">
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6 relative z-30">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                         <p className="text-xs text-gray-500">ลูกค้า</p>
                         {isEditing ? (
-                            <div className="relative mt-1">
-                                <input
-                                    type="text"
-                                    placeholder="ค้นหาลูกค้าทั่วไป..."
-                                    value={customerSearchText}
-                                    onChange={e => {
-                                        setCustomerSearchText(e.target.value);
-                                        setSelectedCustomerId(''); // reset ID when typing
-                                        setShowCustomerDropdown(true);
-                                    }}
-                                    onFocus={() => setShowCustomerDropdown(true)}
-                                    onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                />
+                            <div ref={customerDropdownRef} className="relative mt-1 z-50">
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="🔍 พิมพ์หรือวางชื่อ/เบอร์โทร..."
+                                        value={customerSearchText}
+                                        onChange={e => {
+                                            setCustomerSearchText(e.target.value);
+                                            setSelectedCustomerId(''); // reset ID when typing/pasting
+                                            setShowCustomerDropdown(true);
+                                        }}
+                                        onFocus={e => {
+                                            setShowCustomerDropdown(true);
+                                            if (selectedCustomerId) {
+                                                const t = e.target;
+                                                setTimeout(() => t.select(), 0);
+                                            }
+                                        }}
+                                        className="w-full px-3 py-2 pr-7 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white"
+                                    />
+                                    {customerSearchText && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setCustomerSearchText('');
+                                                setSelectedCustomerId('');
+                                                setShowCustomerDropdown(true);
+                                            }}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                                            title="ล้างชื่อลูกค้า"
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
                                 {showCustomerDropdown && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                    <div className="absolute left-0 z-50 w-full sm:min-w-[280px] mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto">
                                         <button type="button" 
-                                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-emerald-50 transition-colors"
+                                            className={`w-full text-left px-3 py-2.5 text-sm hover:bg-emerald-50 transition-colors border-b border-gray-100 ${!selectedCustomerId ? 'text-emerald-700 font-medium bg-emerald-50/40' : 'text-gray-700'}`}
                                             onClick={() => {
                                                 setSelectedCustomerId('');
                                                 setCustomerSearchText('');
                                                 setShowCustomerDropdown(false);
                                             }}
                                         >
-                                            ลูกค้าทั่วไป
+                                            👤 ลูกค้าทั่วไป
                                         </button>
-                                        {customers.map(c => (
-                                            <button key={c.id} type="button" 
-                                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-emerald-50 transition-colors"
-                                                onClick={() => {
-                                                    setSelectedCustomerId(c.id);
-                                                    setCustomerSearchText(`${c.name} (${c.phone})`);
-                                                    setShowCustomerDropdown(false);
-                                                }}
-                                            >
-                                                {c.name} {c.phone ? `(${c.phone})` : ''}
-                                            </button>
-                                        ))}
+                                        {customers.length === 0 ? (
+                                            <div className="px-3 py-4 text-center text-xs text-gray-400">
+                                                ไม่พบลูกค้าที่ตรงกับคำค้นหา
+                                            </div>
+                                        ) : (
+                                            customers.map(c => (
+                                                <button key={c.id} type="button" 
+                                                    className={`w-full text-left px-3 py-2.5 text-sm hover:bg-emerald-50 transition-colors border-b border-gray-50 last:border-0 ${selectedCustomerId === c.id ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700'}`}
+                                                    onClick={() => {
+                                                        setSelectedCustomerId(c.id);
+                                                        setCustomerSearchText(`${c.name}${c.phone ? ` (${c.phone})` : ''}`);
+                                                        setShowCustomerDropdown(false);
+                                                    }}
+                                                >
+                                                    <span className="font-medium">{c.name}</span>
+                                                    {c.phone && <span className="text-xs text-gray-400 ml-1.5">({c.phone})</span>}
+                                                </button>
+                                            ))
+                                        )}
                                     </div>
                                 )}
                             </div>

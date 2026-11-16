@@ -405,7 +405,7 @@ export default function GoodsReceiveDetailPage() {
             </div>
 
             {/* Vendor & Header Info */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6 relative z-30">
                 <h2 className="text-sm font-semibold text-gray-700 mb-4">ข้อมูลเอกสาร</h2>
                 {isPending ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -426,7 +426,7 @@ export default function GoodsReceiveDetailPage() {
                                     className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                                 />
                                 {showVendorDropdown && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                                         {vendors.filter(v => v.name.toLowerCase().includes(vendorSearchText.toLowerCase()) || (v.phone && v.phone.includes(vendorSearchText))).map(v => (
                                             <button key={v.id} type="button"
                                                 className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-emerald-50 transition-colors"

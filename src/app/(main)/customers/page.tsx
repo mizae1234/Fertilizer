@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import Pagination from '@/components/Pagination';
 import DeleteButton from '@/components/DeleteButton';
 import { deleteCustomer } from '@/app/actions/customers';
+import { parseCustomerSearchTokens } from '@/lib/utils';
 
 interface Props {
     searchParams: Promise<{ page?: string; search?: string }>;
@@ -15,16 +16,23 @@ export default async function CustomersPage({ searchParams }: Props) {
     const sp = await searchParams;
     const page = parseInt(sp.page || '1');
     const search = sp.search || '';
+    const tokens = parseCustomerSearchTokens(search);
     const perPage = 10;
 
     const where = {
         deletedAt: null,
-        ...(search
+        ...(tokens.length > 0
             ? {
-                OR: [
-                    { name: { contains: search, mode: 'insensitive' as const } },
-                    { phone: { contains: search } },
-                ],
+                AND: tokens.map(token => {
+                    const digits = token.replace(/\D/g, '');
+                    return {
+                        OR: [
+                            { name: { contains: token, mode: 'insensitive' as const } },
+                            { phone: { contains: token } },
+                            ...(digits.length >= 3 && digits !== token ? [{ phone: { contains: digits } }] : []),
+                        ],
+                    };
+                }),
             }
             : {}),
     };
