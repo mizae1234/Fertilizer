@@ -41,7 +41,8 @@ interface TemplateData {
 type Template = TemplateData | null;
 
 function formatCurrency(n: number) {
-    return n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const rounded = Math.round(n * 100) / 100;
+    return rounded.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
 function formatDate(d: string) {
@@ -82,7 +83,7 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
     const cashTotal = (sale.payments || [])
         .filter(p => p.method === 'CASH')
         .reduce((s, p) => s + p.amount, 0);
-    const change = totalPaid - sale.totalAmount;
+    const change = Math.round((totalPaid - sale.totalAmount) * 100) / 100;
 
     return (
         <>

@@ -180,11 +180,11 @@ export async function updateSale(id: string, data: {
     });
     if (!existing) throw new Error('ไม่พบรายการขาย');
 
-    const subtotal = data.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
-    const itemDiscountsTotal = data.items.reduce((s, i) => s + (i.itemDiscount || 0), 0);
+    const subtotal = Math.round(data.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0) * 100) / 100;
+    const itemDiscountsTotal = Math.round(data.items.reduce((s, i) => s + (i.itemDiscount || 0), 0) * 100) / 100;
     const billDiscount = data.billDiscount || 0;
-    const totalDiscount = itemDiscountsTotal + billDiscount;
-    const totalAmount = subtotal - totalDiscount;
+    const totalDiscount = Math.round((itemDiscountsTotal + billDiscount) * 100) / 100;
+    const totalAmount = Math.round((subtotal - totalDiscount) * 100) / 100;
     const totalPoints = data.items.reduce((s, i) => s + i.points, 0);
 
     // Recalculate payments JSON if totalAmount changed and has credit/split payments
@@ -303,7 +303,7 @@ export async function updateSale(id: string, data: {
                         quantity: i.quantity,
                         unitPrice: i.unitPrice,
                         unitCost: parseFloat(productCosts[idx].toFixed(2)),
-                        totalPrice: i.quantity * i.unitPrice,
+                        totalPrice: Math.round(i.quantity * i.unitPrice * 100) / 100,
                         discount: i.itemDiscount || 0,
                         points: i.points,
                         unitName: i.unitName || null,

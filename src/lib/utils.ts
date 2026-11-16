@@ -1,11 +1,12 @@
 export function formatCurrency(amount: number | string): string {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+    const rounded = Math.round((num || 0) * 100) / 100;
     return new Intl.NumberFormat('th-TH', {
         style: 'currency',
         currency: 'THB',
         minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(num);
+        maximumFractionDigits: 2,
+    }).format(rounded);
 }
 
 export function formatNumber(num: number | string): string {

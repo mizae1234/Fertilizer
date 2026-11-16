@@ -98,7 +98,7 @@ export async function createSaleFromPOS(data: {
                                 quantity: item.quantity,
                                 unitPrice: item.unitPrice,
                                 unitCost: parseFloat(productCosts[idx].toFixed(2)),
-                                totalPrice: item.quantity * item.unitPrice,
+                                totalPrice: Math.round(item.quantity * item.unitPrice * 100) / 100,
                                 discount: item.itemDiscount || 0,
                                 points: item.points,
                                 unitName: item.unitName || null,
