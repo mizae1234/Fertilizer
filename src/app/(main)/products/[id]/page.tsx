@@ -714,7 +714,7 @@ export default function ProductDetailPage() {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">Stock ขั้นต่ำ</label>
-                        <input type="number" value={infoForm.minStock === 0 ? '' : infoForm.minStock} onChange={e => setInfoForm({ ...infoForm, minStock: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
+                        <input type="number" step="any" value={infoForm.minStock === 0 ? '' : infoForm.minStock} onChange={e => setInfoForm({ ...infoForm, minStock: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 })}
                             onFocus={e => e.target.select()}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                             min={0} placeholder="0" />
@@ -1094,9 +1094,10 @@ export default function ProductDetailPage() {
                                         <span className="text-xs text-gray-500 sm:hidden">ซื้อตั้งแต่:</span>
                                         <input
                                             type="number"
+                                            step="any"
                                             value={tier.minQuantity || ''}
-                                            onChange={e => updateExistingTier(tier.id, { minQuantity: parseInt(e.target.value) || 1 })}
-                                            min={1}
+                                            onChange={e => updateExistingTier(tier.id, { minQuantity: parseFloat(e.target.value) || 0 })}
+                                            min={0.0001}
                                             className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                                             placeholder="จำนวนขั้นต่ำ"
                                         />
@@ -1159,13 +1160,14 @@ export default function ProductDetailPage() {
                                     <span className="text-xs text-gray-500 sm:hidden">ซื้อตั้งแต่:</span>
                                     <input
                                         type="number"
+                                        step="any"
                                         value={row.minQuantity || ''}
                                         onChange={e => {
                                             const updated = [...newTierRows];
-                                            updated[idx].minQuantity = parseInt(e.target.value) || 1;
+                                            updated[idx].minQuantity = parseFloat(e.target.value) || 0;
                                             setNewTierRows(updated);
                                         }}
-                                        min={1}
+                                        min={0.0001}
                                         className="w-full px-3 py-2 rounded-lg border border-emerald-200 text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500"
                                         placeholder="จำนวนขั้นต่ำ เช่น 6"
                                     />

@@ -9,9 +9,18 @@ export function formatCurrency(amount: number | string): string {
     }).format(rounded);
 }
 
-export function formatNumber(num: number | string): string {
+export function roundQty(num: number | string): number {
     const n = typeof num === 'string' ? parseFloat(num) : num;
-    return new Intl.NumberFormat('th-TH').format(n);
+    if (!Number.isFinite(n)) return 0;
+    return Math.round(n * 10000) / 10000;
+}
+
+export function formatNumber(num: number | string): string {
+    const n = roundQty(num);
+    return new Intl.NumberFormat('th-TH', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 4,
+    }).format(n);
 }
 
 export function formatDate(date: Date | string | null | undefined): string {

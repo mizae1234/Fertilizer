@@ -552,9 +552,9 @@ export default function GoodsReceiveDetailPage() {
                                     <div className="w-28 lg:w-32 shrink-0">
                                         <label className="text-xs text-gray-400 mb-1 block">จำนวน</label>
                                         <input
-                                            type="number" min={1} value={item.quantity}
+                                            type="number" min={0.0001} step="any" value={item.quantity}
                                             onFocus={e => e.target.select()}
-                                            onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 1)}
+                                            onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
                                             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-right tabular-nums focus:ring-2 focus:ring-emerald-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         />
                                     </div>

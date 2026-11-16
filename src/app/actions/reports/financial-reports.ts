@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { getDateRange } from './utils';
 import { isServerAdmin } from '@/lib/server-auth';
+import { roundQty } from '@/lib/utils';
 
 // ==================== FINANCIAL REPORTS ====================
 
@@ -407,7 +408,7 @@ export async function getPnLDetail(dateFrom?: string, dateTo?: string) {
         // Calculate item net values before bill-level discount to distribute actualBillDiscount proportionally
         const itemNetValues = sale.items.map(item => {
             const returned = retMap.get(item.id) || 0;
-            const remaining = item.quantity - returned;
+            const remaining = roundQty(item.quantity - returned);
             if (remaining <= 0) return { id: item.id, netBeforeBill: 0, remaining, grossItemRev: 0, remainingItemDiscount: 0 };
             
             const grossItemRev = remaining * Number(item.unitPrice);

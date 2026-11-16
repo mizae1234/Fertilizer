@@ -446,10 +446,11 @@ export default function NewGoodsReceivePage() {
                                                     <input
                                                         type="number"
                                                         value={item.quantity}
-                                                        onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
+                                                        onChange={(e) => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
                                                         onFocus={(e) => e.target.select()}
                                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-right tabular-nums bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                        min="1"
+                                                        min="0.0001"
+                                                        step="any"
                                                         required
                                                     />
                                                 </div>
@@ -554,10 +555,11 @@ export default function NewGoodsReceivePage() {
                                                     <input
                                                         type="number"
                                                         value={item.quantity}
-                                                        onChange={(e) => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
+                                                        onChange={(e) => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
                                                         onFocus={(e) => e.target.select()}
                                                         className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm text-right tabular-nums bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                        min="1"
+                                                        min="0.0001"
+                                                        step="any"
                                                         required
                                                     />
                                                 </div>

@@ -90,13 +90,13 @@ export default function ImportProductsButton() {
                     description: getValue('description'),
                     unit: getValue('unit') || 'ชิ้น',
                     pointsPerUnit: parseInt(getValue('pointsPerUnit') || '0') || 0,
-                    minStock: parseInt(getValue('minStock') || '10') || 10,
+                    minStock: parseFloat(getValue('minStock') || '10') || 10,
                     brand: getValue('brand'),
                     cost: parseFloat(getValue('cost') || '0') || 0,
                     price: parseFloat(getValue('price') || '0') || 0,
                     packaging: getValue('packaging'),
                     productGroup: getValue('productGroup'),
-                    initialStock: parseInt(getValue('initialStock') || '0') || 0,
+                    initialStock: parseFloat(getValue('initialStock') || '0') || 0,
                 });
             }
 

@@ -55,14 +55,14 @@ export function resolveItemUnitPrice({
 }: ResolvePriceParams): ResolvedPriceResult {
     const normBasePrice = Number(basePrice) || 0;
     const normUnitId = selectedUnitId || null;
-    const qty = Math.max(1, Number(quantity) || 1);
+    const qty = Math.max(0, Number(quantity) || 0);
 
     // 1. Check quantity price tiers for the selected unit (or base unit if null)
     if (priceTiers && priceTiers.length > 0) {
         const unitTiers = priceTiers
             .filter(t => (t.productUnitId || null) === normUnitId)
             .map(t => ({
-                minQuantity: Number(t.minQuantity) || 1,
+                minQuantity: Number(t.minQuantity) || 0,
                 price: Number(t.price) || 0,
             }))
             .sort((a, b) => b.minQuantity - a.minQuantity); // Descending order (highest minQty first)

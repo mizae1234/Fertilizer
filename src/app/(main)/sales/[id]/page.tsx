@@ -7,7 +7,7 @@ import { createSaleReturn } from '@/app/actions/sale-returns';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { formatCurrency, formatDateTime, formatNumber, roundQty } from '@/lib/utils';
 import { useUser } from '@/hooks/useUser';
 
 interface SaleReturnData {
@@ -281,7 +281,7 @@ export default function SaleDetailPage() {
             sale.items
                 .map(i => {
                     const returnedQty = returnedMap.get(i.id) || 0;
-                    const netQty = Math.max(0, i.quantity - returnedQty);
+                    const netQty = Math.max(0, roundQty(i.quantity - returnedQty));
                     if (netQty <= 0) return null; // Fully returned items are preserved server-side automatically
                     const prod = prodList.find((p: Product) => p.id === i.productId);
                     const pUnits: ProductUnitInfo[] = prod?.productUnits || [];
@@ -323,17 +323,17 @@ export default function SaleDetailPage() {
                 const pUnits = prod?.productUnits || [];
                 copy[index] = {
                     ...copy[index], productId: value as string,
-                    points: (prod?.pointsPerUnit || 0) * copy[index].quantity,
+                    points: Math.floor((prod?.pointsPerUnit || 0) * copy[index].quantity),
                     productUnits: pUnits,
                     selectedUnitId: '',
                     selectedUnitName: prod?.unit || '',
                     conversionRate: 1,
                 };
             } else if (field === 'quantity') {
-                const qty = Number(value) || 0;
+                const qty = roundQty(parseFloat(String(value)) || 0);
                 const prod = products.find(p => p.id === copy[index].productId);
                 const convRate = copy[index].conversionRate || 1;
-                copy[index] = { ...copy[index], quantity: qty, points: (prod?.pointsPerUnit || 0) * qty * convRate };
+                copy[index] = { ...copy[index], quantity: qty, points: Math.floor((prod?.pointsPerUnit || 0) * qty * convRate) };
             } else {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (copy[index] as any)[field] = (field === 'unitPrice' || field === 'itemDiscount') ? Number(value) || 0 : value;
@@ -356,7 +356,7 @@ export default function SaleDetailPage() {
                     selectedUnitName: prod?.unit || '',
                     conversionRate: 1,
                     unitPrice: Number(prod?.price || item.unitPrice),
-                    points: (prod?.pointsPerUnit || 0) * item.quantity,
+                    points: Math.floor((prod?.pointsPerUnit || 0) * item.quantity),
                 };
             } else {
                 const unit = item.productUnits.find(u => u.id === unitId);
@@ -368,7 +368,7 @@ export default function SaleDetailPage() {
                         selectedUnitName: unit.unitName,
                         conversionRate: convRate,
                         unitPrice: Number(unit.sellingPrice),
-                        points: (prod?.pointsPerUnit || 0) * item.quantity * convRate,
+                        points: Math.floor((prod?.pointsPerUnit || 0) * item.quantity * convRate),
                     };
                 }
             }
@@ -456,7 +456,7 @@ export default function SaleDetailPage() {
         const items: ReturnItem[] = sale.items
             .map(item => {
                 const returned = returnedMap.get(item.id) || 0;
-                const maxQty = item.quantity - returned;
+                const maxQty = roundQty(item.quantity - returned);
                 return {
                     saleItemId: item.id,
                     productId: item.productId,
@@ -762,7 +762,9 @@ export default function SaleDetailPage() {
                                     )}
                                     <div>
                                         <label className="text-xs text-gray-500 mb-1 block">จำนวน</label>
-                                        <input type="number" min={1} value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                                        <input type="number" min={0.0001} step="any" value={item.quantity}
+                                            onFocus={e => e.target.select()}
+                                            onChange={e => updateItem(idx, 'quantity', e.target.value)}
                                             className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
                                     </div>
                                     <div>
@@ -807,9 +809,9 @@ export default function SaleDetailPage() {
                             <tbody className="divide-y divide-gray-50">
                                 {sale.items.map((item, idx) => {
                                     // Calculate how many of this item have been returned
-                                    const returnedQty = (sale.saleReturns || []).reduce((sum, sr) =>
-                                        sum + sr.items.filter(ri => ri.saleItemId === item.id).reduce((s, ri) => s + ri.quantity, 0), 0);
-                                    const remainingQty = item.quantity - returnedQty;
+                                    const returnedQty = roundQty((sale.saleReturns || []).reduce((sum, sr) =>
+                                        sum + sr.items.filter(ri => ri.saleItemId === item.id).reduce((s, ri) => s + ri.quantity, 0), 0));
+                                    const remainingQty = roundQty(item.quantity - returnedQty);
                                     const isFullyReturned = remainingQty <= 0;
                                     const isPartiallyReturned = returnedQty > 0 && remainingQty > 0;
                                     return (
@@ -1209,9 +1211,10 @@ export default function SaleDetailPage() {
                                         type="number"
                                         min={0}
                                         max={item.maxQty}
+                                        step="any"
                                         value={item.returnQty || ''}
                                         onChange={e => {
-                                            const val = Math.min(Number(e.target.value) || 0, item.maxQty);
+                                            const val = roundQty(Math.min(parseFloat(e.target.value) || 0, item.maxQty));
                                             setReturnItems(prev => {
                                                 const copy = [...prev];
                                                 copy[idx] = { ...copy[idx], returnQty: val };
@@ -1219,7 +1222,7 @@ export default function SaleDetailPage() {
                                             });
                                         }}
                                         placeholder="0"
-                                        className="w-20 px-2 py-2 rounded-lg border border-gray-200 text-sm text-center focus:ring-2 focus:ring-orange-400 outline-none"
+                                        className="w-24 px-2 py-2 rounded-lg border border-gray-200 text-sm text-center focus:ring-2 focus:ring-orange-400 outline-none"
                                     />
                                 </div>
                             ))}

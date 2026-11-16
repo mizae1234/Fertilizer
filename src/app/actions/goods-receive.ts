@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { generateNumber } from '@/lib/generateNumber';
 import { isServerAdmin, getServerUser } from '@/lib/server-auth';
+import { roundQty } from '@/lib/utils';
 
 async function checkGoodsReceiveAccess(isAdminOnly = false) {
     const user = await getServerUser();
@@ -77,10 +78,10 @@ export async function createGoodsReceive(data: {
     userId: string;
 }) {
     await checkGoodsReceiveAccess(false);
-    const totalAmount = data.items.reduce(
-        (sum, item) => sum + item.quantity * item.unitCost,
+    const totalAmount = Math.round(data.items.reduce(
+        (sum, item) => sum + roundQty(item.quantity) * item.unitCost,
         0
-    );
+    ) * 100) / 100;
 
     // Validate user exists
     const user = await prisma.user.findUnique({ where: { id: data.userId } });
@@ -99,16 +100,19 @@ export async function createGoodsReceive(data: {
             notes: data.notes,
             createdById: data.userId,
             items: {
-                create: data.items.map((item) => ({
-                    productId: item.productId,
-                    warehouseId: item.warehouseId,
-                    quantity: item.quantity,
-                    unitCost: item.unitCost,
-                    totalCost: item.quantity * item.unitCost,
-                    lotNo: item.lotNo || null,
-                    mfgDate: item.mfgDate ? new Date(item.mfgDate) : null,
-                    expDate: item.expDate ? new Date(item.expDate) : null,
-                })),
+                create: data.items.map((item) => {
+                    const qty = roundQty(item.quantity);
+                    return {
+                        productId: item.productId,
+                        warehouseId: item.warehouseId,
+                        quantity: qty,
+                        unitCost: item.unitCost,
+                        totalCost: Math.round(qty * item.unitCost * 100) / 100,
+                        lotNo: item.lotNo || null,
+                        mfgDate: item.mfgDate ? new Date(item.mfgDate) : null,
+                        expDate: item.expDate ? new Date(item.expDate) : null,
+                    };
+                }),
             },
         },
     });
@@ -138,9 +142,9 @@ export async function updateGoodsReceive(id: string, data: {
         throw new Error('ไม่สามารถแก้ไขรายการที่ไม่ใช่สถานะรออนุมัติ');
     }
 
-    const totalAmount = data.items.reduce(
-        (sum, item) => sum + item.quantity * item.unitCost, 0
-    );
+    const totalAmount = Math.round(data.items.reduce(
+        (sum, item) => sum + roundQty(item.quantity) * item.unitCost, 0
+    ) * 100) / 100;
 
     await prisma.$transaction(async (tx) => {
         // Delete old items
@@ -156,16 +160,19 @@ export async function updateGoodsReceive(id: string, data: {
                 notes: data.notes || null,
                 totalAmount,
                 items: {
-                    create: data.items.map((item) => ({
-                        productId: item.productId,
-                        warehouseId: item.warehouseId,
-                        quantity: item.quantity,
-                        unitCost: item.unitCost,
-                        totalCost: item.quantity * item.unitCost,
-                        lotNo: item.lotNo || null,
-                        mfgDate: item.mfgDate ? new Date(item.mfgDate) : null,
-                        expDate: item.expDate ? new Date(item.expDate) : null,
-                    })),
+                    create: data.items.map((item) => {
+                        const qty = roundQty(item.quantity);
+                        return {
+                            productId: item.productId,
+                            warehouseId: item.warehouseId,
+                            quantity: qty,
+                            unitCost: item.unitCost,
+                            totalCost: Math.round(qty * item.unitCost * 100) / 100,
+                            lotNo: item.lotNo || null,
+                            mfgDate: item.mfgDate ? new Date(item.mfgDate) : null,
+                            expDate: item.expDate ? new Date(item.expDate) : null,
+                        };
+                    }),
                 },
             },
         });
@@ -243,9 +250,9 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
             if (existing) {
                 const oldQty = existing.quantity;
                 const oldCost = Number(existing.avgCost);
-                const newQty = item.quantity;
+                const newQty = roundQty(item.quantity);
                 const newCost = Number(item.unitCost);
-                const totalQty = oldQty + newQty;
+                const totalQty = roundQty(oldQty + newQty);
                 const avgCost = totalQty > 0
                     ? ((oldQty * oldCost) + (newQty * newCost)) / totalQty
                     : newCost;
@@ -253,7 +260,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                 await tx.productStock.update({
                     where: { id: existing.id },
                     data: {
-                        quantity: { increment: item.quantity },
+                        quantity: totalQty,
                         avgCost: parseFloat(avgCost.toFixed(2)),
                         lastCost: Number(item.unitCost),
                     },
@@ -263,7 +270,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     data: {
                         productId: item.productId,
                         warehouseId: item.warehouseId,
-                        quantity: item.quantity,
+                        quantity: roundQty(item.quantity),
                         avgCost: Number(item.unitCost),
                         lastCost: Number(item.unitCost),
                     },
@@ -275,7 +282,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     productId: item.productId,
                     warehouseId: item.warehouseId,
                     type: 'GOODS_RECEIVE',
-                    quantity: item.quantity,
+                    quantity: roundQty(item.quantity),
                     unitCost: Number(item.unitCost),
                     reference: gr.grNumber,
                     lotNo: item.lotNo || null,

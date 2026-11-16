@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { roundQty } from '@/lib/utils';
 
 
 export async function getBundles(page = 1, search = '') {
@@ -85,7 +86,7 @@ export async function createBundle(data: {
                     items: {
                         create: data.items.map((item) => ({
                             productId: item.productId,
-                            quantity: item.quantity,
+                            quantity: roundQty(item.quantity),
                         })),
                     },
                 },
@@ -128,7 +129,7 @@ export async function updateBundle(
             data: data.items.map((item) => ({
                 bundleId: id,
                 productId: item.productId,
-                quantity: item.quantity,
+                quantity: roundQty(item.quantity),
             })),
         });
     });

@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { getDateRange } from './utils';
 import { isServerAdmin } from '@/lib/server-auth';
+import { roundQty } from '@/lib/utils';
 
 // ==================== STOCK DETAIL REPORT ====================
 
@@ -69,11 +70,11 @@ export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
     for (const s of stocks) {
         const existing = totalStockMap.get(s.productId);
         if (existing) {
-            existing.totalQty += s.quantity;
+            existing.totalQty = roundQty(existing.totalQty + s.quantity);
             existing.totalAvgCost += Number(s.avgCost);
             existing.count++;
         } else {
-            totalStockMap.set(s.productId, { totalQty: s.quantity, totalAvgCost: Number(s.avgCost), count: 1 });
+            totalStockMap.set(s.productId, { totalQty: roundQty(s.quantity), totalAvgCost: Number(s.avgCost), count: 1 });
         }
     }
 
@@ -92,7 +93,7 @@ export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
 
     for (const si of saleItems) {
         const returned = retMap.get(si.id) || 0;
-        const remaining = si.quantity - returned;
+        const remaining = roundQty(si.quantity - returned);
         if (remaining <= 0) continue;
 
         const key = si.productId;
@@ -107,7 +108,7 @@ export async function getStockDetailReport(dateFrom?: string, dateTo?: string) {
             });
         }
         const p = productMap.get(key)!;
-        p.qtySold += remaining;
+        p.qtySold = roundQty(p.qtySold + remaining);
         p.revenue += remaining * Number(si.unitPrice);
         const unitCost = Number(si.unitCost);
         const rate = Number(si.conversionRate ?? 1);
@@ -176,7 +177,7 @@ export async function getInventoryReport() {
             });
         }
         const wh = byWarehouse.get(key)!;
-        wh.totalQuantity += stock.quantity;
+        wh.totalQuantity = roundQty(wh.totalQuantity + stock.quantity);
         wh.totalValue += stock.quantity * Number(stock.avgCost);
         if (stock.quantity < stock.product.minStock) {
             wh.lowStockItems++;

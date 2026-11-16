@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import ReceiptPrint from './ReceiptPrint';
+import { roundQty } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,8 +43,8 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
     const adjustedItems = sale.items
         .map(item => {
             const returned = returnedMap.get(item.id) || 0;
-            const remaining = item.quantity - returned;
-            return { ...item, quantity: remaining, totalPrice: remaining * Number(item.unitPrice) };
+            const remaining = roundQty(item.quantity - returned);
+            return { ...item, quantity: remaining, totalPrice: Math.round(remaining * Number(item.unitPrice) * 100) / 100 };
         })
         .filter(item => item.quantity > 0);
 

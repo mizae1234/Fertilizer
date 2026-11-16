@@ -180,7 +180,7 @@ export async function POST(request: Request) {
                         description: getValue('description') || null,
                         unit: getValue('unit') || 'ชิ้น',
                         pointsPerUnit: Math.floor(parseNum(getValue('pointsPerUnit'), 0)),
-                        minStock: Math.floor(parseNum(getValue('minStock'), 10)),
+                        minStock: Math.round(parseNum(getValue('minStock'), 10) * 10000) / 10000,
                         brand: getValue('brand') || null,
                         cost: parseNum(getValue('cost'), 0),
                         price: parseNum(getValue('price'), 0),
@@ -203,12 +203,12 @@ export async function POST(request: Request) {
                         
                         const wStockStr = getValue(`stock_${w.id}`);
                         if (wStockStr !== null) {
-                            stockVal = Math.floor(parseNum(wStockStr, 0));
+                            stockVal = Math.round(parseNum(wStockStr, 0) * 10000) / 10000;
                         } else if (wIndex === 0 && colMap['initialStock'] !== undefined) {
                             // Backwards compatibility for templates with a single "initialStock" column
                             const legacyStockStr = getValue('initialStock');
                             if (legacyStockStr !== null) {
-                                stockVal = Math.floor(parseNum(legacyStockStr, 0));
+                                stockVal = Math.round(parseNum(legacyStockStr, 0) * 10000) / 10000;
                             }
                         }
 

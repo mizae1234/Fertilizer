@@ -276,8 +276,8 @@ export default function NewFactoryReturnPage() {
                                                 <p className={`text-[10px] mt-0.5 ${item.availableStock <= 0 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>คงเหลือ: {item.availableStock}</p>
                                             </td>
                                             <td className="px-3 py-2">
-                                                <input type="number" min={1} value={item.quantity} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
-                                                    className="w-20 px-2 py-1 rounded border border-gray-200 text-sm text-right outline-none focus:ring-1 focus:ring-orange-500" />
+                                                <input type="number" min={0.0001} step="any" value={item.quantity} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                                                    className="w-24 px-2 py-1 rounded border border-gray-200 text-sm text-right outline-none focus:ring-1 focus:ring-orange-500" />
                                             </td>
                                             <td className="px-3 py-2 text-center">
                                                 <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">✕</button>
@@ -309,7 +309,7 @@ export default function NewFactoryReturnPage() {
                                         </div>
                                         <div>
                                             <label className={`text-[10px] ${item.availableStock <= 0 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>จำนวน (คงเหลือ: {item.availableStock})</label>
-                                            <input type="number" min={1} value={item.quantity} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
+                                            <input type="number" min={0.0001} step="any" value={item.quantity} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
                                                 className="w-full px-2 py-1 rounded border border-gray-200 text-xs text-right outline-none" />
                                         </div>
                                     </div>

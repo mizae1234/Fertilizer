@@ -39,11 +39,11 @@ export async function POST(
     const body = await request.json();
     const { tierId, productUnitId, minQuantity, price } = body;
 
-    const minQty = parseInt(minQuantity);
+    const minQty = Math.round(parseFloat(minQuantity) * 10000) / 10000;
     const unitPrice = parseFloat(price);
 
-    if (isNaN(minQty) || minQty < 1) {
-        return NextResponse.json({ error: 'จำนวนขั้นต่ำต้องเป็นตัวเลขตั้งแต่ 1 ขึ้นไป' }, { status: 400 });
+    if (isNaN(minQty) || minQty <= 0) {
+        return NextResponse.json({ error: 'จำนวนขั้นต่ำต้องเป็นตัวเลขที่มากกว่า 0' }, { status: 400 });
     }
     if (isNaN(unitPrice) || unitPrice < 0) {
         return NextResponse.json({ error: 'ราคาต้องเป็นตัวเลขที่ถูกต้อง' }, { status: 400 });

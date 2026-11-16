@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { generateNumber } from '@/lib/generateNumber';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
+import { roundQty } from '@/lib/utils';
 
 export async function getTransfers(page = 1, status = '') {
     const perPage = 10;
@@ -76,7 +77,7 @@ export async function createTransfer(data: {
                 create: data.items.map((item) => ({
                     productId: item.productId,
                     warehouseId: data.fromWarehouseId,
-                    quantity: item.quantity,
+                    quantity: roundQty(item.quantity),
                 })),
             },
         },
@@ -105,6 +106,7 @@ export async function approveTransfer(id: string) {
 
         // Process all items in parallel
         await Promise.all(transfer.items.map(async (item) => {
+            const qty = roundQty(item.quantity);
             // Get source stock to retrieve its avgCost or product cost fallback
             const sourceStock = await tx.productStock.findUnique({
                 where: {
@@ -127,11 +129,11 @@ export async function approveTransfer(id: string) {
                         warehouseId: transfer.fromWarehouseId,
                     },
                 },
-                update: { quantity: { decrement: item.quantity } },
+                update: { quantity: roundQty((sourceStock?.quantity ?? 0) - qty) },
                 create: {
                     productId: item.productId,
                     warehouseId: transfer.fromWarehouseId,
-                    quantity: -item.quantity,
+                    quantity: -qty,
                     avgCost: costToUse,
                 },
             });
@@ -155,13 +157,13 @@ export async function approveTransfer(id: string) {
                     },
                 },
                 update: { 
-                    quantity: { increment: item.quantity },
+                    quantity: roundQty((destStock?.quantity ?? 0) + qty),
                     ...(destAvgCost === 0 ? { avgCost: costToUse } : {})
                 },
                 create: {
                     productId: item.productId,
                     warehouseId: transfer.toWarehouseId,
-                    quantity: item.quantity,
+                    quantity: qty,
                     avgCost: costToUse,
                 },
             });
@@ -172,7 +174,7 @@ export async function approveTransfer(id: string) {
                     productId: item.productId,
                     warehouseId: transfer.fromWarehouseId,
                     type: 'TRANSFER_OUT',
-                    quantity: -item.quantity,
+                    quantity: -qty,
                     reference: transfer.transferNumber,
                     userId: transfer.createdById,
                     notes: `โอนออกไปยัง ${transfer.toWarehouseId}`,
@@ -185,7 +187,7 @@ export async function approveTransfer(id: string) {
                     productId: item.productId,
                     warehouseId: transfer.toWarehouseId,
                     type: 'TRANSFER_IN',
-                    quantity: item.quantity,
+                    quantity: qty,
                     reference: transfer.transferNumber,
                     userId: transfer.createdById,
                     notes: `รับโอนจาก ${transfer.fromWarehouseId}`,

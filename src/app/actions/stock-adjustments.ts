@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { generateNumber } from '@/lib/generateNumber';
 import { getServerUser } from '@/lib/server-auth';
+import { roundQty } from '@/lib/utils';
 
 export async function getStockAdjustments(page = 1, search = '', from = '', to = '') {
     const perPage = 15;
@@ -62,7 +63,8 @@ export async function createStockAdjustment(data: {
 
     await prisma.$transaction(async (tx) => {
         await Promise.all(data.items.map(async (item) => {
-            if (item.quantity <= 0) throw new Error('จำนวนต้องมากกว่า 0');
+            const qty = roundQty(item.quantity);
+            if (qty <= 0) throw new Error('จำนวนต้องมากกว่า 0');
 
             const stock = await tx.productStock.findUnique({
                 where: {
@@ -87,7 +89,7 @@ export async function createStockAdjustment(data: {
                     await tx.productStock.update({
                         where: { id: stock.id },
                         data: { 
-                            quantity: { decrement: item.quantity },
+                            quantity: roundQty(stock.quantity - qty),
                             ...(Number(stock.avgCost) === 0 ? { avgCost: defaultCost } : {})
                         },
                     });
@@ -96,7 +98,7 @@ export async function createStockAdjustment(data: {
                         data: {
                             productId: item.productId,
                             warehouseId: item.warehouseId,
-                            quantity: -item.quantity,
+                            quantity: -qty,
                             avgCost: defaultCost,
                         },
                     });
@@ -107,7 +109,7 @@ export async function createStockAdjustment(data: {
                         productId: item.productId,
                         warehouseId: item.warehouseId,
                         type: 'ADJUSTMENT',
-                        quantity: -item.quantity,
+                        quantity: -qty,
                         unitCost: stock ? Number(stock.avgCost) : defaultCost,
                         reference: adjNumber,
                         userId: data.userId,
@@ -120,7 +122,7 @@ export async function createStockAdjustment(data: {
                     await tx.productStock.update({
                         where: { id: stock.id },
                         data: { 
-                            quantity: { increment: item.quantity },
+                            quantity: roundQty(stock.quantity + qty),
                             ...(Number(stock.avgCost) === 0 ? { avgCost: defaultCost } : {})
                         },
                     });
@@ -129,7 +131,7 @@ export async function createStockAdjustment(data: {
                         data: {
                             productId: item.productId,
                             warehouseId: item.warehouseId,
-                            quantity: item.quantity,
+                            quantity: qty,
                             avgCost: defaultCost,
                         },
                     });
@@ -140,7 +142,7 @@ export async function createStockAdjustment(data: {
                         productId: item.productId,
                         warehouseId: item.warehouseId,
                         type: 'ADJUSTMENT',
-                        quantity: item.quantity,
+                        quantity: qty,
                         unitCost: stock ? Number(stock.avgCost) : defaultCost,
                         reference: adjNumber,
                         userId: data.userId,
@@ -186,7 +188,8 @@ export async function createBatchStockAdjustment(data: {
 
     await prisma.$transaction(async (tx) => {
         for (const item of validChanges) {
-            const diff = item.countedStock - item.currentStock;
+            const counted = roundQty(item.countedStock);
+            const diff = roundQty(counted - item.currentStock);
             if (diff === 0) continue;
 
             const stock = await tx.productStock.findUnique({
@@ -212,7 +215,7 @@ export async function createBatchStockAdjustment(data: {
                 await tx.productStock.update({
                     where: { id: stock.id },
                     data: {
-                        quantity: item.countedStock,
+                        quantity: counted,
                         ...(Number(stock.avgCost) === 0 ? { avgCost: defaultCost } : {}),
                     },
                 });
@@ -221,7 +224,7 @@ export async function createBatchStockAdjustment(data: {
                     data: {
                         productId: item.productId,
                         warehouseId: data.warehouseId,
-                        quantity: item.countedStock,
+                        quantity: counted,
                         avgCost: defaultCost,
                     },
                 });

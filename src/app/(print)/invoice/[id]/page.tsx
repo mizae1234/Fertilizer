@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import InvoicePrint from './InvoicePrint';
+import { roundQty } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,8 +42,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     const adjustedItems = sale.items
         .map(item => {
             const returned = returnedMap.get(item.id) || 0;
-            const remaining = item.quantity - returned;
-            return { ...item, quantity: remaining, totalPrice: remaining * Number(item.unitPrice) };
+            const remaining = roundQty(item.quantity - returned);
+            return { ...item, quantity: remaining, totalPrice: Math.round(remaining * Number(item.unitPrice) * 100) / 100 };
         })
         .filter(item => item.quantity > 0);
 

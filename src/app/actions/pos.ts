@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { generateNumber } from '@/lib/generateNumber';
+import { roundQty } from '@/lib/utils';
 
 export async function createSaleFromPOS(data: {
     customerId?: string;
@@ -56,7 +57,7 @@ export async function createSaleFromPOS(data: {
         ? data.payments[0].method
         : 'SPLIT';
 
-    const totalPoints = data.items.reduce((sum, item) => sum + item.points, 0);
+    const totalPoints = Math.floor(data.items.reduce((sum, item) => sum + Math.floor(item.points || 0), 0));
 
     // Retry on saleNumber collision
     let lastError: Error | null = null;
@@ -92,18 +93,21 @@ export async function createSaleFromPOS(data: {
                         createdById: data.userId,
                         shiftId: data.shiftId || null,
                         items: {
-                            create: data.items.map((item, idx) => ({
-                                productId: item.productId,
-                                warehouseId: item.warehouseId,
-                                quantity: item.quantity,
-                                unitPrice: item.unitPrice,
-                                unitCost: parseFloat(productCosts[idx].toFixed(2)),
-                                totalPrice: Math.round(item.quantity * item.unitPrice * 100) / 100,
-                                discount: item.itemDiscount || 0,
-                                points: item.points,
-                                unitName: item.unitName || null,
-                                conversionRate: item.conversionRate || 1,
-                            })),
+                            create: data.items.map((item, idx) => {
+                                const qty = roundQty(item.quantity);
+                                return {
+                                    productId: item.productId,
+                                    warehouseId: item.warehouseId,
+                                    quantity: qty,
+                                    unitPrice: item.unitPrice,
+                                    unitCost: parseFloat(productCosts[idx].toFixed(2)),
+                                    totalPrice: Math.round(qty * item.unitPrice * 100) / 100,
+                                    discount: item.itemDiscount || 0,
+                                    points: Math.floor(item.points || 0),
+                                    unitName: item.unitName || null,
+                                    conversionRate: item.conversionRate || 1,
+                                };
+                            }),
                         },
                     },
                 });
@@ -111,7 +115,8 @@ export async function createSaleFromPOS(data: {
                 // Deduct stock + create stock transactions sequentially per item to avoid transaction deadlocks
                 for (let idx = 0; idx < data.items.length; idx++) {
                     const item = data.items[idx];
-                    const stockToDeduct = item.quantity * (item.conversionRate || 1);
+                    const qty = roundQty(item.quantity);
+                    const stockToDeduct = roundQty(qty * (item.conversionRate || 1));
                     
                     const destStock = await tx.productStock.findUnique({
                         where: {
@@ -132,7 +137,7 @@ export async function createSaleFromPOS(data: {
                             },
                         },
                         update: {
-                            quantity: { decrement: stockToDeduct },
+                            quantity: roundQty((destStock?.quantity ?? 0) - stockToDeduct),
                             ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
                         },
                         create: {
@@ -152,7 +157,7 @@ export async function createSaleFromPOS(data: {
                             unitCost: parseFloat(productCosts[idx].toFixed(2)),
                             reference: saleNumber,
                             userId: data.userId,
-                            notes: `ขายสินค้า ${saleNumber}${(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
+                            notes: `ขายสินค้า ${saleNumber}${(item.conversionRate || 1) > 1 ? ` (${qty}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
                         },
                     });
                 }

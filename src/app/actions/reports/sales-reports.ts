@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { getDateRange } from './utils';
 import { isServerAdmin } from '@/lib/server-auth';
+import { roundQty } from '@/lib/utils';
 
 // ==================== SALES REPORTS ====================
 
@@ -170,14 +171,14 @@ export async function getSalesDetail(dateFrom?: string, dateTo?: string) {
         const adjustedItems = s.items
             .map(i => {
                 const returned = retMap.get(i.id) || 0;
-                const remaining = i.quantity - returned;
+                const remaining = roundQty(i.quantity - returned);
                 return {
                     productName: i.product.name,
                     productCode: i.product.code,
                     warehouse: i.warehouse.name,
                     quantity: remaining,
                     unitPrice: Number(i.unitPrice),
-                    totalPrice: remaining * Number(i.unitPrice),
+                    totalPrice: Math.round(remaining * Number(i.unitPrice) * 100) / 100,
                 };
             })
             .filter(i => i.quantity > 0);
@@ -251,11 +252,11 @@ export async function getTopProducts(dateFrom?: string, dateTo?: string) {
 
     for (const si of allSaleItems) {
         const returned = retMap.get(si.id) || 0;
-        const remaining = si.quantity - returned;
+        const remaining = roundQty(si.quantity - returned);
         if (remaining <= 0) continue;
 
         productIdsWithSales.add(si.productId);
-        const adjustedTotal = remaining * Number(si.unitPrice);
+        const adjustedTotal = Math.round(remaining * Number(si.unitPrice) * 100) / 100;
 
         if (!productAgg.has(si.productId)) {
             productAgg.set(si.productId, {
@@ -267,14 +268,14 @@ export async function getTopProducts(dateFrom?: string, dateTo?: string) {
             });
         }
         const p = productAgg.get(si.productId)!;
-        p.quantity += remaining;
-        p.totalAmount += adjustedTotal;
+        p.quantity = roundQty(p.quantity + remaining);
+        p.totalAmount = Math.round((p.totalAmount + adjustedTotal) * 100) / 100;
 
         // Category aggregation
         const cat = si.product.productGroup?.name || 'ไม่มีหมวดหมู่';
         const existing = categoryMap.get(cat) || { total: 0, count: 0 };
-        existing.total += adjustedTotal;
-        existing.count += remaining;
+        existing.total = Math.round((existing.total + adjustedTotal) * 100) / 100;
+        existing.count = roundQty(existing.count + remaining);
         categoryMap.set(cat, existing);
     }
 
@@ -371,7 +372,7 @@ export async function getCustomerReport(dateFrom?: string, dateTo?: string) {
                 const items = s.items
                     .map(it => {
                         const returned = retMap.get(it.id) || 0;
-                        const remaining = Math.max(0, it.quantity - returned);
+                        const remaining = Math.max(0, roundQty(it.quantity - returned));
                         const unitPrice = Number(it.unitPrice);
                         return {
                             id: it.id,
@@ -383,7 +384,7 @@ export async function getCustomerReport(dateFrom?: string, dateTo?: string) {
                             warehouse: it.warehouse.name,
                             quantity: remaining,
                             unitPrice,
-                            totalPrice: remaining * unitPrice,
+                            totalPrice: Math.round(remaining * unitPrice * 100) / 100,
                         };
                     })
                     .filter(it => it.quantity > 0);

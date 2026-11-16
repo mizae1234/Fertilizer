@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { generateNumber } from '@/lib/generateNumber';
+import { roundQty } from '@/lib/utils';
 
 export async function getQuotations(page = 1, search = '', status = '') {
     const perPage = 10;
@@ -67,9 +68,9 @@ export async function createQuotation(data: {
     if (!data.userId) throw new Error('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่');
     if (!data.items.length) throw new Error('กรุณาเพิ่มรายการสินค้า');
 
-    const subtotal = data.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+    const subtotal = Math.round(data.items.reduce((sum, i) => sum + roundQty(i.quantity) * i.unitPrice, 0) * 100) / 100;
     const discount = data.discount || 0;
-    const totalAmount = subtotal - discount;
+    const totalAmount = Math.round((subtotal - discount) * 100) / 100;
 
     let lastError: Error | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -87,13 +88,16 @@ export async function createQuotation(data: {
                     status: 'DRAFT',
                     createdById: data.userId,
                     items: {
-                        create: data.items.map(i => ({
-                            productId: i.productId,
-                            quantity: i.quantity,
-                            unitPrice: i.unitPrice,
-                            totalPrice: i.quantity * i.unitPrice,
-                            unitName: i.unitName || null,
-                        })),
+                        create: data.items.map(i => {
+                            const qty = roundQty(i.quantity);
+                            return {
+                                productId: i.productId,
+                                quantity: qty,
+                                unitPrice: i.unitPrice,
+                                totalPrice: Math.round(qty * i.unitPrice * 100) / 100,
+                                unitName: i.unitName || null,
+                            };
+                        }),
                     },
                 },
             });
@@ -138,19 +142,22 @@ export async function updateQuotation(id: string, data: {
     if (data.status) updateData.status = data.status;
 
     if (data.items) {
-        const subtotal = data.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+        const subtotal = Math.round(data.items.reduce((s, i) => s + roundQty(i.quantity) * i.unitPrice, 0) * 100) / 100;
         const discount = data.discount ?? Number(existing.discount);
-        updateData.totalAmount = subtotal - discount;
+        updateData.totalAmount = Math.round((subtotal - discount) * 100) / 100;
         updateData.discount = discount;
 
         updateData.items = {
-            create: data.items.map(i => ({
-                productId: i.productId,
-                quantity: i.quantity,
-                unitPrice: i.unitPrice,
-                totalPrice: i.quantity * i.unitPrice,
-                unitName: i.unitName || null,
-            })),
+            create: data.items.map(i => {
+                const qty = roundQty(i.quantity);
+                return {
+                    productId: i.productId,
+                    quantity: qty,
+                    unitPrice: i.unitPrice,
+                    totalPrice: Math.round(qty * i.unitPrice * 100) / 100,
+                    unitName: i.unitName || null,
+                };
+            }),
         };
     } else if (data.discount !== undefined) {
         updateData.discount = data.discount;

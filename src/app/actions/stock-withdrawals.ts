@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { generateNumber } from '@/lib/generateNumber';
+import { roundQty } from '@/lib/utils';
 
 export async function createStockWithdrawal(data: {
     requesterName: string;
@@ -36,10 +37,10 @@ export async function createStockWithdrawal(data: {
             })
         );
 
-        const totalAmount = data.items.reduce((sum, item, idx) => {
+        const totalAmount = Math.round(data.items.reduce((sum, item, idx) => {
             const cost = productCosts[idx];
-            return sum + item.quantity * cost;
-        }, 0);
+            return sum + roundQty(item.quantity) * cost;
+        }, 0) * 100) / 100;
 
         const withdrawal = await tx.stockWithdrawal.create({
             data: {
@@ -54,12 +55,13 @@ export async function createStockWithdrawal(data: {
                 items: {
                     create: data.items.map((item, idx) => {
                         const cost = productCosts[idx];
+                        const qty = roundQty(item.quantity);
                         return {
                             productId: item.productId,
                             warehouseId: item.warehouseId,
-                            quantity: item.quantity,
+                            quantity: qty,
                             unitCost: cost,
-                            totalCost: item.quantity * cost,
+                            totalCost: Math.round(qty * cost * 100) / 100,
                         };
                     }),
                 },
@@ -69,6 +71,7 @@ export async function createStockWithdrawal(data: {
         // Deduct stock + create stock transactions
         await Promise.all(data.items.map(async (item, idx) => {
             const costToUse = productCosts[idx];
+            const qty = roundQty(item.quantity);
             const destStock = await tx.productStock.findUnique({
                 where: {
                     productId_warehouseId: {
@@ -87,13 +90,13 @@ export async function createStockWithdrawal(data: {
                     },
                 },
                 update: { 
-                    quantity: { decrement: item.quantity },
+                    quantity: roundQty((destStock?.quantity ?? 0) - qty),
                     ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
                 },
                 create: {
                     productId: item.productId,
                     warehouseId: item.warehouseId,
-                    quantity: -item.quantity,
+                    quantity: -qty,
                     avgCost: costToUse,
                 },
             });
@@ -103,7 +106,7 @@ export async function createStockWithdrawal(data: {
                     productId: item.productId,
                     warehouseId: item.warehouseId,
                     type: 'WITHDRAWAL',
-                    quantity: -item.quantity,
+                    quantity: -qty,
                     unitCost: costToUse,
                     reference: withdrawalNumber,
                     userId: data.userId,
@@ -220,11 +223,14 @@ export async function cancelStockWithdrawal(id: string) {
             const matchingTx = originalTxs.find(
                 st => st.productId === item.productId && st.warehouseId === item.warehouseId
             );
-            const qtyToRestore = matchingTx ? Math.abs(matchingTx.quantity) : item.quantity;
+            const qtyToRestore = roundQty(matchingTx ? Math.abs(matchingTx.quantity) : item.quantity);
+            const curStock = await tx.productStock.findUnique({
+                where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
+            });
 
             await tx.productStock.update({
                 where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
-                data: { quantity: { increment: qtyToRestore } },
+                data: { quantity: roundQty((curStock?.quantity ?? 0) + qtyToRestore) },
             });
 
             await tx.stockTransaction.create({

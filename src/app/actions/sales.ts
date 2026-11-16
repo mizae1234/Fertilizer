@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { roundQty } from '@/lib/utils';
 
 export async function getSales(page = 1, status = '') {
     const perPage = 10;
@@ -83,8 +84,8 @@ export async function approveSale(id: string) {
 
     for (const item of sale.items) {
         const stock = stockMap.get(`${item.productId}_${item.warehouseId}`);
-        const stockToDeduct = item.quantity * Number(item.conversionRate || 1);
-        if (!stock || stock.quantity < stockToDeduct) {
+        const stockToDeduct = roundQty(item.quantity * Number(item.conversionRate || 1));
+        if (!stock || stock.quantity + 0.0001 < stockToDeduct) {
             throw new Error('สินค้ามี stock ไม่เพียงพอ');
         }
     }
@@ -98,7 +99,8 @@ export async function approveSale(id: string) {
 
         // Deduct stock + create stock transactions in parallel
         await Promise.all(sale.items.map(async (item) => {
-            const stockToDeduct = item.quantity * Number(item.conversionRate || 1);
+            const stockToDeduct = roundQty(item.quantity * Number(item.conversionRate || 1));
+            const currentStock = stockMap.get(`${item.productId}_${item.warehouseId}`);
             
             await tx.productStock.update({
                 where: {
@@ -108,7 +110,7 @@ export async function approveSale(id: string) {
                     },
                 },
                 data: {
-                    quantity: { decrement: stockToDeduct },
+                    quantity: roundQty((currentStock?.quantity ?? 0) - stockToDeduct),
                 },
             });
 
@@ -196,12 +198,12 @@ export async function updateSale(id: string, data: {
     }
 
     // data.items.quantity is the net remaining quantity kept by the customer
-    const subtotal = Math.round(data.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0) * 100) / 100;
+    const subtotal = Math.round(data.items.reduce((s, i) => s + roundQty(i.quantity) * i.unitPrice, 0) * 100) / 100;
     const itemDiscountsTotal = Math.round(data.items.reduce((s, i) => s + (i.itemDiscount || 0), 0) * 100) / 100;
     const billDiscount = data.billDiscount || 0;
     const totalDiscount = Math.round((itemDiscountsTotal + billDiscount) * 100) / 100;
     const totalAmount = Math.max(0, Math.round((subtotal - totalDiscount) * 100) / 100);
-    const totalPoints = data.items.reduce((s, i) => s + i.points, 0);
+    const totalPoints = Math.floor(data.items.reduce((s, i) => s + Math.floor(i.points || 0), 0));
 
     // Resolve updated creditDueDate
     const nextDueDate: Date | null | undefined =
@@ -291,17 +293,17 @@ export async function updateSale(id: string, data: {
         changes.discount = { old: Number(existing.discount), new: totalDiscount };
     }
     changes.oldItems = existing.items.map(i => ({
-        product: i.product.name, qty: Math.max(0, i.quantity - (returnedByItemId.get(i.id) || 0)), price: Number(i.unitPrice),
+        product: i.product.name, qty: Math.max(0, roundQty(i.quantity - (returnedByItemId.get(i.id) || 0))), price: Number(i.unitPrice),
     }));
     changes.newItems = data.items.map(i => ({
-        productId: i.productId, qty: i.quantity, price: i.unitPrice,
+        productId: i.productId, qty: roundQty(i.quantity), price: i.unitPrice,
     }));
 
     await prisma.$transaction(async (tx) => {
         // If APPROVED, reverse old stock first (gross sold qty, since SALE_RETURN txs stay intact)
         if (existing.status === 'APPROVED') {
             for (const item of existing.items) {
-                const stockToRestore = item.quantity * Number(item.conversionRate || 1);
+                const stockToRestore = roundQty(item.quantity * Number(item.conversionRate || 1));
                 const costToUse = Number(item.unitCost);
                 const destStock = await tx.productStock.findUnique({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
@@ -311,7 +313,7 @@ export async function updateSale(id: string, data: {
                 await tx.productStock.upsert({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
                     update: { 
-                        quantity: { increment: stockToRestore },
+                        quantity: roundQty((destStock?.quantity ?? 0) + stockToRestore),
                         ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
                     },
                     create: {
@@ -345,7 +347,7 @@ export async function updateSale(id: string, data: {
         // if a removed item had prior returns, keep it with quantity = returnedQty so SaleReturnItem.saleItemId stays intact!
         for (const oldItem of existing.items) {
             if (!incomingIds.has(oldItem.id)) {
-                const retQty = returnedByItemId.get(oldItem.id) || 0;
+                const retQty = roundQty(returnedByItemId.get(oldItem.id) || 0);
                 if (retQty > 0) {
                     await tx.saleItem.update({
                         where: { id: oldItem.id },
@@ -356,10 +358,13 @@ export async function updateSale(id: string, data: {
                         },
                     });
                     if (existing.status === 'APPROVED') {
-                        const stockForReturned = retQty * Number(oldItem.conversionRate || 1);
+                        const stockForReturned = roundQty(retQty * Number(oldItem.conversionRate || 1));
+                        const destStock = await tx.productStock.findUnique({
+                            where: { productId_warehouseId: { productId: oldItem.productId, warehouseId: oldItem.warehouseId } },
+                        });
                         await tx.productStock.update({
                             where: { productId_warehouseId: { productId: oldItem.productId, warehouseId: oldItem.warehouseId } },
-                            data: { quantity: { decrement: stockForReturned } },
+                            data: { quantity: roundQty((destStock?.quantity ?? 0) - stockForReturned) },
                         });
                         await tx.stockTransaction.create({
                             data: {
@@ -384,9 +389,10 @@ export async function updateSale(id: string, data: {
         for (let idx = 0; idx < data.items.length; idx++) {
             const i = data.items[idx];
             const retQty = i.id ? (returnedByItemId.get(i.id) || 0) : 0;
-            const grossQty = i.quantity + retQty;
+            const grossQty = roundQty(i.quantity + retQty);
             const conv = i.conversionRate || 1;
             const unitCostVal = parseFloat(productCosts[idx].toFixed(2));
+            const ptsVal = Math.floor(i.points || 0);
 
             if (i.id && existing.items.some(old => old.id === i.id)) {
                 await tx.saleItem.update({
@@ -399,7 +405,7 @@ export async function updateSale(id: string, data: {
                         unitCost: unitCostVal,
                         totalPrice: Math.round(grossQty * i.unitPrice * 100) / 100,
                         discount: i.itemDiscount || 0,
-                        points: i.points,
+                        points: ptsVal,
                         unitName: i.unitName || null,
                         conversionRate: conv,
                     },
@@ -415,7 +421,7 @@ export async function updateSale(id: string, data: {
                         unitCost: unitCostVal,
                         totalPrice: Math.round(grossQty * i.unitPrice * 100) / 100,
                         discount: i.itemDiscount || 0,
-                        points: i.points,
+                        points: ptsVal,
                         unitName: i.unitName || null,
                         conversionRate: conv,
                     },
@@ -423,7 +429,7 @@ export async function updateSale(id: string, data: {
             }
 
             if (existing.status === 'APPROVED') {
-                const stockToDeduct = grossQty * conv;
+                const stockToDeduct = roundQty(grossQty * conv);
                 const destStock = await tx.productStock.findUnique({
                     where: { productId_warehouseId: { productId: i.productId, warehouseId: i.warehouseId } },
                 });
@@ -432,7 +438,7 @@ export async function updateSale(id: string, data: {
                 await tx.productStock.upsert({
                     where: { productId_warehouseId: { productId: i.productId, warehouseId: i.warehouseId } },
                     update: { 
-                        quantity: { decrement: stockToDeduct },
+                        quantity: roundQty((destStock?.quantity ?? 0) - stockToDeduct),
                         ...(currentAvgCost === 0 ? { avgCost: unitCostVal } : {})
                     },
                     create: {
@@ -553,7 +559,7 @@ export async function cancelSale(id: string, userId?: string) {
                 );
                 // Use the absolute value of the stock transaction quantity (which is in base units)
                 // Fallback to item.quantity if no stock transaction found
-                const baseQtyToRestore = matchingTx ? Math.abs(matchingTx.quantity) : item.quantity * Number(item.conversionRate || 1);
+                const baseQtyToRestore = roundQty(matchingTx ? Math.abs(matchingTx.quantity) : item.quantity * Number(item.conversionRate || 1));
 
                 const costToUse = Number(item.unitCost);
                 const destStock = await tx.productStock.findUnique({
@@ -564,7 +570,7 @@ export async function cancelSale(id: string, userId?: string) {
                 await tx.productStock.upsert({
                     where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
                     update: { 
-                        quantity: { increment: baseQtyToRestore },
+                        quantity: roundQty((destStock?.quantity ?? 0) + baseQtyToRestore),
                         ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
                     },
                     create: {

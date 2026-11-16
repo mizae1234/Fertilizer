@@ -329,9 +329,10 @@ export default function NewStockAdjustmentPage() {
                                     )}
                                 </label>
                                 <input
-                                    type="number" min={1} max={isDecrease ? (item.currentStock ?? undefined) : undefined}
+                                    type="number" min={0.0001} step="any" max={isDecrease ? (item.currentStock ?? undefined) : undefined}
                                     value={item.quantity}
-                                    onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)}
+                                    onFocus={e => e.target.select()}
+                                    onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
                                     className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                 />
                             </div>

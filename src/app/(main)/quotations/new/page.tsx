@@ -206,7 +206,7 @@ export default function NewQuotationPage() {
                                 </div>
                                 <div>
                                     <label className="text-xs text-gray-500 mb-1 block">จำนวน</label>
-                                    <input type="number" min={1} value={item.quantity || ''} onFocus={e => e.target.select()}
+                                    <input type="number" min={0.0001} step="any" value={item.quantity || ''} onFocus={e => e.target.select()}
                                         onChange={e => updateItem(idx, 'quantity', e.target.value)}
                                         className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
                                 </div>

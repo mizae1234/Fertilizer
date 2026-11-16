@@ -182,10 +182,10 @@ export default function BatchStockAdjustmentPage() {
             return;
         }
 
-        const countNum = parseInt(valStr, 10);
+        const countNum = Math.round(parseFloat(valStr) * 10000) / 10000;
         if (isNaN(countNum)) return;
 
-        const diff = countNum - currentStock;
+        const diff = Math.round((countNum - currentStock) * 10000) / 10000;
         const defaultReason = diff > 0 ? 'ตรวจนับเกิน' : (diff < 0 ? 'ตรวจนับขาด' : 'ปรับปรุงยอด');
 
         setEdits(prev => ({
@@ -241,7 +241,7 @@ export default function BatchStockAdjustmentPage() {
         if (!product) return;
         const currentStock = getCurrentStock(product);
         const existingCount = edits[productId] !== undefined ? edits[productId].countedStock : currentStock;
-        handleCountChange(productId, String(existingCount + delta));
+        handleCountChange(productId, String(Math.round((existingCount + delta) * 10000) / 10000));
     };
 
     // Filtered Products
@@ -639,7 +639,7 @@ export default function BatchStockAdjustmentPage() {
                                     const edit = edits[p.id];
                                     const isEdited = edit !== undefined && edit.countedStock !== currentStock;
                                     const countedValue = edit !== undefined ? String(edit.countedStock) : '';
-                                    const diff = isEdited ? edit.countedStock - currentStock : 0;
+                                    const diff = isEdited ? Math.round((edit.countedStock - currentStock) * 10000) / 10000 : 0;
 
                                     return (
                                         <tr
@@ -708,6 +708,7 @@ export default function BatchStockAdjustmentPage() {
                                                     <input
                                                         ref={el => { inputRefs.current[p.id] = el; }}
                                                         type="number"
+                                                        step="any"
                                                         value={countedValue}
                                                         placeholder={String(currentStock)}
                                                         onChange={e => handleCountChange(p.id, e.target.value)}

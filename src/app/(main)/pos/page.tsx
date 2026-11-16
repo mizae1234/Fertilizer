@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSaleFromPOS } from '@/app/actions/pos';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatNumber, roundQty } from '@/lib/utils';
 import { resolveItemUnitPrice } from '@/lib/priceCalculator';
 import AlertModal from '@/components/AlertModal';
 import { useShift } from '@/hooks/useShift';
@@ -452,6 +452,8 @@ export default function POSPage() {
 
     // Default quantity preset — value used when adding items to cart
     const [defaultQty, setDefaultQty] = useState(1);
+    const [defaultQtyDraft, setDefaultQtyDraft] = useState<string | null>(null);
+    const [qtyDrafts, setQtyDrafts] = useState<Record<number, string>>({});
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
     // Bill-level discount
@@ -553,7 +555,7 @@ export default function POSPage() {
 
     const getStock = (product: Product, warehouseId: string): number => {
         const stock = product.productStocks.find(s => s.warehouseId === warehouseId);
-        return stock?.quantity || 0;
+        return roundQty(stock?.quantity || 0);
     };
 
     // Trigger pulse animation on an item
@@ -601,12 +603,12 @@ export default function POSPage() {
         const convRate = 1;
         const unitName = product.unit;
 
-        const qtyToAdd = defaultQty || 1;
+        const qtyToAdd = roundQty(defaultQty || 1);
         const existingIdx = cart.findIndex(c => c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === '' && !c.isFreebie);
         if (existingIdx !== -1) {
             setCart(cart.map((c, idx) => {
                 if (idx === existingIdx) {
-                    const newQty = c.quantity + qtyToAdd;
+                    const newQty = roundQty(c.quantity + qtyToAdd);
                     const priceRes = !c.isManualPrice ? resolveItemUnitPrice({
                         quantity: newQty,
                         basePrice: c.baseUnitPrice,
@@ -623,13 +625,14 @@ export default function POSPage() {
                         unitPrice: priceRes.unitPrice,
                         isTierApplied: priceRes.isTierApplied,
                         appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${c.unit}` : undefined,
-                        points: newQty * c.conversionRate * c.pointsPerUnit,
+                        points: Math.floor(newQty * c.conversionRate * c.pointsPerUnit),
                     };
                 }
                 return c;
             }));
             triggerPulse(product.id);
             setDefaultQty(1);
+            setDefaultQtyDraft(null);
         } else {
             const productPricesMapped = product.productPrices.map(pp => ({ customerGroupId: pp.customerGroup.id, productUnitId: pp.productUnitId, price: Number(pp.price) }));
             const basePrice = Number(product.price);
@@ -646,7 +649,7 @@ export default function POSPage() {
             setCart([...cart, {
                 productId: product.id, productName: product.name, productCode: product.code,
                 unit: unitName, warehouseId, quantity: qtyToAdd, unitPrice: priceRes.unitPrice,
-                points: product.pointsPerUnit * qtyToAdd, availableStock: stock,
+                points: Math.floor(product.pointsPerUnit * qtyToAdd), availableStock: stock,
                 pointsPerUnit: product.pointsPerUnit,
                 priceTier: 'custom',
                 productPrices: productPricesMapped,
@@ -664,6 +667,7 @@ export default function POSPage() {
             setTimeout(() => setLastAddedId(null), 400);
             setTimeout(() => cartEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
             setDefaultQty(1);
+            setDefaultQtyDraft(null);
         }
     };
 
@@ -745,13 +749,15 @@ export default function POSPage() {
         setDefaultQty(1);
     };
 
-    const updateCartQty = (idx: number, qty: number) => {
+    const updateCartQty = (idx: number, rawQty: number) => {
+        const qty = roundQty(rawQty);
         if (qty <= 0) { removeFromCart(idx); return; }
         const item = cart[idx];
+        if (!item) return;
         setCart(cart.map((c, i) => {
             if (i !== idx) return c;
             if (c.isBundle) {
-                return { ...c, quantity: qty, points: qty * c.conversionRate * c.pointsPerUnit };
+                return { ...c, quantity: qty, points: Math.floor(qty * c.conversionRate * c.pointsPerUnit) };
             }
             const priceRes = !c.isManualPrice ? resolveItemUnitPrice({
                 quantity: qty,
@@ -769,7 +775,7 @@ export default function POSPage() {
                 unitPrice: priceRes.unitPrice,
                 isTierApplied: priceRes.isTierApplied,
                 appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${c.selectedUnitName || c.unit}` : undefined,
-                points: c.isFreebie ? 0 : qty * c.conversionRate * c.pointsPerUnit,
+                points: c.isFreebie ? 0 : Math.floor(qty * c.conversionRate * c.pointsPerUnit),
             };
         }));
         triggerPulse(item.productId);
@@ -806,7 +812,10 @@ export default function POSPage() {
         }
     };
 
-    const removeFromCart = (idx: number) => setCart(cart.filter((_, i) => i !== idx));
+    const removeFromCart = (idx: number) => {
+        setQtyDrafts({});
+        setCart(cart.filter((_, i) => i !== idx));
+    };
 
     const updateCartPrice = (idx: number, price: number) => {
         setCart(cart.map((c, i) => {
@@ -820,7 +829,7 @@ export default function POSPage() {
                 isTierApplied: false,
                 appliedTierText: undefined,
                 priceTier: 'custom',
-                points: stillFreebie ? 0 : c.quantity * c.conversionRate * c.pointsPerUnit,
+                points: stillFreebie ? 0 : Math.floor(c.quantity * c.conversionRate * c.pointsPerUnit),
             };
         }));
     };
@@ -845,7 +854,7 @@ export default function POSPage() {
                     appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${c.selectedUnitName || c.unit}` : undefined,
                     isManualPrice: false,
                     isFreebie: false,
-                    points: c.quantity * c.conversionRate * c.pointsPerUnit,
+                    points: Math.floor(c.quantity * c.conversionRate * c.pointsPerUnit),
                 };
             }
             return {
@@ -925,7 +934,7 @@ export default function POSPage() {
                     isManualPrice: !!c.isFreebie,
                     availableStock: baseStock,
                     priceTier: 'custom',
-                    points: c.isFreebie ? 0 : c.quantity * 1 * c.pointsPerUnit,
+                    points: c.isFreebie ? 0 : Math.floor(c.quantity * 1 * c.pointsPerUnit),
                 };
             }
 
@@ -954,7 +963,7 @@ export default function POSPage() {
                 isManualPrice: !!c.isFreebie,
                 availableStock: baseStock,
                 priceTier: 'custom',
-                points: c.isFreebie ? 0 : c.quantity * convRate * c.pointsPerUnit,
+                points: c.isFreebie ? 0 : Math.floor(c.quantity * convRate * c.pointsPerUnit),
             };
         }));
     };
@@ -962,8 +971,8 @@ export default function POSPage() {
     const subtotal = cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
     const itemDiscountsTotal = cart.reduce((s, i) => s + (i.itemDiscount || 0), 0);
     const total = Math.max(0, Math.round((subtotal - itemDiscountsTotal - billDiscount) * 100) / 100);
-    const totalPoints = cart.reduce((s, i) => s + i.points, 0);
-    const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
+    const totalPoints = Math.floor(cart.reduce((s, i) => s + Math.floor(i.points || 0), 0));
+    const cartCount = roundQty(cart.reduce((s, i) => s + i.quantity, 0));
 
     const [saleNotes, setSaleNotes] = useState('');
     const [showNotes, setShowNotes] = useState(false);
@@ -1418,23 +1427,38 @@ export default function POSPage() {
                                     <label className="text-[10px] text-gray-500">จำนวน:</label>
                                     <input
                                         ref={qtyInputRef}
-                                        type="number"
-                                        value={defaultQty}
-                                        onChange={e => setDefaultQty(Math.max(1, parseInt(e.target.value) || 1))}
-                                        onFocus={e => e.target.select()}
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={defaultQtyDraft !== null ? defaultQtyDraft : defaultQty}
+                                        onChange={e => {
+                                            const raw = e.target.value;
+                                            if (!/^\d*\.?\d*$/.test(raw)) return;
+                                            setDefaultQtyDraft(raw);
+                                            const val = parseFloat(raw);
+                                            if (!isNaN(val) && val > 0) setDefaultQty(roundQty(val));
+                                        }}
+                                        onFocus={e => {
+                                            setDefaultQtyDraft(String(defaultQty));
+                                            const t = e.target;
+                                            setTimeout(() => t.select(), 0);
+                                        }}
+                                        onBlur={e => {
+                                            const val = parseFloat(e.target.value);
+                                            setDefaultQtyDraft(null);
+                                            setDefaultQty(!isNaN(val) && val > 0 ? roundQty(val) : 1);
+                                        }}
                                         onKeyDown={e => {
                                             if (e.key === 'Enter') { e.preventDefault(); searchInputRef.current?.focus(); }
                                             if (e.key === '*') { e.preventDefault(); }
                                         }}
-                                        min={1}
-                                        className={`w-14 px-2 py-1.5 rounded-lg border text-sm font-bold text-center outline-none transition-all ${
-                                            defaultQty > 1
+                                        className={`w-16 px-2 py-1.5 rounded-lg border text-sm font-bold text-center outline-none transition-all ${
+                                            defaultQty !== 1
                                                 ? 'border-amber-400 bg-amber-50 text-amber-700 ring-2 ring-amber-200'
                                                 : 'border-gray-200 text-gray-700 focus:ring-2 focus:ring-emerald-500'
                                         }`}
                                     />
-                                    {defaultQty > 1 && (
-                                        <button onClick={() => setDefaultQty(1)} className="text-amber-400 hover:text-amber-600 text-xs" title="รีเซ็ตเป็น 1">✕</button>
+                                    {defaultQty !== 1 && (
+                                        <button onClick={() => { setDefaultQty(1); setDefaultQtyDraft(null); }} className="text-amber-400 hover:text-amber-600 text-xs" title="รีเซ็ตเป็น 1">✕</button>
                                     )}
                                 </div>
                                 <div ref={desktopSearchRef} className="relative w-[480px] shrink-0">
@@ -1653,13 +1677,23 @@ export default function POSPage() {
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center shrink-0">
-                                                        <input type="number" value={item.quantity}
-                                                            onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
-                                                            onChange={e => { const raw = e.target.value.replace(/^0+(?=\d)/, ''); const val = parseInt(raw); if (!isNaN(val) && val >= 1) updateCartQty(idx, val); }}
-                                                            onBlur={e => { const val = parseInt(e.target.value) || 1; updateCartQty(idx, Math.max(1, val)); }}
+                                                        <input type="text" inputMode="decimal"
+                                                            value={qtyDrafts[idx] !== undefined ? qtyDrafts[idx] : item.quantity}
+                                                            onFocus={e => { setQtyDrafts(prev => ({ ...prev, [idx]: String(item.quantity) })); const t = e.target; setTimeout(() => t.select(), 0); }}
+                                                            onChange={e => {
+                                                                const raw = e.target.value;
+                                                                if (!/^\d*\.?\d*$/.test(raw)) return;
+                                                                setQtyDrafts(prev => ({ ...prev, [idx]: raw }));
+                                                                const val = parseFloat(raw);
+                                                                if (!isNaN(val) && val > 0) updateCartQty(idx, val);
+                                                            }}
+                                                            onBlur={e => {
+                                                                const val = parseFloat(e.target.value);
+                                                                setQtyDrafts(prev => { const next = { ...prev }; delete next[idx]; return next; });
+                                                                updateCartQty(idx, !isNaN(val) && val > 0 ? val : (item.quantity > 0 ? item.quantity : 1));
+                                                            }}
                                                             onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                                                            className="font-bold text-xs lg:text-sm text-center w-10 lg:w-12 rounded border border-purple-200 bg-purple-50 py-0.5 outline-none focus:ring-1 focus:ring-purple-400 text-purple-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                            min={1}
+                                                            className="font-bold text-xs lg:text-sm text-center w-14 lg:w-16 rounded border border-purple-200 bg-purple-50 py-0.5 outline-none focus:ring-1 focus:ring-purple-400 text-purple-700"
                                                         />
                                                     </div>
                                                     <p className="text-xs lg:text-sm font-bold text-purple-600 shrink-0">{formatCurrency(item.quantity * item.unitPrice)}</p>
@@ -1668,7 +1702,7 @@ export default function POSPage() {
                                                 {item.bundleItems && (
                                                     <div className="mt-1 pl-2 border-l-2 border-purple-200 space-y-0">
                                                         {item.bundleItems.map(si => (
-                                                            <p key={si.productId} className="text-[10px] text-purple-400 leading-tight">{si.productName} ×{si.quantity * item.quantity}</p>
+                                                            <p key={si.productId} className="text-[10px] text-purple-400 leading-tight">{si.productName} ×{roundQty(si.quantity * item.quantity)}</p>
                                                         ))}
                                                     </div>
                                                 )}
@@ -1700,7 +1734,7 @@ export default function POSPage() {
                                                             className="px-1.5 py-0.5 rounded border border-gray-200 text-[11px] outline-none">
                                                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                                                         </select>
-                                                        <span className="text-gray-400 text-[10px]">({item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock})</span>
+                                                        <span className="text-gray-400 text-[10px]">({formatNumber(item.conversionRate > 1 ? item.availableStock / item.conversionRate : item.availableStock)})</span>
                                                         {item.productUnits && item.productUnits.length > 0 && (
                                                             <select value={item.selectedUnitId || '__default__'} onChange={e => updateCartUnit(idx, e.target.value)}
                                                                 className="px-1.5 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-[11px] outline-none font-medium">
@@ -1726,13 +1760,23 @@ export default function POSPage() {
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center shrink-0">
-                                                        <input type="number" value={item.quantity}
-                                                            onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
-                                                            onChange={e => { const raw = e.target.value.replace(/^0+(?=\d)/, ''); const val = parseInt(raw); if (!isNaN(val) && val >= 1) updateCartQty(idx, val); }}
-                                                            onBlur={e => { const val = parseInt(e.target.value) || 1; updateCartQty(idx, Math.max(1, val)); }}
+                                                        <input type="text" inputMode="decimal"
+                                                            value={qtyDrafts[idx] !== undefined ? qtyDrafts[idx] : item.quantity}
+                                                            onFocus={e => { setQtyDrafts(prev => ({ ...prev, [idx]: String(item.quantity) })); const t = e.target; setTimeout(() => t.select(), 0); }}
+                                                            onChange={e => {
+                                                                const raw = e.target.value;
+                                                                if (!/^\d*\.?\d*$/.test(raw)) return;
+                                                                setQtyDrafts(prev => ({ ...prev, [idx]: raw }));
+                                                                const val = parseFloat(raw);
+                                                                if (!isNaN(val) && val > 0) updateCartQty(idx, val);
+                                                            }}
+                                                            onBlur={e => {
+                                                                const val = parseFloat(e.target.value);
+                                                                setQtyDrafts(prev => { const next = { ...prev }; delete next[idx]; return next; });
+                                                                updateCartQty(idx, !isNaN(val) && val > 0 ? val : (item.quantity > 0 ? item.quantity : 1));
+                                                            }}
                                                             onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                                                            className="font-bold text-xs lg:text-sm text-center w-10 lg:w-12 rounded border border-gray-200 py-0.5 outline-none focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                            min={1}
+                                                            className="font-bold text-xs lg:text-sm text-center w-14 lg:w-16 rounded border border-gray-200 py-0.5 outline-none focus:ring-1 focus:ring-emerald-400"
                                                         />
                                                     </div>
                                                     <p className="text-xs lg:text-sm font-bold text-emerald-600 shrink-0 min-w-[60px] lg:min-w-[80px] text-right">{formatCurrency(item.quantity * item.unitPrice)}</p>
@@ -1773,7 +1817,7 @@ export default function POSPage() {
                                                         </>
                                                     )}
                                                     <span className="text-[10px] text-gray-300 ml-1">|</span>
-                                                    <span className={`text-[10px] font-medium ${(item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) <= 0 ? 'text-red-500' : (item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) < 10 ? 'text-orange-500' : 'text-gray-500'}`}>📦 คงเหลือ {item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock} {item.selectedUnitName}</span>
+                                                    <span className={`text-[10px] font-medium ${(item.conversionRate > 1 ? item.availableStock / item.conversionRate : item.availableStock) <= 0 ? 'text-red-500' : (item.conversionRate > 1 ? item.availableStock / item.conversionRate : item.availableStock) < 10 ? 'text-orange-500' : 'text-gray-500'}`}>📦 คงเหลือ {formatNumber(item.conversionRate > 1 ? item.availableStock / item.conversionRate : item.availableStock)} {item.selectedUnitName}</span>
                                                 </div>
                                                 {/* Mobile-only Row 2: controls */}
                                                 <div className="flex lg:hidden items-center gap-2 mt-1.5 flex-wrap text-[10px]">
@@ -1800,7 +1844,7 @@ export default function POSPage() {
                                                         className="px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none">
                                                         {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                                                     </select>
-                                                    <span className={`${(item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) <= 0 ? 'text-red-500' : (item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) < 10 ? 'text-orange-500' : 'text-gray-400'}`}>คงเหลือ {item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock}</span>
+                                                    <span className={`${(item.conversionRate > 1 ? item.availableStock / item.conversionRate : item.availableStock) <= 0 ? 'text-red-500' : (item.conversionRate > 1 ? item.availableStock / item.conversionRate : item.availableStock) < 10 ? 'text-orange-500' : 'text-gray-400'}`}>คงเหลือ {formatNumber(item.conversionRate > 1 ? item.availableStock / item.conversionRate : item.availableStock)}</span>
                                                     {item.productUnits && item.productUnits.length > 0 && (
                                                         <select value={item.selectedUnitId || '__default__'} onChange={e => updateCartUnit(idx, e.target.value)}
                                                             className="px-1 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-[10px] outline-none font-medium">

@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { generateNumber } from '@/lib/generateNumber';
+import { roundQty } from '@/lib/utils';
 
 export async function createSaleReturn(data: {
     saleId: string;
@@ -44,13 +45,13 @@ export async function createSaleReturn(data: {
         const saleItem = sale.items.find(si => si.id === item.saleItemId);
         if (!saleItem) throw new Error('ไม่พบรายการสินค้าในบิล');
         const alreadyReturned = returnedMap.get(item.saleItemId) || 0;
-        const maxReturnable = saleItem.quantity - alreadyReturned;
-        if (item.quantity > maxReturnable) {
-            throw new Error(`สินค้าคืนได้อีกสูงสุด ${maxReturnable} ชิ้น (คืนไปแล้ว ${alreadyReturned})`);
+        const maxReturnable = roundQty(saleItem.quantity - alreadyReturned);
+        if (roundQty(item.quantity) > maxReturnable + 0.0001) {
+            throw new Error(`สินค้าคืนได้อีกสูงสุด ${maxReturnable} ชิ้น (คืนไปแล้ว ${roundQty(alreadyReturned)})`);
         }
     }
 
-    const totalAmount = data.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+    const totalAmount = Math.round(data.items.reduce((sum, i) => sum + roundQty(i.quantity) * i.unitPrice, 0) * 100) / 100;
 
     // Retry on unique collision
     let lastError: Error | null = null;
@@ -67,14 +68,17 @@ export async function createSaleReturn(data: {
                         totalAmount,
                         createdById: data.userId,
                         items: {
-                            create: data.items.map(i => ({
-                                saleItemId: i.saleItemId,
-                                productId: i.productId,
-                                warehouseId: i.warehouseId,
-                                quantity: i.quantity,
-                                unitPrice: i.unitPrice,
-                                totalPrice: i.quantity * i.unitPrice,
-                            })),
+                            create: data.items.map(i => {
+                                const qty = roundQty(i.quantity);
+                                return {
+                                    saleItemId: i.saleItemId,
+                                    productId: i.productId,
+                                    warehouseId: i.warehouseId,
+                                    quantity: qty,
+                                    unitPrice: i.unitPrice,
+                                    totalPrice: Math.round(qty * i.unitPrice * 100) / 100,
+                                };
+                            }),
                         },
                     },
                 });
@@ -83,7 +87,8 @@ export async function createSaleReturn(data: {
                 await Promise.all(data.items.map(async (item) => {
                     const saleItem = sale.items.find(si => si.id === item.saleItemId);
                     const rate = saleItem ? Number(saleItem.conversionRate ?? 1) : 1;
-                    const baseQtyToRestore = item.quantity * rate;
+                    const qty = roundQty(item.quantity);
+                    const baseQtyToRestore = roundQty(qty * rate);
 
                     const costToUse = saleItem ? Number(saleItem.unitCost) : Number(item.unitPrice);
                     const destStock = await tx.productStock.findUnique({
@@ -104,7 +109,7 @@ export async function createSaleReturn(data: {
                             },
                         },
                         update: { 
-                            quantity: { increment: baseQtyToRestore },
+                            quantity: roundQty((destStock?.quantity ?? 0) + baseQtyToRestore),
                             ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
                         },
                         create: {

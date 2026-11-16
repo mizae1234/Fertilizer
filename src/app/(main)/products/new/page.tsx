@@ -329,8 +329,9 @@ export default function NewProductPage() {
                             <label className="block text-sm font-medium text-gray-600 mb-1.5">Stock ขั้นต่ำ</label>
                             <input
                                 type="number"
+                                step="any"
                                 value={form.minStock === 0 ? '' : form.minStock}
-                                onChange={(e) => setForm({ ...form, minStock: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
+                                onChange={(e) => setForm({ ...form, minStock: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 })}
                                 onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                                 min={0}

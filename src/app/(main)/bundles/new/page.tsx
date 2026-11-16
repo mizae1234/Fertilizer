@@ -67,7 +67,7 @@ export default function NewBundlePage() {
     };
 
     const updateQuantity = (index: number, quantity: number) => {
-        setItems(prev => prev.map((item, i) => i === index ? { ...item, quantity: Math.max(1, quantity) } : item));
+        setItems(prev => prev.map((item, i) => i === index ? { ...item, quantity: Math.max(0, Math.round(quantity * 10000) / 10000) } : item));
     };
 
     // Calculate totals from individual items
@@ -240,16 +240,18 @@ export default function NewBundlePage() {
                                         <p className="text-xs text-gray-400">{item.product?.code} · {formatCurrency(item.product?.price || 0)}/{item.product?.unit}</p>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <button type="button" onClick={() => updateQuantity(idx, item.quantity - 1)}
+                                        <button type="button" onClick={() => updateQuantity(idx, Math.max(0.01, Math.round((item.quantity - 1) * 10000) / 10000))}
                                             className="w-7 h-7 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm font-bold">−</button>
                                         <input
                                             type="number"
+                                            step="any"
                                             value={item.quantity}
-                                            onChange={(e) => updateQuantity(idx, parseInt(e.target.value) || 1)}
-                                            className="w-14 text-center px-1 py-1 rounded-lg border border-gray-200 text-sm"
-                                            min={1}
+                                            onFocus={e => e.target.select()}
+                                            onChange={(e) => updateQuantity(idx, parseFloat(e.target.value) || 0)}
+                                            className="w-16 text-center px-1 py-1 rounded-lg border border-gray-200 text-sm"
+                                            min={0.0001}
                                         />
-                                        <button type="button" onClick={() => updateQuantity(idx, item.quantity + 1)}
+                                        <button type="button" onClick={() => updateQuantity(idx, Math.round((item.quantity + 1) * 10000) / 10000)}
                                             className="w-7 h-7 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm font-bold">+</button>
                                         <span className="text-xs text-gray-400 w-10">{item.product?.unit}</span>
                                     </div>
