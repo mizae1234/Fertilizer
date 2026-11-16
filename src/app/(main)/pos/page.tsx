@@ -60,6 +60,7 @@ interface CartItem {
     isTierApplied?: boolean;
     appliedTierText?: string;
     isManualPrice?: boolean;
+    isFreebie?: boolean;
     // Bundle fields
     isBundle?: boolean;
     bundleId?: string;
@@ -601,10 +602,10 @@ export default function POSPage() {
         const unitName = product.unit;
 
         const qtyToAdd = defaultQty || 1;
-        const existing = cart.find(c => c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === '');
-        if (existing) {
-            setCart(cart.map(c => {
-                if (c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === '') {
+        const existingIdx = cart.findIndex(c => c.productId === product.id && c.warehouseId === warehouseId && c.selectedUnitId === '' && !c.isFreebie);
+        if (existingIdx !== -1) {
+            setCart(cart.map((c, idx) => {
+                if (idx === existingIdx) {
                     const newQty = c.quantity + qtyToAdd;
                     const priceRes = !c.isManualPrice ? resolveItemUnitPrice({
                         quantity: newQty,
@@ -768,7 +769,7 @@ export default function POSPage() {
                 unitPrice: priceRes.unitPrice,
                 isTierApplied: priceRes.isTierApplied,
                 appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${c.selectedUnitName || c.unit}` : undefined,
-                points: qty * c.conversionRate * c.pointsPerUnit,
+                points: c.isFreebie ? 0 : qty * c.conversionRate * c.pointsPerUnit,
             };
         }));
         triggerPulse(item.productId);
@@ -808,7 +809,89 @@ export default function POSPage() {
     const removeFromCart = (idx: number) => setCart(cart.filter((_, i) => i !== idx));
 
     const updateCartPrice = (idx: number, price: number) => {
-        setCart(cart.map((c, i) => i === idx ? { ...c, unitPrice: price, isManualPrice: true, isTierApplied: false, appliedTierText: undefined, priceTier: 'custom' } : c));
+        setCart(cart.map((c, i) => {
+            if (i !== idx) return c;
+            const stillFreebie = price === 0 ? c.isFreebie : false;
+            return {
+                ...c,
+                unitPrice: price,
+                isManualPrice: true,
+                isFreebie: stillFreebie,
+                isTierApplied: false,
+                appliedTierText: undefined,
+                priceTier: 'custom',
+                points: stillFreebie ? 0 : c.quantity * c.conversionRate * c.pointsPerUnit,
+            };
+        }));
+    };
+
+    const toggleFreebie = (idx: number) => {
+        setCart(prev => prev.map((c, i) => {
+            if (i !== idx) return c;
+            if (c.isFreebie) {
+                const priceRes = resolveItemUnitPrice({
+                    quantity: c.quantity,
+                    basePrice: c.baseUnitPrice,
+                    selectedUnitId: c.selectedUnitId || null,
+                    productUnits: c.productUnits,
+                    priceTiers: c.priceTiers,
+                    productPrices: c.productPrices,
+                    customerGroupId: selectedCustomer?.customerGroup?.id,
+                });
+                return {
+                    ...c,
+                    unitPrice: priceRes.unitPrice,
+                    isTierApplied: priceRes.isTierApplied,
+                    appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${c.selectedUnitName || c.unit}` : undefined,
+                    isManualPrice: false,
+                    isFreebie: false,
+                    points: c.quantity * c.conversionRate * c.pointsPerUnit,
+                };
+            }
+            return {
+                ...c,
+                unitPrice: 0,
+                itemDiscount: 0,
+                points: 0,
+                isManualPrice: true,
+                isFreebie: true,
+                isTierApplied: false,
+                appliedTierText: undefined,
+                priceTier: 'custom',
+            };
+        }));
+    };
+
+    const addFreebieItem = (idx: number) => {
+        setCart(prev => {
+            const source = prev[idx];
+            if (!source || source.isBundle) return prev;
+            const existingFreeIdx = prev.findIndex((c, ci) =>
+                ci !== idx &&
+                c.isFreebie &&
+                c.productId === source.productId &&
+                c.warehouseId === source.warehouseId &&
+                c.selectedUnitId === source.selectedUnitId
+            );
+            if (existingFreeIdx !== -1) {
+                return prev.map((c, ci) => ci === existingFreeIdx ? { ...c, quantity: c.quantity + 1 } : c);
+            }
+            const freeRow: CartItem = {
+                ...source,
+                quantity: 1,
+                unitPrice: 0,
+                itemDiscount: 0,
+                points: 0,
+                isManualPrice: true,
+                isFreebie: true,
+                isTierApplied: false,
+                appliedTierText: undefined,
+                priceTier: 'custom',
+            };
+            const next = [...prev];
+            next.splice(idx + 1, 0, freeRow);
+            return next;
+        });
     };
 
     // updateCartPriceTier removed — price is auto-determined by customer group + unit
@@ -836,13 +919,13 @@ export default function POSPage() {
                     selectedUnitId: '',
                     selectedUnitName: c.unit,
                     conversionRate: 1,
-                    unitPrice: priceRes.unitPrice,
-                    isTierApplied: priceRes.isTierApplied,
-                    appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${c.unit}` : undefined,
-                    isManualPrice: false,
+                    unitPrice: c.isFreebie ? 0 : priceRes.unitPrice,
+                    isTierApplied: c.isFreebie ? false : priceRes.isTierApplied,
+                    appliedTierText: !c.isFreebie && priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${c.unit}` : undefined,
+                    isManualPrice: !!c.isFreebie,
                     availableStock: baseStock,
                     priceTier: 'custom',
-                    points: c.quantity * 1 * c.pointsPerUnit,
+                    points: c.isFreebie ? 0 : c.quantity * 1 * c.pointsPerUnit,
                 };
             }
 
@@ -865,13 +948,13 @@ export default function POSPage() {
                 selectedUnitId: unit.id,
                 selectedUnitName: unit.unitName,
                 conversionRate: convRate,
-                unitPrice: priceRes.unitPrice,
-                isTierApplied: priceRes.isTierApplied,
-                appliedTierText: priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${unit.unitName}` : undefined,
-                isManualPrice: false,
+                unitPrice: c.isFreebie ? 0 : priceRes.unitPrice,
+                isTierApplied: c.isFreebie ? false : priceRes.isTierApplied,
+                appliedTierText: !c.isFreebie && priceRes.appliedTier ? `${priceRes.appliedTier.minQuantity}+ ${unit.unitName}` : undefined,
+                isManualPrice: !!c.isFreebie,
                 availableStock: baseStock,
                 priceTier: 'custom',
-                points: c.quantity * convRate * c.pointsPerUnit,
+                points: c.isFreebie ? 0 : c.quantity * convRate * c.pointsPerUnit,
             };
         }));
     };
@@ -1536,12 +1619,14 @@ export default function POSPage() {
                             <div className="space-y-1.5 lg:space-y-2">
                                 {cart.map((item, idx) => (
                                     <div
-                                        key={item.productId + (item.bundleId || '')}
+                                        key={`${item.productId}-${item.bundleId || ''}-${item.isFreebie ? 'free' : 'paid'}-${idx}`}
                                         className={`rounded-lg lg:rounded-xl transition-all ${pulsingItems.has(item.productId) ? 'animate-cart-pulse' : ''
                                             } ${lastAddedId === item.productId ? 'animate-cart-slide-in' : ''
                                             } ${item.isBundle
                                                 ? 'bg-purple-50 border border-purple-200 p-2.5 lg:p-4 shadow-sm'
-                                                : 'bg-white border border-gray-100 p-2.5 lg:p-4 shadow-sm'
+                                                : item.isFreebie
+                                                    ? 'bg-amber-50/70 border border-amber-200 p-2.5 lg:p-4 shadow-sm'
+                                                    : 'bg-white border border-gray-100 p-2.5 lg:p-4 shadow-sm'
                                             }`}
                                     >
                                         {item.isBundle ? (
@@ -1595,6 +1680,11 @@ export default function POSPage() {
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-1.5 flex-wrap">
                                                             <p className="text-xs lg:text-sm font-semibold text-gray-800 truncate">{item.productName}</p>
+                                                            {(item.isFreebie || item.unitPrice === 0) && (
+                                                                <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-semibold shrink-0">
+                                                                    🎁 ของแถม
+                                                                </span>
+                                                            )}
                                                             {item.isTierApplied && item.appliedTierText && (
                                                                 <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-medium shrink-0">
                                                                     🪜 {item.appliedTierText}
@@ -1627,6 +1717,7 @@ export default function POSPage() {
                                                         <div className="flex items-center gap-0.5">
                                                             <span className="text-gray-400">฿</span>
                                                             <input type="number" value={item.unitPrice}
+                                                                onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
                                                                 onChange={e => updateCartPrice(idx, parseFloat(e.target.value) || 0)}
                                                                 className="w-20 px-1 py-0.5 rounded border border-gray-200 text-[11px] outline-none text-right font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                 step="0.01" min={0}
@@ -1647,19 +1738,64 @@ export default function POSPage() {
                                                     <p className="text-xs lg:text-sm font-bold text-emerald-600 shrink-0 min-w-[60px] lg:min-w-[80px] text-right">{formatCurrency(item.quantity * item.unitPrice)}</p>
                                                     <button onClick={() => removeFromCart(idx)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
                                                 </div>
-                                                {/* Item discount row + stock */}
+                                                {/* Item discount row + freebie actions + stock */}
                                                 <div className="hidden lg:flex items-center gap-2 mt-1">
-                                                    <span className="text-[10px] text-gray-400">ส่วนลด:</span>
-                                                    <input type="number" value={item.itemDiscount || ''}
-                                                        onChange={e => setCart(prev => prev.map((c, ci) => ci === idx ? { ...c, itemDiscount: parseFloat(e.target.value) || 0 } : c))}
-                                                        className="w-20 px-1.5 py-0.5 rounded border border-gray-200 text-xs outline-none text-right"
-                                                        placeholder="0" step="0.01" min={0} />
-                                                    <span className="text-[10px] text-gray-400">บาท</span>
-                                                    <span className="text-[10px] text-gray-400 ml-2">|</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleFreebie(idx)}
+                                                        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${item.isFreebie
+                                                            ? 'bg-amber-500 text-white hover:bg-amber-600'
+                                                            : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                                                            }`}
+                                                        title={item.isFreebie ? 'คลิกเพื่อคืนราคาปกติ' : 'เปลี่ยนรายการนี้เป็นของแถม 0 บาท'}
+                                                    >
+                                                        {item.isFreebie ? '🎁 ของแถม ✕' : '🎁 แถมฟรี'}
+                                                    </button>
+                                                    {!item.isFreebie && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => addFreebieItem(idx)}
+                                                            className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-medium hover:bg-emerald-100 transition-colors"
+                                                            title="เพิ่มบรรทัดของแถมแยกต่างหาก (สำหรับโปรซื้อแถมตัวเดิม)"
+                                                        >
+                                                            +🎁 แถมเพิ่ม
+                                                        </button>
+                                                    )}
+                                                    {!item.isFreebie && (
+                                                        <>
+                                                            <span className="text-[10px] text-gray-300">|</span>
+                                                            <span className="text-[10px] text-gray-400">ส่วนลด:</span>
+                                                            <input type="number" value={item.itemDiscount || ''}
+                                                                onChange={e => setCart(prev => prev.map((c, ci) => ci === idx ? { ...c, itemDiscount: parseFloat(e.target.value) || 0 } : c))}
+                                                                className="w-20 px-1.5 py-0.5 rounded border border-gray-200 text-xs outline-none text-right"
+                                                                placeholder="0" step="0.01" min={0} />
+                                                            <span className="text-[10px] text-gray-400">บาท</span>
+                                                        </>
+                                                    )}
+                                                    <span className="text-[10px] text-gray-300 ml-1">|</span>
                                                     <span className={`text-[10px] font-medium ${(item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) <= 0 ? 'text-red-500' : (item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock) < 10 ? 'text-orange-500' : 'text-gray-500'}`}>📦 คงเหลือ {item.conversionRate > 1 ? Math.floor(item.availableStock / item.conversionRate) : item.availableStock} {item.selectedUnitName}</span>
                                                 </div>
                                                 {/* Mobile-only Row 2: controls */}
                                                 <div className="flex lg:hidden items-center gap-2 mt-1.5 flex-wrap text-[10px]">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleFreebie(idx)}
+                                                        className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${item.isFreebie
+                                                            ? 'bg-amber-500 text-white'
+                                                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                            }`}
+                                                    >
+                                                        {item.isFreebie ? '🎁 ของแถม ✕' : '🎁 แถมฟรี'}
+                                                    </button>
+                                                    {!item.isFreebie && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => addFreebieItem(idx)}
+                                                            className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-medium"
+                                                        >
+                                                            +🎁 แถมเพิ่ม
+                                                        </button>
+                                                    )}
                                                     <select value={item.warehouseId} onChange={e => updateCartWarehouse(idx, e.target.value)}
                                                         className="px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none">
                                                         {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -1683,6 +1819,7 @@ export default function POSPage() {
                                                     <div className="flex items-center gap-0.5">
                                                         <span className="text-gray-400">฿</span>
                                                         <input type="number" value={item.unitPrice}
+                                                            onFocus={e => { const t = e.target; setTimeout(() => t.select(), 0); }}
                                                             onChange={e => updateCartPrice(idx, parseFloat(e.target.value) || 0)}
                                                             className="w-16 px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none text-right font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                             step="0.01" min={0}
@@ -1690,13 +1827,15 @@ export default function POSPage() {
                                                         <span className="text-gray-400">/{item.selectedUnitName}</span>
                                                     </div>
                                                     {/* Mobile item discount */}
-                                                    <div className="flex items-center gap-0.5">
-                                                        <span className="text-gray-400">ลด:</span>
-                                                        <input type="number" value={item.itemDiscount || ''}
-                                                            onChange={e => setCart(prev => prev.map((c, ci) => ci === idx ? { ...c, itemDiscount: parseFloat(e.target.value) || 0 } : c))}
-                                                            className="w-12 px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none text-right"
-                                                            placeholder="0" step="0.01" min={0} />
-                                                    </div>
+                                                    {!item.isFreebie && (
+                                                        <div className="flex items-center gap-0.5">
+                                                            <span className="text-gray-400">ลด:</span>
+                                                            <input type="number" value={item.itemDiscount || ''}
+                                                                onChange={e => setCart(prev => prev.map((c, ci) => ci === idx ? { ...c, itemDiscount: parseFloat(e.target.value) || 0 } : c))}
+                                                                className="w-12 px-1 py-0.5 rounded border border-gray-200 text-[10px] outline-none text-right"
+                                                                placeholder="0" step="0.01" min={0} />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </>
                                         )}

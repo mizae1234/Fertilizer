@@ -26,7 +26,7 @@ interface SaleEditLogData {
 }
 
 interface DebtPaymentData {
-    id: string; amount: string; method: string; note: string | null; bankAccountId?: string | null; paidAt: string;
+    id: string; amount: string; method: string; dueDate?: string | null; note: string | null; bankAccountId?: string | null; paidAt: string;
 }
 
 interface SaleDetail {
@@ -35,13 +35,14 @@ interface SaleDetail {
     customerId: string | null;
     notes: string | null;
     paymentMethod: string | null;
-    payments: { method: string; amount: number; bankAccountId?: string | null }[] | null;
+    payments: { method: string; amount: number; bankAccountId?: string | null; dueDate?: string | null }[] | null;
     creditDueDate: string | null;
     customer: { name: string; phone: string } | null;
     createdBy: { name: string };
     items: {
         id: string; quantity: number; unitPrice: string; totalPrice: string; discount: string; points: number;
         unitName: string | null;
+        conversionRate?: string | number;
         productId: string; warehouseId: string;
         product: { name: string; code: string; unit: string; productUnits: { unitName: string; conversionRate: string }[] };
         warehouse: { name: string };
@@ -58,6 +59,8 @@ interface Warehouse { id: string; name: string; }
 interface Customer { id: string; name: string; phone: string; }
 
 interface EditItem {
+    id?: string;
+    returnedQty?: number;
     productId: string;
     warehouseId: string;
     quantity: number;
@@ -188,6 +191,7 @@ export default function SaleDetailPage() {
     const [showCustomerDropdown, setShowCustomerDropdown] = useState<boolean>(false);
     const [editNotes, setEditNotes] = useState<string>('');
     const [editBillDiscount, setEditBillDiscount] = useState(0);
+    const [editCreditDueDate, setEditCreditDueDate] = useState<string>('');
     const [saving, setSaving] = useState(false);
 
     // Reference data
@@ -213,7 +217,7 @@ export default function SaleDetailPage() {
     }, []);
 
     const fetchSale = useCallback(async () => {
-        const data = await fetch(`/api/sales/${id}`).then(r => r.json());
+        const data = await fetch(`/api/sales/${id}`, { cache: 'no-store' }).then(r => r.json());
         setSale(data);
         setLoading(false);
     }, [id]);
@@ -245,10 +249,11 @@ export default function SaleDetailPage() {
     const startEditing = async () => {
         if (!sale) return;
         const [prods, whs] = await Promise.all([
-            fetch('/api/products').then(r => r.json()),
+            fetch('/api/products?includeInactive=1').then(r => r.json()),
             fetch('/api/warehouses').then(r => r.json()),
         ]);
-        setProducts(prods);
+        const prodList: Product[] = Array.isArray(prods) ? prods : [];
+        setProducts(prodList);
         setWarehouses(whs);
         // Load current sale's customer for display
         setSelectedCustomerId(sale.customerId || '');
@@ -258,37 +263,55 @@ export default function SaleDetailPage() {
             setCustomerSearchText('');
         }
         setEditNotes(sale.notes || '');
+        setEditCreditDueDate(sale.creditDueDate ? new Date(sale.creditDueDate).toISOString().slice(0, 10) : '');
         // Calculate bill-level discount = total discount - sum of item discounts
         const totalDiscount = Number(sale.discount || 0);
         const itemDiscountsSum = sale.items.reduce((s, i) => s + Number(i.discount || 0), 0);
         setEditBillDiscount(Math.max(0, totalDiscount - itemDiscountsSum));
-        setItems(sale.items.map(i => {
-            // Find matching product to get its productUnits
-            const prod = prods.find((p: Product) => p.id === i.productId);
-            const pUnits: ProductUnitInfo[] = prod?.productUnits || [];
-            // Match existing unitName to a productUnit
-            let selectedUnitId = '';
-            let convRate = 1;
-            if (i.unitName && pUnits.length > 0) {
-                const matchedUnit = pUnits.find(u => u.unitName === i.unitName);
-                if (matchedUnit) {
-                    selectedUnitId = matchedUnit.id;
-                    convRate = Number(matchedUnit.conversionRate);
-                }
+
+        // Build already-returned quantities per saleItemId so editing uses net remaining quantities!
+        const returnedMap = new Map<string, number>();
+        for (const sr of sale.saleReturns || []) {
+            for (const ri of sr.items) {
+                returnedMap.set(ri.saleItemId, (returnedMap.get(ri.saleItemId) || 0) + ri.quantity);
             }
-            return {
-                productId: i.productId,
-                warehouseId: i.warehouseId,
-                quantity: i.quantity,
-                unitPrice: Number(i.unitPrice),
-                points: i.points,
-                itemDiscount: Number(i.discount || 0),
-                selectedUnitId,
-                selectedUnitName: i.unitName || prod?.unit || i.product?.unit || '',
-                conversionRate: convRate,
-                productUnits: pUnits,
-            };
-        }));
+        }
+
+        setItems(
+            sale.items
+                .map(i => {
+                    const returnedQty = returnedMap.get(i.id) || 0;
+                    const netQty = Math.max(0, i.quantity - returnedQty);
+                    if (netQty <= 0) return null; // Fully returned items are preserved server-side automatically
+                    const prod = prodList.find((p: Product) => p.id === i.productId);
+                    const pUnits: ProductUnitInfo[] = prod?.productUnits || [];
+                    let selectedUnitId = '';
+                    let convRate = Number(i.conversionRate || 1);
+                    if (i.unitName && pUnits.length > 0) {
+                        const matchedUnit = pUnits.find(u => u.unitName === i.unitName);
+                        if (matchedUnit) {
+                            selectedUnitId = matchedUnit.id;
+                            convRate = Number(matchedUnit.conversionRate);
+                        }
+                    }
+                    const netPoints = i.quantity > 0 ? Math.round((netQty / i.quantity) * i.points) : 0;
+                    return {
+                        id: i.id,
+                        returnedQty,
+                        productId: i.productId,
+                        warehouseId: i.warehouseId,
+                        quantity: netQty,
+                        unitPrice: Number(i.unitPrice),
+                        points: netPoints,
+                        itemDiscount: Number(i.discount || 0),
+                        selectedUnitId,
+                        selectedUnitName: i.unitName || prod?.unit || i.product?.unit || '',
+                        conversionRate: convRate,
+                        productUnits: pUnits,
+                    };
+                })
+                .filter(Boolean) as EditItem[]
+        );
         setIsEditing(true);
     };
 
@@ -374,10 +397,13 @@ export default function SaleDetailPage() {
         if (totalDisc > sub) { showAlert(`ส่วนลดรวม (${totalDisc.toLocaleString()}) เกินยอดสินค้า (${sub.toLocaleString()})`, 'error'); return; }
         setSaving(true);
         try {
+            const isCreditBill = sale?.paymentMethod === 'CREDIT' || sale?.paymentMethod === 'SPLIT' || !!sale?.creditDueDate;
             const updated = await updateSale(id, {
                 customerId: selectedCustomerId || null,
                 notes: editNotes || null,
+                ...(isCreditBill ? { creditDueDate: editCreditDueDate || null } : {}),
                 items: items.map(i => ({
+                    id: i.id,
                     productId: i.productId,
                     warehouseId: i.warehouseId,
                     quantity: i.quantity,
@@ -397,7 +423,6 @@ export default function SaleDetailPage() {
             }
             setIsEditing(false);
             showAlert('บันทึกการแก้ไขเรียบร้อย', 'success', 'สำเร็จ');
-            fetchSale(); // Refresh to get updated logs
         } catch (error) {
             showAlert((error as Error).message, 'error', 'เกิดข้อผิดพลาด');
         } finally { setSaving(false); }
@@ -666,6 +691,17 @@ export default function SaleDetailPage() {
                         <p className="text-sm text-gray-800">{formatDateTime(sale.createdAt)}</p>
                     </div>
                 </div>
+                {isEditing && (sale.paymentMethod === 'CREDIT' || sale.paymentMethod === 'SPLIT' || !!sale.creditDueDate) && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                        <label className="text-xs font-semibold text-orange-600 block mb-1.5">📅 กำหนดชำระเครดิต (เลื่อนวันครบกำหนด)</label>
+                        <input
+                            type="date"
+                            value={editCreditDueDate}
+                            onChange={e => setEditCreditDueDate(e.target.value)}
+                            className="px-3 py-2 rounded-lg border border-orange-200 bg-orange-50/40 text-sm font-medium text-gray-800 focus:ring-2 focus:ring-orange-400 outline-none"
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Items */}
@@ -682,7 +718,14 @@ export default function SaleDetailPage() {
                         {items.map((item, idx) => (
                             <div key={idx} className="p-4 space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium text-gray-400">#{idx + 1}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-medium text-gray-400">#{idx + 1}</span>
+                                        {(item.returnedQty || 0) > 0 && (
+                                            <span className="text-[11px] px-2 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200 font-medium">
+                                                คืนแล้ว {item.returnedQty} (กำลังแก้ไขยอดคงเหลือ)
+                                            </span>
+                                        )}
+                                    </div>
                                     <button onClick={() => removeItem(idx)} className="text-xs text-red-500 hover:underline">ลบ</button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
@@ -949,19 +992,26 @@ export default function SaleDetailPage() {
                                 <div className="space-y-2">
                                     {sale.debtPayments.map(dp => {
                                         const bank = dp.bankAccountId ? bankAccounts.find((a: any) => a.id === dp.bankAccountId) : null;
+                                        const isPostpone = dp.method === 'CREDIT';
                                         return (
-                                            <div key={dp.id} className="flex justify-between items-center text-sm bg-emerald-50 rounded-lg px-3 py-2">
+                                            <div key={dp.id} className={`flex justify-between items-center text-sm rounded-lg px-3 py-2 ${isPostpone ? 'bg-amber-50' : 'bg-emerald-50'}`}>
                                                 <div>
                                                     <span className="text-gray-700 font-medium">
-                                                        {paymentMethodLabels[dp.method] || dp.method}
+                                                        {isPostpone ? '📅 เลื่อนกำหนดชำระ' : (paymentMethodLabels[dp.method] || dp.method)}
                                                         {bank && <span className="text-xs text-gray-500 ml-1.5">({bank.bankName} - {bank.accountNumber})</span>}
                                                     </span>
                                                     <span className="text-xs text-gray-400 ml-2">
                                                         {dp.paidAt ? formatDateTime(dp.paidAt) : '-'}
                                                     </span>
-                                                    {dp.note && <span className="text-xs text-gray-400 ml-2">({dp.note})</span>}
+                                                    {dp.note && <span className="text-xs text-gray-500 ml-2">({dp.note})</span>}
                                                 </div>
-                                                <span className="font-semibold text-emerald-600">+{formatCurrency(Number(dp.amount))}</span>
+                                                {isPostpone ? (
+                                                    <span className="text-xs font-semibold text-amber-700">
+                                                        {dp.dueDate ? `กำหนดใหม่: ${new Date(dp.dueDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'เลื่อนกำหนด'}
+                                                    </span>
+                                                ) : (
+                                                    <span className="font-semibold text-emerald-600">+{formatCurrency(Number(dp.amount))}</span>
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -1107,6 +1157,9 @@ export default function SaleDetailPage() {
                                             )}
                                             {log.changes.discount && (
                                                 <p>ส่วนลด: {formatCurrency(log.changes.discount.old)} → {formatCurrency(log.changes.discount.new)}</p>
+                                            )}
+                                            {log.changes.creditDueDate && (
+                                                <p>กำหนดชำระ: {log.changes.creditDueDate.old || '-'} → {log.changes.creditDueDate.new || '-'}</p>
                                             )}
                                         </div>
                                     )}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { addInterest, payDebt, deleteInterest } from '@/app/actions/debt';
+import { addInterest, payDebt, deleteInterest, postponeDueDate } from '@/app/actions/debt';
 import { useRouter } from 'next/navigation';
 
 const formatCurrency = (n: number) => '฿' + n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -71,11 +71,12 @@ function DebtPaymentModal({ total, loading, onConfirm, onClose }: {
         }).catch(() => { });
     }, []);
 
-    const paid = lines.reduce((s, l) => s + (l.amount || 0), 0);
-    const remaining = total - paid;
+    const paid = lines.filter(l => l.method !== 'CREDIT').reduce((s, l) => s + (l.amount || 0), 0);
+    const remaining = Math.max(0, total - paid);
+    const hasPostponeOnly = lines.some(l => l.method === 'CREDIT' && !!l.dueDate);
     const isValid = lines.every(l =>
-        l.amount > 0 && (l.method !== 'CREDIT' || l.dueDate)
-    ) && paid > 0;
+        (l.method === 'CREDIT' ? (!!l.dueDate && l.amount >= 0) : l.amount > 0)
+    ) && (paid > 0 || hasPostponeOnly);
 
     const updateLine = (idx: number, patch: Partial<typeof lines[0]>) => {
         setLines(lines.map((l, i) => i === idx ? { ...l, ...patch } : l));
@@ -221,6 +222,8 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [showPayment, setShowPayment] = useState(false);
+    const [newDueDate, setNewDueDate] = useState(sale.currentDueDate ? new Date(sale.currentDueDate).toISOString().slice(0, 10) : '');
+    const [postponeNote, setPostponeNote] = useState('');
     const [interestPct, setInterestPct] = useState('');
     const [interestMonths, setInterestMonths] = useState('1');
     const [interestDays, setInterestDays] = useState('0');
@@ -271,6 +274,24 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
         } finally { setLoading(false); }
     };
 
+    const handlePostponeDue = async () => {
+        if (!newDueDate) {
+            setAlert({ open: true, message: 'กรุณาเลือกวันครบกำหนดชำระใหม่', type: 'warning', title: 'ข้อมูลไม่ครบ' });
+            return;
+        }
+        setLoading(true);
+        try {
+            await postponeDueDate(sale.id, newDueDate, postponeNote || undefined);
+            setPostponeNote('');
+            setAlert({ open: true, message: 'เลื่อนวันครบกำหนดชำระเรียบร้อยแล้ว', type: 'success', title: 'สำเร็จ' });
+            router.refresh();
+        } catch (err) {
+            setAlert({ open: true, message: (err as Error).message, type: 'error', title: 'เกิดข้อผิดพลาด' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handlePayDebt = async (payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string }[]) => {
         setLoading(true);
         try {
@@ -296,6 +317,45 @@ export default function OverdueBillClient({ sale }: { sale: SaleData }) {
 
     return (
         <>
+            {/* Postpone Due Date Section */}
+            {!sale.isPaidOff && sale.status !== 'CANCELLED' && (
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-6 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <h2 className="text-sm font-semibold text-gray-700">📅 เลื่อนวันครบกำหนดชำระ</h2>
+                        <span className="text-[11px] text-gray-400">กำหนดปัจจุบัน: {formatDate(sale.currentDueDate)}</span>
+                    </div>
+                    <div className="p-4 flex flex-wrap items-end gap-3">
+                        <div>
+                            <label className="text-xs text-gray-500 block mb-1">กำหนดชำระใหม่ *</label>
+                            <input
+                                type="date"
+                                value={newDueDate}
+                                onChange={e => setNewDueDate(e.target.value)}
+                                className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                            />
+                        </div>
+                        <div className="flex-1 min-w-[200px]">
+                            <label className="text-xs text-gray-500 block mb-1">หมายเหตุการเลื่อน (ถ้ามี)</label>
+                            <input
+                                type="text"
+                                value={postponeNote}
+                                onChange={e => setPostponeNote(e.target.value)}
+                                placeholder="เช่น ลูกค้าขอนัดชำระสิ้นเดือน"
+                                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handlePostponeDue}
+                            disabled={loading || !newDueDate}
+                            className="px-5 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 shrink-0"
+                        >
+                            {loading ? '⏳' : '📅 บันทึกเลื่อนกำหนด'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Interest Section */}
             {!sale.isPaidOff && sale.status !== 'CANCELLED' && (
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-6 overflow-hidden">

@@ -112,11 +112,12 @@ function computeDebtTotals<T extends {
     const totalPaid = initialPaid + debtPaid;
     const remaining = isCancelled ? 0 : Math.max(0, grandTotal - totalPaid);
 
-    // Check current due date (latest credit payment or original)
+    // sale.creditDueDate is always kept up-to-date when postponing or editing the bill;
+    // fallback to latestCreditPayment.dueDate only if creditDueDate was null
     const latestCreditPayment = sale.debtPayments
         .filter(dp => dp.method === 'CREDIT' && dp.dueDate)
         .sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())[0];
-    const currentDueDate = latestCreditPayment?.dueDate || sale.creditDueDate;
+    const currentDueDate = sale.creditDueDate || latestCreditPayment?.dueDate || null;
 
     return {
         ...sale,
@@ -208,6 +209,51 @@ export async function deleteInterest(interestId: string, saleId: string) {
     return { success: true };
 }
 
+export async function postponeDueDate(saleId: string, newDueDate: string, note?: string) {
+    if (!newDueDate) throw new Error('กรุณาระบุวันครบกำหนดชำระใหม่');
+
+    await prisma.$transaction(async (tx) => {
+        const sale = await tx.sale.findUnique({
+            where: { id: saleId },
+            select: { id: true, status: true, payments: true },
+        });
+        if (!sale) throw new Error('ไม่พบบิล');
+        if (sale.status === 'CANCELLED') throw new Error('บิลนี้ถูกยกเลิกแล้ว');
+
+        const dueObj = new Date(newDueDate);
+        let updatedPayments: any[] | undefined;
+        if (sale.payments && Array.isArray(sale.payments)) {
+            updatedPayments = (sale.payments as any[]).map(p =>
+                p.method === 'CREDIT' ? { ...p, dueDate: newDueDate } : p
+            );
+        }
+
+        await tx.sale.update({
+            where: { id: saleId },
+            data: {
+                creditDueDate: dueObj,
+                ...(updatedPayments ? { payments: updatedPayments } : {}),
+            },
+        });
+
+        await tx.debtPayment.create({
+            data: {
+                saleId,
+                amount: 0,
+                method: 'CREDIT',
+                dueDate: dueObj,
+                note: note?.trim() || `เลื่อนกำหนดชำระไปวันที่ ${newDueDate}`,
+            },
+        });
+    });
+
+    revalidatePath(`/overdue-bills/${saleId}`);
+    revalidatePath('/overdue-bills');
+    revalidatePath(`/sales/${saleId}`);
+    revalidatePath('/sales');
+    return { success: true };
+}
+
 export async function payDebt(
     saleId: string,
     payments: { method: string; amount: number; dueDate?: string; bankAccountId?: string; chequeNo?: string }[]
@@ -246,12 +292,21 @@ export async function payDebt(
             })
         ));
 
-        // If CREDIT payment exists, update sale due date
+        // If CREDIT payment exists, update sale due date & payments JSON
         const creditPayment = payments.find(p => p.method === 'CREDIT' && p.dueDate);
         if (creditPayment?.dueDate) {
+            let updatedPaymentsJson: any[] | undefined;
+            if (sale.payments && Array.isArray(sale.payments)) {
+                updatedPaymentsJson = (sale.payments as any[]).map(p =>
+                    p.method === 'CREDIT' ? { ...p, dueDate: creditPayment.dueDate } : p
+                );
+            }
             await tx.sale.update({
                 where: { id: saleId },
-                data: { creditDueDate: new Date(creditPayment.dueDate) },
+                data: {
+                    creditDueDate: new Date(creditPayment.dueDate),
+                    ...(updatedPaymentsJson ? { payments: updatedPaymentsJson } : {}),
+                },
             });
         }
 

@@ -162,11 +162,13 @@ export async function updateSale(id: string, data: {
     customerId?: string | null;
     notes?: string | null;
     billDiscount?: number;
+    creditDueDate?: string | null;
     userId: string;
     items: {
+        id?: string;
         productId: string;
         warehouseId: string;
-        quantity: number;
+        quantity: number; // net remaining quantity (excluding already-returned qty)
         unitPrice: number;
         points: number;
         itemDiscount?: number;
@@ -176,45 +178,93 @@ export async function updateSale(id: string, data: {
 }) {
     const existing = await prisma.sale.findUnique({
         where: { id },
-        include: { items: { include: { product: { select: { name: true, code: true } } } } },
+        include: {
+            items: { include: { product: { select: { name: true, code: true } } } },
+            saleReturns: { include: { items: true } },
+            debtPayments: true,
+            debtInterests: true,
+        },
     });
     if (!existing) throw new Error('ไม่พบรายการขาย');
 
+    // Map already-returned quantity per original SaleItem.id
+    const returnedByItemId = new Map<string, number>();
+    for (const sr of existing.saleReturns || []) {
+        for (const ri of sr.items) {
+            returnedByItemId.set(ri.saleItemId, (returnedByItemId.get(ri.saleItemId) || 0) + ri.quantity);
+        }
+    }
+
+    // data.items.quantity is the net remaining quantity kept by the customer
     const subtotal = Math.round(data.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0) * 100) / 100;
     const itemDiscountsTotal = Math.round(data.items.reduce((s, i) => s + (i.itemDiscount || 0), 0) * 100) / 100;
     const billDiscount = data.billDiscount || 0;
     const totalDiscount = Math.round((itemDiscountsTotal + billDiscount) * 100) / 100;
-    const totalAmount = Math.round((subtotal - totalDiscount) * 100) / 100;
+    const totalAmount = Math.max(0, Math.round((subtotal - totalDiscount) * 100) / 100);
     const totalPoints = data.items.reduce((s, i) => s + i.points, 0);
 
-    // Recalculate payments JSON if totalAmount changed and has credit/split payments
+    // Resolve updated creditDueDate
+    const nextDueDate: Date | null | undefined =
+        data.creditDueDate === undefined
+            ? undefined
+            : data.creditDueDate
+                ? new Date(data.creditDueDate)
+                : null;
+    const effectiveDueDateIso =
+        nextDueDate !== undefined
+            ? (nextDueDate ? nextDueDate.toISOString().slice(0, 10) : undefined)
+            : (existing.creditDueDate ? existing.creditDueDate.toISOString().slice(0, 10) : undefined);
+
+    // Recalculate payments JSON if totalAmount or creditDueDate changed
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let updatedPayments: any[] | undefined;
-    const existingPayments = existing.payments as { method: string; amount: number }[] | null;
-    if (existingPayments && Array.isArray(existingPayments) && totalAmount !== Number(existing.totalAmount)) {
-        const hasCredit = existingPayments.some(p => p.method === 'CREDIT');
-        if (hasCredit) {
-            // Keep non-credit payments as-is, recalculate credit = newTotal - sumOfNonCredit
+    const existingPayments = existing.payments as { method: string; amount: number; dueDate?: string; bankAccountId?: string; chequeNo?: string }[] | null;
+    const hasCreditInPayments = existingPayments && Array.isArray(existingPayments) && existingPayments.some(p => p.method === 'CREDIT');
+
+    if (existingPayments && Array.isArray(existingPayments) && (totalAmount !== Number(existing.totalAmount) || (nextDueDate !== undefined && hasCreditInPayments))) {
+        if (hasCreditInPayments) {
+            const oldCreditEntry = existingPayments.find(p => p.method === 'CREDIT');
             const nonCreditPaid = existingPayments
                 .filter(p => p.method !== 'CREDIT')
                 .reduce((s, p) => s + Number(p.amount), 0);
-            const newCredit = Math.max(0, totalAmount - nonCreditPaid);
+            const newCredit = Math.max(0, Math.round((totalAmount - nonCreditPaid) * 100) / 100);
+            const dueToStore = effectiveDueDateIso || oldCreditEntry?.dueDate;
             updatedPayments = [
                 ...existingPayments.filter(p => p.method !== 'CREDIT'),
-                ...(newCredit > 0 ? [{ method: 'CREDIT', amount: newCredit }] : []),
+                ...(newCredit > 0 ? [{ method: 'CREDIT', amount: newCredit, ...(dueToStore ? { dueDate: dueToStore } : {}) }] : []),
             ];
         } else {
-            // No credit involved — recalculate proportionally or just update
-            // For CASH/TRANSFER-only, set the single payment to match new total
             if (existingPayments.length === 1) {
-                updatedPayments = [{ method: existingPayments[0].method, amount: totalAmount }];
-            } else {
-                // Multiple non-credit payments: adjust last one to cover the difference
+                updatedPayments = [{ ...existingPayments[0], amount: totalAmount }];
+            } else if (existingPayments.length > 1) {
                 const allButLast = existingPayments.slice(0, -1);
                 const sumAllButLast = allButLast.reduce((s, p) => s + Number(p.amount), 0);
-                const lastPayment = { ...existingPayments[existingPayments.length - 1], amount: Math.max(0, totalAmount - sumAllButLast) };
+                const lastPayment = { ...existingPayments[existingPayments.length - 1], amount: Math.max(0, Math.round((totalAmount - sumAllButLast) * 100) / 100) };
                 updatedPayments = [...allButLast, lastPayment];
             }
+        }
+    }
+
+    // Determine if paymentMethod needs to transition between PAID and CREDIT/SPLIT
+    let nextPaymentMethod: string | undefined;
+    if (hasCreditInPayments || existing.paymentMethod === 'CREDIT' || existing.paymentMethod === 'SPLIT' || existing.paymentMethod === 'PAID') {
+        const paymentsForCheck = updatedPayments || existingPayments || [];
+        const initialNonCredit = Array.isArray(paymentsForCheck)
+            ? paymentsForCheck.filter((p: any) => p.method !== 'CREDIT').reduce((s: number, p: any) => s + Number(p.amount), 0)
+            : 0;
+        const debtPaid = (existing.debtPayments || [])
+            .filter(dp => dp.method !== 'CREDIT')
+            .reduce((s, dp) => s + Number(dp.amount), 0);
+        const totalInterest = (existing.debtInterests || []).reduce((s, di) => s + Number(di.amount), 0);
+        const remainingDebt = totalAmount + totalInterest - (initialNonCredit + debtPaid);
+        if (hasCreditInPayments || existing.paymentMethod === 'CREDIT' || existing.paymentMethod === 'SPLIT') {
+            if (remainingDebt <= 0.01) {
+                nextPaymentMethod = 'PAID';
+            } else {
+                nextPaymentMethod = initialNonCredit > 0 ? 'SPLIT' : 'CREDIT';
+            }
+        } else if (existing.paymentMethod === 'PAID' && remainingDebt > 0.01) {
+            nextPaymentMethod = initialNonCredit > 0 ? 'SPLIT' : 'CREDIT';
         }
     }
 
@@ -227,6 +277,13 @@ export async function updateSale(id: string, data: {
     if (data.notes !== undefined && data.notes !== existing.notes) {
         changes.notes = { old: existing.notes, new: data.notes };
     }
+    if (nextDueDate !== undefined) {
+        const oldDue = existing.creditDueDate ? existing.creditDueDate.toISOString().slice(0, 10) : null;
+        const newDue = nextDueDate ? nextDueDate.toISOString().slice(0, 10) : null;
+        if (oldDue !== newDue) {
+            changes.creditDueDate = { old: oldDue, new: newDue };
+        }
+    }
     if (totalAmount !== Number(existing.totalAmount)) {
         changes.totalAmount = { old: Number(existing.totalAmount), new: totalAmount };
     }
@@ -234,14 +291,14 @@ export async function updateSale(id: string, data: {
         changes.discount = { old: Number(existing.discount), new: totalDiscount };
     }
     changes.oldItems = existing.items.map(i => ({
-        product: i.product.name, qty: i.quantity, price: Number(i.unitPrice),
+        product: i.product.name, qty: Math.max(0, i.quantity - (returnedByItemId.get(i.id) || 0)), price: Number(i.unitPrice),
     }));
     changes.newItems = data.items.map(i => ({
         productId: i.productId, qty: i.quantity, price: i.unitPrice,
     }));
 
     await prisma.$transaction(async (tx) => {
-        // If APPROVED, reverse old stock first
+        // If APPROVED, reverse old stock first (gross sold qty, since SALE_RETURN txs stay intact)
         if (existing.status === 'APPROVED') {
             for (const item of existing.items) {
                 const stockToRestore = item.quantity * Number(item.conversionRate || 1);
@@ -265,17 +322,13 @@ export async function updateSale(id: string, data: {
                     },
                 });
             }
-            // Remove old stock transactions
+            // Remove old SALE stock transactions
             await tx.stockTransaction.deleteMany({
                 where: { reference: existing.saleNumber, type: 'SALE' },
             });
         }
 
-        // Delete old items
-        await tx.saleItem.deleteMany({ where: { saleId: id } });
-
-        // Fetch product.cost for each item — product.cost already reflects the user's
-        // configured cost type (avg / last / custom) via updateProductCost
+        // Fetch product.cost for each item
         const productCosts = await Promise.all(
             data.items.map(async (i) => {
                 const product = await tx.product.findUnique({
@@ -286,7 +339,125 @@ export async function updateSale(id: string, data: {
             })
         );
 
-        // Update sale header + create new items
+        const incomingIds = new Set(data.items.map(i => i.id).filter(Boolean) as string[]);
+
+        // Delete removed SaleItems ONLY if they have 0 returned quantity;
+        // if a removed item had prior returns, keep it with quantity = returnedQty so SaleReturnItem.saleItemId stays intact!
+        for (const oldItem of existing.items) {
+            if (!incomingIds.has(oldItem.id)) {
+                const retQty = returnedByItemId.get(oldItem.id) || 0;
+                if (retQty > 0) {
+                    await tx.saleItem.update({
+                        where: { id: oldItem.id },
+                        data: {
+                            quantity: retQty,
+                            totalPrice: Math.round(retQty * Number(oldItem.unitPrice) * 100) / 100,
+                            points: 0,
+                        },
+                    });
+                    if (existing.status === 'APPROVED') {
+                        const stockForReturned = retQty * Number(oldItem.conversionRate || 1);
+                        await tx.productStock.update({
+                            where: { productId_warehouseId: { productId: oldItem.productId, warehouseId: oldItem.warehouseId } },
+                            data: { quantity: { decrement: stockForReturned } },
+                        });
+                        await tx.stockTransaction.create({
+                            data: {
+                                productId: oldItem.productId,
+                                warehouseId: oldItem.warehouseId,
+                                type: 'SALE',
+                                quantity: -stockForReturned,
+                                unitCost: Number(oldItem.unitCost),
+                                reference: existing.saleNumber,
+                                userId: existing.createdById,
+                                notes: `ขายสินค้า ${existing.saleNumber} (แก้ไข - รายการคืนแล้ว)`,
+                            },
+                        });
+                    }
+                } else {
+                    await tx.saleItem.delete({ where: { id: oldItem.id } });
+                }
+            }
+        }
+
+        // Update existing items in-place (preserving SaleItem.id!) and create newly added items
+        for (let idx = 0; idx < data.items.length; idx++) {
+            const i = data.items[idx];
+            const retQty = i.id ? (returnedByItemId.get(i.id) || 0) : 0;
+            const grossQty = i.quantity + retQty;
+            const conv = i.conversionRate || 1;
+            const unitCostVal = parseFloat(productCosts[idx].toFixed(2));
+
+            if (i.id && existing.items.some(old => old.id === i.id)) {
+                await tx.saleItem.update({
+                    where: { id: i.id },
+                    data: {
+                        productId: i.productId,
+                        warehouseId: i.warehouseId,
+                        quantity: grossQty,
+                        unitPrice: i.unitPrice,
+                        unitCost: unitCostVal,
+                        totalPrice: Math.round(grossQty * i.unitPrice * 100) / 100,
+                        discount: i.itemDiscount || 0,
+                        points: i.points,
+                        unitName: i.unitName || null,
+                        conversionRate: conv,
+                    },
+                });
+            } else {
+                await tx.saleItem.create({
+                    data: {
+                        saleId: id,
+                        productId: i.productId,
+                        warehouseId: i.warehouseId,
+                        quantity: grossQty,
+                        unitPrice: i.unitPrice,
+                        unitCost: unitCostVal,
+                        totalPrice: Math.round(grossQty * i.unitPrice * 100) / 100,
+                        discount: i.itemDiscount || 0,
+                        points: i.points,
+                        unitName: i.unitName || null,
+                        conversionRate: conv,
+                    },
+                });
+            }
+
+            if (existing.status === 'APPROVED') {
+                const stockToDeduct = grossQty * conv;
+                const destStock = await tx.productStock.findUnique({
+                    where: { productId_warehouseId: { productId: i.productId, warehouseId: i.warehouseId } },
+                });
+                const currentAvgCost = destStock ? Number(destStock.avgCost) : 0;
+
+                await tx.productStock.upsert({
+                    where: { productId_warehouseId: { productId: i.productId, warehouseId: i.warehouseId } },
+                    update: { 
+                        quantity: { decrement: stockToDeduct },
+                        ...(currentAvgCost === 0 ? { avgCost: unitCostVal } : {})
+                    },
+                    create: {
+                        productId: i.productId,
+                        warehouseId: i.warehouseId,
+                        quantity: -stockToDeduct,
+                        avgCost: unitCostVal,
+                    },
+                });
+                await tx.stockTransaction.create({
+                    data: {
+                        productId: i.productId,
+                        warehouseId: i.warehouseId,
+                        type: 'SALE',
+                        quantity: -stockToDeduct,
+                        unitCost: unitCostVal,
+                        reference: existing.saleNumber,
+                        userId: existing.createdById,
+                        notes: `ขายสินค้า ${existing.saleNumber} (แก้ไข)${conv > 1 ? ` (${grossQty}×${conv} = ${stockToDeduct} base unit)` : ''}`,
+                    },
+                });
+            }
+        }
+
+        // Update sale header
         await tx.sale.update({
             where: { id },
             data: {
@@ -295,62 +466,11 @@ export async function updateSale(id: string, data: {
                 totalAmount,
                 totalPoints,
                 discount: totalDiscount,
+                ...(nextDueDate !== undefined ? { creditDueDate: nextDueDate } : {}),
                 ...(updatedPayments ? { payments: updatedPayments } : {}),
-                items: {
-                    create: data.items.map((i, idx) => ({
-                        productId: i.productId,
-                        warehouseId: i.warehouseId,
-                        quantity: i.quantity,
-                        unitPrice: i.unitPrice,
-                        unitCost: parseFloat(productCosts[idx].toFixed(2)),
-                        totalPrice: Math.round(i.quantity * i.unitPrice * 100) / 100,
-                        discount: i.itemDiscount || 0,
-                        points: i.points,
-                        unitName: i.unitName || null,
-                        conversionRate: i.conversionRate || 1,
-                    })),
-                },
+                ...(nextPaymentMethod ? { paymentMethod: nextPaymentMethod } : {}),
             },
         });
-
-        // If APPROVED, deduct new stock
-        if (existing.status === 'APPROVED') {
-            for (let idx = 0; idx < data.items.length; idx++) {
-                const item = data.items[idx];
-                const stockToDeduct = item.quantity * (item.conversionRate || 1);
-                const costToUse = productCosts[idx];
-                const destStock = await tx.productStock.findUnique({
-                    where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
-                });
-                const currentAvgCost = destStock ? Number(destStock.avgCost) : 0;
-
-                await tx.productStock.upsert({
-                    where: { productId_warehouseId: { productId: item.productId, warehouseId: item.warehouseId } },
-                    update: { 
-                        quantity: { decrement: stockToDeduct },
-                        ...(currentAvgCost === 0 ? { avgCost: costToUse } : {})
-                    },
-                    create: {
-                        productId: item.productId,
-                        warehouseId: item.warehouseId,
-                        quantity: -stockToDeduct,
-                        avgCost: costToUse,
-                    },
-                });
-                await tx.stockTransaction.create({
-                    data: {
-                        productId: item.productId,
-                        warehouseId: item.warehouseId,
-                        type: 'SALE',
-                        quantity: -stockToDeduct,
-                        unitCost: item.unitPrice,
-                        reference: existing.saleNumber,
-                        userId: existing.createdById,
-                        notes: `ขายสินค้า ${existing.saleNumber} (แก้ไข)${(item.conversionRate || 1) > 1 ? ` (${item.quantity}×${item.conversionRate} = ${stockToDeduct} base unit)` : ''}`,
-                    },
-                });
-            }
-        }
 
         // Create audit log
         await tx.saleEditLog.create({
@@ -392,7 +512,7 @@ export async function updateSale(id: string, data: {
                 orderBy: { createdAt: 'desc' },
             },
             debtPayments: {
-                select: { id: true, amount: true, method: true, note: true, paidAt: true },
+                select: { id: true, amount: true, method: true, dueDate: true, note: true, bankAccountId: true, paidAt: true },
                 orderBy: { paidAt: 'desc' },
             },
             debtInterests: {
