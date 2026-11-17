@@ -7,7 +7,7 @@ const statusConfig: Record<StatusType, { label: string; className: string }> = {
     PENDING: { label: 'รออนุมัติ', className: 'bg-orange-100 text-orange-700' },
     APPROVED: { label: 'อนุมัติแล้ว', className: 'bg-emerald-100 text-emerald-700' },
     REJECTED: { label: 'ปฏิเสธ', className: 'bg-red-100 text-red-700' },
-    CANCELLED: { label: 'ยกเลิกบิล', className: 'bg-gray-200 text-gray-500' },
+    CANCELLED: { label: 'ยกเลิกแล้ว', className: 'bg-rose-100 text-rose-700' },
 };
 
 interface StatusBadgeProps {

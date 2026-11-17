@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { updateProductCost } from '@/app/actions/products';
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
+import { formatCurrency, formatDate, formatDateTime, roundQty } from '@/lib/utils';
 import AlertModal from '@/components/AlertModal';
 import { useUser } from '@/hooks/useUser';
 
@@ -75,8 +75,11 @@ interface ProductGoodsReceiveItem {
         receivedDate: string;
         status: string;
         notes: string | null;
+        cancelReason?: string | null;
+        cancelledAt?: string | null;
         vendor: { id: string; name: string };
         createdBy: { name: string };
+        cancelledBy?: { name: string } | null;
     };
     warehouse: { id: string; name: string };
 }
@@ -128,6 +131,7 @@ interface ProductDetail {
 
 const txTypeLabels: Record<string, { label: string; color: string; icon: string }> = {
     GOODS_RECEIVE: { label: 'รับสินค้า', color: 'text-emerald-700 bg-emerald-50', icon: '📥' },
+    GOODS_RECEIVE_CANCEL: { label: 'ยกเลิกรับเข้า', color: 'text-rose-700 bg-rose-50', icon: '❌' },
     SALE: { label: 'ขาย', color: 'text-blue-700 bg-blue-50', icon: '💰' },
     SALE_CANCEL: { label: 'ยกเลิกบิล', color: 'text-rose-700 bg-rose-50', icon: '❌' },
     SALE_RETURN: { label: 'คืนสินค้า', color: 'text-orange-700 bg-orange-50', icon: '📦' },
@@ -1326,18 +1330,25 @@ export default function ProductDetailPage() {
                                                     return { label: 'ปกติ', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
                                                 })();
 
+                                                const isVoided = item.goodsReceive.status === 'CANCELLED' || item.goodsReceive.status === 'REJECTED';
+
                                                 return (
-                                                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                                                    <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors ${isVoided ? 'opacity-65 bg-gray-50/50' : ''}`}>
                                                         <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
                                                             {formatDate(item.goodsReceive.receivedDate)}
                                                         </td>
                                                         <td className="px-4 py-3 font-medium whitespace-nowrap">
                                                             <Link
                                                                 href={`/goods-receive/${item.goodsReceive.id}`}
-                                                                className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-semibold"
+                                                                className={`hover:underline font-mono font-semibold ${isVoided ? 'text-gray-400 line-through' : 'text-emerald-600 hover:text-emerald-700'}`}
                                                             >
                                                                 {item.goodsReceive.grNumber}
                                                             </Link>
+                                                            {item.goodsReceive.status === 'CANCELLED' && item.goodsReceive.cancelReason && (
+                                                                <p className="text-[11px] text-rose-600 mt-0.5 max-w-[200px] truncate" title={item.goodsReceive.cancelReason}>
+                                                                    เหตุผล: {item.goodsReceive.cancelReason}
+                                                                </p>
+                                                            )}
                                                         </td>
                                                         <td className="px-4 py-3 text-gray-600">
                                                             {item.goodsReceive.vendor?.name || '-'}
@@ -1345,11 +1356,11 @@ export default function ProductDetailPage() {
                                                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                                                             {item.warehouse?.name || '-'}
                                                         </td>
-                                                        <td className="px-4 py-3 text-right font-semibold text-gray-800 whitespace-nowrap">
+                                                        <td className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${isVoided ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
                                                             +{item.quantity.toLocaleString()} {product.unit}
                                                         </td>
                                                         {user?.role === 'ADMIN' && (
-                                                            <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                                                            <td className={`px-4 py-3 text-right whitespace-nowrap ${isVoided ? 'text-gray-400 line-through' : 'text-gray-600'}`}>
                                                                 {formatCurrency(Number(item.unitCost))}
                                                             </td>
                                                         )}
@@ -1369,7 +1380,7 @@ export default function ProductDetailPage() {
                                                             {item.expDate ? (
                                                                 <div className="flex flex-col items-start gap-1">
                                                                     <span className="text-gray-700 font-medium">{formatDate(item.expDate)}</span>
-                                                                    {expStatus && (
+                                                                    {expStatus && !isVoided && (
                                                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${expStatus.color}`}>
                                                                             {expStatus.label}
                                                                         </span>
@@ -1392,7 +1403,12 @@ export default function ProductDetailPage() {
                                                             )}
                                                             {item.goodsReceive.status === 'REJECTED' && (
                                                                 <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                                                                    ยกเลิก
+                                                                    ปฏิเสธ
+                                                                </span>
+                                                            )}
+                                                            {item.goodsReceive.status === 'CANCELLED' && (
+                                                                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800">
+                                                                    ยกเลิกแล้ว
                                                                 </span>
                                                             )}
                                                         </td>
@@ -1421,12 +1437,14 @@ export default function ProductDetailPage() {
                                             return { label: 'ปกติ', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
                                         })();
 
+                                        const isVoided = item.goodsReceive.status === 'CANCELLED' || item.goodsReceive.status === 'REJECTED';
+
                                         return (
-                                            <div key={item.id} className="p-4 space-y-2">
+                                            <div key={item.id} className={`p-4 space-y-2 ${isVoided ? 'opacity-65 bg-gray-50/50' : ''}`}>
                                                 <div className="flex items-center justify-between">
                                                     <Link
                                                         href={`/goods-receive/${item.goodsReceive.id}`}
-                                                        className="text-sm font-bold font-mono text-emerald-600 hover:underline"
+                                                        className={`text-sm font-bold font-mono hover:underline ${isVoided ? 'text-gray-400 line-through' : 'text-emerald-600'}`}
                                                     >
                                                         {item.goodsReceive.grNumber}
                                                     </Link>
@@ -1442,13 +1460,21 @@ export default function ProductDetailPage() {
                                                     )}
                                                     {item.goodsReceive.status === 'REJECTED' && (
                                                         <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-800">
-                                                            ยกเลิก
+                                                            ปฏิเสธ
+                                                        </span>
+                                                    )}
+                                                    {item.goodsReceive.status === 'CANCELLED' && (
+                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-800">
+                                                            ยกเลิกแล้ว
                                                         </span>
                                                     )}
                                                 </div>
+                                                {item.goodsReceive.status === 'CANCELLED' && item.goodsReceive.cancelReason && (
+                                                    <p className="text-[11px] text-rose-600">❌ เหตุผลยกเลิก: {item.goodsReceive.cancelReason}</p>
+                                                )}
                                                 <div className="flex justify-between text-xs text-gray-500">
                                                     <span>📅 {formatDate(item.goodsReceive.receivedDate)}</span>
-                                                    <span className="font-semibold text-gray-800">+{item.quantity.toLocaleString()} {product.unit}</span>
+                                                    <span className={`font-semibold ${isVoided ? 'text-gray-400 line-through' : 'text-gray-800'}`}>+{item.quantity.toLocaleString()} {product.unit}</span>
                                                 </div>
                                                 <div className="text-xs text-gray-600 flex justify-between">
                                                     <span>🏢 {item.goodsReceive.vendor?.name || '-'}</span>
@@ -1574,13 +1600,13 @@ export default function ProductDetailPage() {
                                                     if (product.txSumAfterFilterPerWarehouse) {
                                                         Object.entries(product.txSumAfterFilterPerWarehouse).forEach(([whId, qty]) => {
                                                             if (warehouseBalances[whId] !== undefined) {
-                                                                warehouseBalances[whId] -= qty;
+                                                                warehouseBalances[whId] = roundQty(warehouseBalances[whId] - qty);
                                                             }
                                                         });
                                                     }
 
                                                     // Compute accurate starting balance for total:
-                                                    const startingBalance = totalStock - (product.txSumAfterFilter ?? 0);
+                                                    const startingBalance = roundQty(totalStock - (product.txSumAfterFilter ?? 0));
                                                     let balance = startingBalance;
 
                                                     // Maps transaction ID to calculated balances
@@ -1588,8 +1614,8 @@ export default function ProductDetailPage() {
 
                                                     // Traverse from newest to oldest to build chronological balances
                                                     product.stockTransactions.forEach(tx => {
-                                                        const currentTotalBalance = balance;
-                                                        const currentWarehouseBalance = warehouseBalances[tx.warehouseId] ?? 0;
+                                                        const currentTotalBalance = roundQty(balance);
+                                                        const currentWarehouseBalance = roundQty(warehouseBalances[tx.warehouseId] ?? 0);
 
                                                         calculatedBalances[tx.id] = {
                                                             warehouseBalance: currentWarehouseBalance,
@@ -1600,9 +1626,9 @@ export default function ProductDetailPage() {
                                                         const isOut = tx.quantity < 0;
                                                         const absQty = Math.abs(tx.quantity);
 
-                                                        balance = balance + (isOut ? absQty : -absQty);
+                                                        balance = roundQty(balance + (isOut ? absQty : -absQty));
                                                         if (warehouseBalances[tx.warehouseId] !== undefined) {
-                                                            warehouseBalances[tx.warehouseId] = warehouseBalances[tx.warehouseId] + (isOut ? absQty : -absQty);
+                                                            warehouseBalances[tx.warehouseId] = roundQty(warehouseBalances[tx.warehouseId] + (isOut ? absQty : -absQty));
                                                         }
                                                     });
 
@@ -1672,13 +1698,13 @@ export default function ProductDetailPage() {
                                              if (product.txSumAfterFilterPerWarehouse) {
                                                  Object.entries(product.txSumAfterFilterPerWarehouse).forEach(([whId, qty]) => {
                                                      if (warehouseBalances[whId] !== undefined) {
-                                                         warehouseBalances[whId] -= qty;
+                                                         warehouseBalances[whId] = roundQty(warehouseBalances[whId] - qty);
                                                      }
                                                  });
                                              }
 
                                              // Compute accurate starting balance for total:
-                                             const startingBalance = totalStock - (product.txSumAfterFilter ?? 0);
+                                             const startingBalance = roundQty(totalStock - (product.txSumAfterFilter ?? 0));
                                              let balance = startingBalance;
 
                                              // Maps transaction ID to calculated balances
@@ -1686,8 +1712,8 @@ export default function ProductDetailPage() {
 
                                              // Traverse from newest to oldest to build chronological balances
                                              product.stockTransactions.forEach(tx => {
-                                                 const currentTotalBalance = balance;
-                                                 const currentWarehouseBalance = warehouseBalances[tx.warehouseId] ?? 0;
+                                                 const currentTotalBalance = roundQty(balance);
+                                                 const currentWarehouseBalance = roundQty(warehouseBalances[tx.warehouseId] ?? 0);
 
                                                  calculatedBalances[tx.id] = {
                                                      warehouseBalance: currentWarehouseBalance,
@@ -1698,9 +1724,9 @@ export default function ProductDetailPage() {
                                                  const isOut = tx.quantity < 0;
                                                  const absQty = Math.abs(tx.quantity);
 
-                                                 balance = balance + (isOut ? absQty : -absQty);
+                                                 balance = roundQty(balance + (isOut ? absQty : -absQty));
                                                  if (warehouseBalances[tx.warehouseId] !== undefined) {
-                                                     warehouseBalances[tx.warehouseId] = warehouseBalances[tx.warehouseId] + (isOut ? absQty : -absQty);
+                                                     warehouseBalances[tx.warehouseId] = roundQty(warehouseBalances[tx.warehouseId] + (isOut ? absQty : -absQty));
                                                  }
                                              });
 

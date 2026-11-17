@@ -3,8 +3,14 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { generateNumber } from '@/lib/generateNumber';
-import { isServerAdmin, getServerUser } from '@/lib/server-auth';
+import { getServerUser } from '@/lib/server-auth';
 import { roundQty } from '@/lib/utils';
+import {
+    getCancelledGrNumbers,
+    buildActiveReceiveTxWhere,
+    computeWeightedAvgCost,
+    pickLatestReceiveCost,
+} from '@/lib/stock-cost-queries';
 
 async function checkGoodsReceiveAccess(isAdminOnly = false) {
     const user = await getServerUser();
@@ -23,7 +29,7 @@ export async function getGoodsReceives(page = 1, status = '') {
     const perPage = 10;
     const where = {
         deletedAt: null,
-        ...(status ? { status: status as 'PENDING' | 'APPROVED' | 'REJECTED' } : {}),
+        ...(status ? { status: status as 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' } : {}),
     };
 
     const [records, total] = await Promise.all([
@@ -32,6 +38,7 @@ export async function getGoodsReceives(page = 1, status = '') {
             include: {
                 vendor: { select: { name: true } },
                 createdBy: { select: { name: true } },
+                cancelledBy: { select: { name: true } },
                 _count: { select: { items: true } },
             },
             skip: (page - 1) * perPage,
@@ -51,9 +58,20 @@ export async function getGoodsReceiveDetail(id: string) {
         include: {
             vendor: { select: { id: true, name: true, phone: true, lineId: true } },
             createdBy: { select: { name: true } },
+            cancelledBy: { select: { name: true } },
             items: {
                 include: {
-                    product: { select: { name: true, code: true, unit: true, costMethod: true } },
+                    product: {
+                        select: {
+                            name: true,
+                            code: true,
+                            unit: true,
+                            costMethod: true,
+                            productStocks: {
+                                select: { warehouseId: true, quantity: true },
+                            },
+                        },
+                    },
                     warehouse: { select: { name: true } },
                 },
             },
@@ -197,22 +215,34 @@ export async function updateGoodsReceive(id: string, data: {
 }
 
 export async function approveGoodsReceive(id: string, costMethodOverrides?: Record<string, string>) {
-    await checkGoodsReceiveAccess(true);
-    const gr = await prisma.goodsReceive.findUnique({
-        where: { id },
-        include: { items: true },
-    });
+    const adminUser = await checkGoodsReceiveAccess(true);
+    const [gr, dbAdmin] = await Promise.all([
+        prisma.goodsReceive.findUnique({
+            where: { id },
+            include: { items: true },
+        }),
+        prisma.user.findUnique({
+            where: { id: adminUser.userId },
+            select: { id: true },
+        }),
+    ]);
 
+    if (!dbAdmin) {
+        throw new Error('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่');
+    }
     if (!gr || gr.status !== 'PENDING') {
         throw new Error('ไม่สามารถอนุมัติได้');
     }
 
     await prisma.$transaction(async (tx) => {
-        // Update GR status
-        await tx.goodsReceive.update({
-            where: { id },
+        // Update GR status atomically
+        const claimed = await tx.goodsReceive.updateMany({
+            where: { id, status: 'PENDING', deletedAt: null },
             data: { status: 'APPROVED' },
         });
+        if (claimed.count === 0) {
+            throw new Error('สถานะใบรับสินค้าเปลี่ยนแปลงแล้ว กรุณารีเฟรชหน้าจอ');
+        }
 
         // If costMethod overrides provided, apply them to Product records first
         if (costMethodOverrides && Object.keys(costMethodOverrides).length > 0) {
@@ -250,9 +280,11 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                 const oldQty = existing.quantity;
                 const oldCost = Number(existing.avgCost);
                 const totalQty = roundQty(oldQty + newQty);
-                const avgCost = totalQty > 0
-                    ? ((oldQty * oldCost) + (newQty * newCost)) / totalQty
-                    : newCost;
+                const avgCost = oldQty <= 0
+                    ? newCost
+                    : totalQty > 0
+                        ? ((oldQty * oldCost) + (newQty * newCost)) / totalQty
+                        : newCost;
 
                 await tx.productStock.update({
                     where: { id: existing.id },
@@ -283,7 +315,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     unitCost: newCost,
                     reference: gr.grNumber,
                     lotNo: item.lotNo || null,
-                    userId: gr.createdById,
+                    userId: dbAdmin.id,
                     notes: `รับสินค้าจาก GR ${gr.grNumber}`,
                 },
             });
@@ -347,7 +379,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                 await tx.productLog.create({
                     data: {
                         productId,
-                        userId: gr.createdById,
+                        userId: dbAdmin.id,
                         action: 'COST_UPDATE',
                         field: 'cost',
                         oldValue: String(oldCost),
@@ -366,7 +398,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                 await tx.productLog.create({
                     data: {
                         productId,
-                        userId: gr.createdById,
+                        userId: dbAdmin.id,
                         action: 'COST_UPDATE',
                         field: 'cost',
                         oldValue: String(oldCost),
@@ -386,7 +418,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     await tx.productLog.create({
                         data: {
                             productId,
-                            userId: gr.createdById,
+                            userId: dbAdmin.id,
                             action: 'COST_UPDATE',
                             field: 'cost',
                             oldValue: String(oldCost),
@@ -400,22 +432,357 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
     });
 
     revalidatePath('/goods-receive');
+    revalidatePath(`/goods-receive/${id}`);
+    revalidatePath('/products');
+}
+
+export async function cancelGoodsReceive(id: string, reason: string) {
+    const adminUser = await checkGoodsReceiveAccess(true);
+    const cleanReason = (reason || '').trim();
+    if (!cleanReason) {
+        throw new Error('กรุณาระบุเหตุผลการยกเลิกใบรับสินค้า');
+    }
+
+    const dbAdmin = await prisma.user.findUnique({
+        where: { id: adminUser.userId },
+        select: { id: true },
+    });
+    if (!dbAdmin) {
+        throw new Error('ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่');
+    }
+
+    await prisma.$transaction(async (tx) => {
+        const gr = await tx.goodsReceive.findUnique({
+            where: { id },
+            include: { items: true },
+        });
+
+        if (!gr || gr.deletedAt) {
+            throw new Error('ไม่พบรายการใบรับสินค้า');
+        }
+        if (gr.status === 'CANCELLED') {
+            throw new Error('ใบรับสินค้านี้ถูกยกเลิกไปแล้ว');
+        }
+        if (gr.status !== 'APPROVED') {
+            throw new Error('สามารถยกเลิกได้เฉพาะใบรับสินค้าที่อนุมัติแล้วเท่านั้น');
+        }
+
+        // Atomic compare-and-set to prevent concurrent double cancellation
+        const claimed = await tx.goodsReceive.updateMany({
+            where: { id, status: 'APPROVED', deletedAt: null },
+            data: {
+                status: 'CANCELLED',
+                cancelledAt: new Date(),
+                cancelledById: dbAdmin.id,
+                cancelReason: cleanReason,
+            },
+        });
+        if (claimed.count === 0) {
+            throw new Error('สถานะใบรับสินค้าเปลี่ยนแปลงแล้ว กรุณารีเฟรชหน้าจอ');
+        }
+
+        const productIds = [...new Set(gr.items.map(i => i.productId))];
+        const [products, cancelledRefs] = await Promise.all([
+            tx.product.findMany({
+                where: { id: { in: productIds } },
+                select: {
+                    id: true,
+                    cost: true,
+                    costMethod: true,
+                    name: true,
+                    mfgDate: true,
+                    expDate: true,
+                },
+            }),
+            // Includes `gr.grNumber` because status was just updated to 'CANCELLED' above
+            getCancelledGrNumbers(tx, productIds),
+        ]);
+        const productMap = Object.fromEntries(products.map(p => [p.id, p]));
+
+        // Group stock deductions by (productId, warehouseId) so multi-line items in the same GR deduct atomically
+        const whGroups = new Map<
+            string,
+            { productId: string; warehouseId: string; deductQty: number; deductValue: number }
+        >();
+        for (const item of gr.items) {
+            const key = `${item.productId}_${item.warehouseId}`;
+            const itemQty = roundQty(item.quantity);
+            const itemValue = itemQty * Number(item.unitCost);
+            const group = whGroups.get(key);
+            if (group) {
+                group.deductQty = roundQty(group.deductQty + itemQty);
+                group.deductValue += itemValue;
+            } else {
+                whGroups.set(key, {
+                    productId: item.productId,
+                    warehouseId: item.warehouseId,
+                    deductQty: itemQty,
+                    deductValue: itemValue,
+                });
+            }
+        }
+
+        // 1) Deduct ProductStock per (productId, warehouseId) — supports negative balance seamlessly
+        for (const group of whGroups.values()) {
+            const existing = await tx.productStock.findUnique({
+                where: {
+                    productId_warehouseId: {
+                        productId: group.productId,
+                        warehouseId: group.warehouseId,
+                    },
+                },
+            });
+
+            const oldQty = existing ? existing.quantity : 0;
+            const oldAvgCost = existing ? Number(existing.avgCost) : 0;
+            const remainingQty = roundQty(oldQty - group.deductQty);
+
+            const whActiveReceives = await tx.stockTransaction.findMany({
+                where: buildActiveReceiveTxWhere({
+                    productId: group.productId,
+                    warehouseId: group.warehouseId,
+                    cancelledRefs,
+                }),
+                orderBy: { createdAt: 'desc' },
+                select: { quantity: true, unitCost: true, reference: true },
+            });
+
+            const unmixedWhValue = oldQty * oldAvgCost - group.deductValue;
+            let newWhAvgCost: number;
+            if (remainingQty > 0 && oldQty > 0 && unmixedWhValue > 0) {
+                newWhAvgCost = Math.round((unmixedWhValue / remainingQty) * 100) / 100;
+            } else if (whActiveReceives.length > 0) {
+                newWhAvgCost = computeWeightedAvgCost(whActiveReceives);
+            } else {
+                newWhAvgCost = 0;
+            }
+
+            const newWhLastCost = whActiveReceives.length > 0
+                ? pickLatestReceiveCost(whActiveReceives)
+                : 0;
+
+            await tx.productStock.upsert({
+                where: {
+                    productId_warehouseId: {
+                        productId: group.productId,
+                        warehouseId: group.warehouseId,
+                    },
+                },
+                update: {
+                    quantity: remainingQty,
+                    avgCost: newWhAvgCost,
+                    lastCost: newWhLastCost,
+                },
+                create: {
+                    productId: group.productId,
+                    warehouseId: group.warehouseId,
+                    quantity: remainingQty,
+                    avgCost: newWhAvgCost,
+                    lastCost: newWhLastCost,
+                },
+            });
+        }
+
+        // 2) Record 1:1 GOODS_RECEIVE_CANCEL StockTransaction per GR item line
+        for (const item of gr.items) {
+            const qtyToDeduct = roundQty(item.quantity);
+            await tx.stockTransaction.create({
+                data: {
+                    productId: item.productId,
+                    warehouseId: item.warehouseId,
+                    type: 'GOODS_RECEIVE_CANCEL',
+                    quantity: -qtyToDeduct,
+                    unitCost: item.unitCost,
+                    reference: gr.grNumber,
+                    lotNo: item.lotNo || null,
+                    userId: dbAdmin.id,
+                    notes: `ยกเลิกรับสินค้า ${gr.grNumber} (เหตุผล: ${cleanReason})`,
+                },
+            });
+        }
+
+        // 3) Revert Product.cost, mfgDate/expDate, and record ProductLog per unique product
+        for (const productId of productIds) {
+            const prod = productMap[productId];
+            if (!prod) continue;
+
+            const cancelledItemsForProduct = gr.items.filter(i => i.productId === productId);
+            if (cancelledItemsForProduct.length === 0) continue;
+
+            const totalCancelledQty = roundQty(
+                cancelledItemsForProduct.reduce((s, i) => s + roundQty(i.quantity), 0)
+            );
+            const totalCancelledValue = cancelledItemsForProduct.reduce(
+                (s, i) => s + roundQty(i.quantity) * Number(i.unitCost),
+                0
+            );
+
+            const [activeReceives, approvalCostLog, latestCostLog, stockAfterAgg] = await Promise.all([
+                tx.stockTransaction.findMany({
+                    where: buildActiveReceiveTxWhere({ productId, cancelledRefs }),
+                    orderBy: { createdAt: 'desc' },
+                    select: { quantity: true, unitCost: true, reference: true },
+                }),
+                tx.productLog.findFirst({
+                    where: {
+                        productId,
+                        action: 'COST_UPDATE',
+                        field: 'cost',
+                        details: { contains: `(GR ${gr.grNumber})` },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                }),
+                tx.productLog.findFirst({
+                    where: { productId, action: 'COST_UPDATE', field: 'cost' },
+                    orderBy: { createdAt: 'desc' },
+                }),
+                tx.productStock.aggregate({
+                    where: { productId },
+                    _sum: { quantity: true },
+                }),
+            ]);
+
+            const oldCost = Number(prod.cost);
+            const wasLatestCostFromThisGr =
+                approvalCostLog !== null &&
+                latestCostLog?.id === approvalCostLog.id &&
+                approvalCostLog.oldValue !== null;
+
+            let revertedCost = oldCost;
+            if (wasLatestCostFromThisGr) {
+                const parsedPrior = Number(approvalCostLog.oldValue);
+                if (Number.isFinite(parsedPrior) && parsedPrior >= 0) {
+                    revertedCost = Math.round(parsedPrior * 100) / 100;
+                }
+            } else {
+                const method = prod.costMethod || 'MANUAL';
+                if (method === 'LAST') {
+                    revertedCost = activeReceives.length > 0
+                        ? pickLatestReceiveCost(activeReceives)
+                        : oldCost;
+                } else if (method === 'AVG') {
+                    const stockAfter = roundQty(stockAfterAgg._sum.quantity ?? 0);
+                    const stockBeforeCancel = roundQty(stockAfter + totalCancelledQty);
+                    const unmixedValue = stockBeforeCancel * oldCost - totalCancelledValue;
+                    if (stockAfter > 0 && stockBeforeCancel > 0 && unmixedValue > 0) {
+                        revertedCost = Math.round((unmixedValue / stockAfter) * 100) / 100;
+                    } else if (activeReceives.length > 0) {
+                        revertedCost = computeWeightedAvgCost(activeReceives);
+                    }
+                }
+            }
+
+            // Revert mfgDate / expDate if this GR had set them
+            const hadMfgInCancelledGr = cancelledItemsForProduct.some(i => i.mfgDate !== null);
+            const hadExpInCancelledGr = cancelledItemsForProduct.some(i => i.expDate !== null);
+            const productUpdates: Record<string, unknown> = {};
+
+            if (revertedCost !== oldCost) {
+                productUpdates.cost = revertedCost;
+            }
+
+            if (hadMfgInCancelledGr) {
+                const latestMfgItem = await tx.goodsReceiveItem.findFirst({
+                    where: {
+                        productId,
+                        mfgDate: { not: null },
+                        goodsReceive: { status: 'APPROVED', deletedAt: null },
+                    },
+                    orderBy: [
+                        { goodsReceive: { receivedDate: 'desc' } },
+                        { goodsReceive: { createdAt: 'desc' } },
+                    ],
+                    select: { mfgDate: true },
+                });
+                productUpdates.mfgDate = latestMfgItem?.mfgDate ?? null;
+            }
+
+            if (hadExpInCancelledGr) {
+                const latestExpItem = await tx.goodsReceiveItem.findFirst({
+                    where: {
+                        productId,
+                        expDate: { not: null },
+                        goodsReceive: { status: 'APPROVED', deletedAt: null },
+                    },
+                    orderBy: [
+                        { goodsReceive: { receivedDate: 'desc' } },
+                        { goodsReceive: { createdAt: 'desc' } },
+                    ],
+                    select: { expDate: true },
+                });
+                productUpdates.expDate = latestExpItem?.expDate ?? null;
+            }
+
+            if (Object.keys(productUpdates).length > 0) {
+                await tx.product.update({
+                    where: { id: productId },
+                    data: productUpdates,
+                });
+            }
+
+            if (revertedCost !== oldCost) {
+                await tx.productLog.create({
+                    data: {
+                        productId,
+                        userId: dbAdmin.id,
+                        action: 'COST_UPDATE',
+                        field: 'cost',
+                        oldValue: String(oldCost),
+                        newValue: String(revertedCost),
+                        details: `ปรับต้นทุนกลับจากการยกเลิกใบรับสินค้า ${gr.grNumber} จาก ฿${oldCost} → ฿${revertedCost} (หักสต็อกคืน -${totalCancelledQty}) เหตุผล: ${cleanReason}`,
+                    },
+                });
+            }
+
+            // If a warehouse's ProductStock had no remaining active receives, align its fallback avgCost with revertedCost
+            for (const group of whGroups.values()) {
+                if (group.productId !== productId) continue;
+                const ps = await tx.productStock.findUnique({
+                    where: {
+                        productId_warehouseId: {
+                            productId: group.productId,
+                            warehouseId: group.warehouseId,
+                        },
+                    },
+                });
+                if (ps && Number(ps.avgCost) === 0 && revertedCost > 0) {
+                    await tx.productStock.update({
+                        where: { id: ps.id },
+                        data: { avgCost: revertedCost },
+                    });
+                }
+            }
+        }
+    });
+
+    revalidatePath('/goods-receive');
+    revalidatePath(`/goods-receive/${id}`);
+    revalidatePath('/products');
+
+    return getGoodsReceiveDetail(id);
 }
 
 export async function rejectGoodsReceive(id: string) {
     await checkGoodsReceiveAccess(true);
+    const existing = await prisma.goodsReceive.findUnique({ where: { id } });
+    if (!existing || existing.status !== 'PENDING') {
+        throw new Error('สามารถปฏิเสธได้เฉพาะรายการที่รออนุมัติเท่านั้น');
+    }
     await prisma.goodsReceive.update({
         where: { id },
         data: { status: 'REJECTED' },
     });
     revalidatePath('/goods-receive');
+    revalidatePath(`/goods-receive/${id}`);
 }
 
 export async function deleteGoodsReceive(id: string) {
     await checkGoodsReceiveAccess(false);
     const gr = await prisma.goodsReceive.findUnique({ where: { id } });
     if (!gr) throw new Error('ไม่พบรายการ');
-    if (gr.status === 'APPROVED') throw new Error('ไม่สามารถลบรายการที่อนุมัติแล้วได้');
+    if (gr.status === 'APPROVED' || gr.status === 'CANCELLED') {
+        throw new Error('ไม่สามารถลบรายการที่อนุมัติหรือยกเลิกแล้วได้');
+    }
 
     await prisma.goodsReceive.update({
         where: { id },
@@ -433,6 +800,9 @@ export async function updateGoodsReceivePayment(id: string, data: {
     await checkGoodsReceiveAccess(true);
     const gr = await prisma.goodsReceive.findUnique({ where: { id } });
     if (!gr) throw new Error('ไม่พบรายการ');
+    if (gr.status === 'CANCELLED') {
+        throw new Error('ไม่สามารถแก้ไขสถานะการจ่ายเงินของรายการที่ยกเลิกแล้วได้');
+    }
 
     await prisma.goodsReceive.update({
         where: { id },

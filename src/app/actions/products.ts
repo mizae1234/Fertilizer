@@ -3,6 +3,12 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getServerUser } from '@/lib/server-auth';
+import {
+    getCancelledGrNumbers,
+    buildActiveReceiveTxWhere,
+    computeWeightedAvgCost,
+    pickLatestReceiveCost,
+} from '@/lib/stock-cost-queries';
 
 export async function getProducts(page = 1, search = '') {
     const perPage = 10;
@@ -293,26 +299,21 @@ export async function updateProductCost(
 ) {
     let newCost: number;
     if (costType === 'avg') {
-        // Weighted average from ALL GOODS_RECEIVE StockTransactions
+        const cancelledRefs = await getCancelledGrNumbers(prisma, [productId]);
         const receives = await prisma.stockTransaction.findMany({
-            where: { productId, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
+            where: buildActiveReceiveTxWhere({ productId, cancelledRefs }),
             select: { quantity: true, unitCost: true },
         });
-        if (receives.length > 0) {
-            const totalQty = receives.reduce((s, r) => s + r.quantity, 0);
-            const totalCost = receives.reduce((s, r) => s + r.quantity * Number(r.unitCost), 0);
-            newCost = totalQty > 0 ? totalCost / totalQty : 0;
-        } else {
-            newCost = 0;
-        }
+        newCost = computeWeightedAvgCost(receives);
     } else if (costType === 'last') {
-        // Most recent GOODS_RECEIVE unitCost
-        const lastReceive = await prisma.stockTransaction.findFirst({
-            where: { productId, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
+        const cancelledRefs = await getCancelledGrNumbers(prisma, [productId]);
+        const recentReceives = await prisma.stockTransaction.findMany({
+            where: buildActiveReceiveTxWhere({ productId, cancelledRefs }),
             orderBy: { createdAt: 'desc' },
-            select: { unitCost: true },
+            take: 10,
+            select: { unitCost: true, reference: true },
         });
-        newCost = lastReceive ? Number(lastReceive.unitCost) : 0;
+        newCost = pickLatestReceiveCost(recentReceives);
     } else {
         if (customCost === undefined || customCost < 0) throw new Error('กรุณาระบุต้นทุนที่ถูกต้อง');
         newCost = customCost;

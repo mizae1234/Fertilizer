@@ -55,6 +55,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
             include: {
                 vendor: { select: { name: true } },
                 createdBy: { select: { name: true } },
+                cancelledBy: { select: { name: true } },
                 _count: { select: { items: true } },
             },
             skip: (page - 1) * perPage,
@@ -90,7 +91,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                 <div className="flex flex-wrap items-end gap-3">
                     {/* Status Filter */}
                     <div className="flex flex-wrap gap-2">
-                        {[{ v: '', l: 'ทั้งหมด' }, { v: 'PENDING', l: 'รอตรวจสอบ' }, { v: 'APPROVED', l: 'รับแล้ว' }, { v: 'REJECTED', l: 'ปฏิเสธ' }].map(f => (
+                        {[{ v: '', l: 'ทั้งหมด' }, { v: 'PENDING', l: 'รอตรวจสอบ' }, { v: 'APPROVED', l: 'รับแล้ว' }, { v: 'REJECTED', l: 'ปฏิเสธ' }, { v: 'CANCELLED', l: 'ยกเลิกแล้ว' }].map(f => (
                             <Link key={f.v} href={buildUrl({ status: f.v, page: '1' })}
                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium ${status === f.v || (!status && !f.v) ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                                 {f.l}
@@ -131,19 +132,27 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                         {records.length === 0 ? (
                             <tr><td colSpan={isAdmin ? 9 : 6} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
                         ) : (
-                            records.map(gr => (
-                                <tr key={gr.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3"><Link href={`/goods-receive/${gr.id}`} className="text-sm font-medium text-emerald-600 hover:underline">{gr.grNumber}</Link></td>
+                            records.map(gr => {
+                                const isCancelled = gr.status === 'CANCELLED';
+                                return (
+                                <tr key={gr.id} className={`hover:bg-gray-50 ${isCancelled ? 'bg-gray-50/60' : ''}`}>
+                                    <td className="px-4 py-3">
+                                        <Link href={`/goods-receive/${gr.id}`} className={`text-sm font-medium hover:underline ${isCancelled ? 'text-gray-400 line-through' : 'text-emerald-600'}`}>{gr.grNumber}</Link>
+                                        {isCancelled && gr.cancelReason && (
+                                            <p className="text-[11px] text-rose-500 mt-0.5 truncate max-w-[180px]" title={gr.cancelReason}>เหตุผล: {gr.cancelReason}</p>
+                                        )}
+                                    </td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{gr.poNumber || '-'}</td>
                                     <td className="px-4 py-3 text-sm text-gray-800">{gr.vendor.name}</td>
                                     <td className="px-4 py-3 text-sm text-gray-600">{gr._count.items} รายการ</td>
-                                    {isAdmin && <td className="px-4 py-3 text-sm font-semibold text-gray-800">{formatCurrency(Number(gr.totalAmount))}</td>}
+                                    {isAdmin && <td className={`px-4 py-3 text-sm font-semibold ${isCancelled ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{formatCurrency(Number(gr.totalAmount))}</td>}
                                     <td className="px-4 py-3"><StatusBadge status={gr.status} /></td>
                                     {isAdmin && <td className="px-4 py-3 text-center text-sm">{gr.goodsPaid ? <span className="text-emerald-500" title="จ่ายแล้ว">✅</span> : <span className="text-gray-300" title="ยังไม่จ่าย">⬜</span>}</td>}
                                     {isAdmin && <td className="px-4 py-3 text-center text-sm">{gr.shippingPaid ? <span className="text-emerald-500" title={`จ่ายแล้ว ฿${Number(gr.shippingCost).toLocaleString()}`}>✅</span> : <span className="text-gray-300" title="ยังไม่จ่าย">⬜</span>}</td>}
                                     <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(gr.createdAt)}</td>
                                 </tr>
-                            ))
+                                );
+                            })
                         )}
                     </tbody>
                 </table>
@@ -158,20 +167,25 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                 {records.length === 0 ? (
                     <div className="text-center py-12 text-gray-400 bg-white rounded-xl shadow-md border border-gray-100">ไม่พบรายการ</div>
                 ) : (
-                    records.map(gr => (
+                    records.map(gr => {
+                        const isCancelled = gr.status === 'CANCELLED';
+                        return (
                         <Link key={gr.id} href={`/goods-receive/${gr.id}`}
-                            className="block bg-white rounded-xl shadow-md border border-gray-100 p-4 hover:shadow-lg transition-shadow">
+                            className={`block bg-white rounded-xl shadow-md border border-gray-100 p-4 hover:shadow-lg transition-shadow ${isCancelled ? 'opacity-75' : ''}`}>
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-semibold text-emerald-600">{gr.grNumber}</span>
+                                <span className={`text-sm font-semibold ${isCancelled ? 'text-gray-400 line-through' : 'text-emerald-600'}`}>{gr.grNumber}</span>
                                 <StatusBadge status={gr.status} />
                             </div>
                             <p className="text-sm font-medium text-gray-800 mb-1">{gr.vendor.name}</p>
                             {gr.poNumber && <p className="text-xs text-gray-500 mb-1">PO: {gr.poNumber}</p>}
                             <div className="flex items-center justify-between text-xs text-gray-500">
                                 <span>{gr._count.items} รายการ · {gr.createdBy.name}</span>
-                                {isAdmin && <span className="font-semibold text-gray-800 text-sm">{formatCurrency(Number(gr.totalAmount))}</span>}
+                                {isAdmin && <span className={`font-semibold text-sm ${isCancelled ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{formatCurrency(Number(gr.totalAmount))}</span>}
                             </div>
                             {gr.notes && <p className="text-xs text-gray-400 mt-1">📝 {gr.notes}</p>}
+                            {isCancelled && gr.cancelReason && (
+                                <p className="text-xs text-rose-600 mt-1">❌ ยกเลิก: {gr.cancelReason}</p>
+                            )}
                             {isAdmin && (
                                 <div className="flex items-center gap-3 mt-2 text-xs">
                                     <span className={gr.goodsPaid ? 'text-emerald-600' : 'text-gray-400'}>ค่าสินค้า: {gr.goodsPaid ? '✅' : '⬜'}</span>
@@ -180,7 +194,8 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                             )}
                             <p className="text-xs text-gray-400 mt-1">{formatDateTime(gr.createdAt)}</p>
                         </Link>
-                    ))
+                        );
+                    })
                 )}
                 {totalPages > 1 && (
                     <Pagination page={page} totalPages={totalPages} basePath="/goods-receive" params={{ status, from, to, search: searchQuery }} />

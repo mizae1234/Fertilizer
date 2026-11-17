@@ -28,7 +28,16 @@ export default async function VendorsPage({ searchParams }: Props) {
         prisma.vendor.findMany({
             where,
             include: {
-                _count: { select: { goodsReceives: true } },
+                _count: {
+                    select: {
+                        goodsReceives: {
+                            where: {
+                                deletedAt: null,
+                                status: { notIn: ['CANCELLED', 'REJECTED'] },
+                            },
+                        },
+                    },
+                },
             },
             skip: (page - 1) * perPage,
             take: perPage,

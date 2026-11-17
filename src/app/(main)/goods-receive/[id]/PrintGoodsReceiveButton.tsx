@@ -8,12 +8,16 @@ interface GoodsReceiveData {
     id: string;
     grNumber: string;
     poNumber: string | null;
+    status: string;
     receivedDate: string;
     createdAt: string;
+    cancelledAt?: string | null;
+    cancelReason?: string | null;
     totalAmount: number | string;
     notes: string | null;
     vendor: { name: string; phone: string | null; lineId: string | null };
     createdBy: { name: string };
+    cancelledBy?: { name: string } | null;
     items: {
         id: string;
         quantity: number;
@@ -73,7 +77,19 @@ export default function PrintGoodsReceiveButton({ id }: { id: string }) {
     ${logoUrl ? `<div style="text-align:center;margin-bottom:8px;"><img src="${logoUrl}" style="max-height:60px;max-width:200px;object-fit:contain;display:block;margin:0 auto;" /></div>` : ''}
     ${shopInfo?.name ? `<div style="text-align:center;font-size:14px;font-weight:700;margin-bottom:2px;">${shopInfo.name}</div>` : ''}
     ${shopInfo?.address ? `<div style="text-align:center;font-size:10px;color:#666;margin-bottom:6px;">${shopInfo.address}</div>` : ''}
-    <h1 style="text-align:center;font-size:18px;margin-bottom:8px;font-weight:700;border-top:1px solid #e5e7eb;padding-top:8px;">ใบรับสินค้า (Goods Receive)</h1>
+    <h1 style="text-align:center;font-size:18px;margin-bottom:8px;font-weight:700;border-top:1px solid #e5e7eb;padding-top:8px;">
+        ใบรับสินค้า (Goods Receive)
+        ${data.status === 'CANCELLED' ? `<span style="display:inline-block;margin-left:8px;padding:2px 8px;border-radius:4px;background:#fee2e2;color:#b91c1c;font-size:12px;vertical-align:middle;">ยกเลิกแล้ว</span>` : ''}
+    </h1>
+
+    ${data.status === 'CANCELLED' ? `
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#991b1b;">
+        <strong>เอกสารนี้ถูกยกเลิกและหักสต็อกคืนแล้ว</strong>
+        ${data.cancelledBy?.name ? ` • โดย: ${data.cancelledBy.name}` : ''}
+        ${data.cancelledAt ? ` • เมื่อ: ${new Date(data.cancelledAt).toLocaleString('th-TH')}` : ''}
+        ${data.cancelReason ? `<div style="margin-top:3px;"><strong>เหตุผล:</strong> ${data.cancelReason}</div>` : ''}
+    </div>
+    ` : ''}
 
     <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
         <div style="font-size:12px;">

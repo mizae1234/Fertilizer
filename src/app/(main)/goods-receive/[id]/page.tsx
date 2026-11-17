@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { updateGoodsReceive, approveGoodsReceive, rejectGoodsReceive, deleteGoodsReceive, updateGoodsReceivePayment } from '@/app/actions/goods-receive';
+import { updateGoodsReceive, approveGoodsReceive, rejectGoodsReceive, deleteGoodsReceive, updateGoodsReceivePayment, cancelGoodsReceive } from '@/app/actions/goods-receive';
 import StatusBadge from '@/components/StatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import AlertModal from '@/components/AlertModal';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, formatDateTime, roundQty } from '@/lib/utils';
 import { useUser } from '@/hooks/useUser';
 import PrintGoodsReceiveButton from './PrintGoodsReceiveButton';
 
@@ -39,11 +39,14 @@ interface GRDetail {
     notes: string | null;
     receivedDate: string;
     createdAt: string;
+    cancelledAt?: string | null;
+    cancelReason?: string | null;
     goodsPaid: boolean;
     shippingPaid: boolean;
     shippingCost: number | string;
     vendor: Vendor;
     createdBy: { name: string };
+    cancelledBy?: { name: string } | null;
     items: {
         id: string;
         productId: string;
@@ -54,7 +57,13 @@ interface GRDetail {
         lotNo: string | null;
         mfgDate?: string | null;
         expDate?: string | null;
-        product: { name: string; code: string; unit: string; costMethod?: string | null };
+        product: {
+            name: string;
+            code: string;
+            unit: string;
+            costMethod?: string | null;
+            productStocks?: { warehouseId: string; quantity: number }[];
+        };
         warehouse: { name: string };
     }[];
 }
@@ -184,6 +193,8 @@ export default function GoodsReceiveDetailPage() {
     const [costMethodOverrides, setCostMethodOverrides] = useState<Record<string, string>>({});
     const [showReject, setShowReject] = useState(false);
     const [showDelete, setShowDelete] = useState(false);
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; type: 'success' | 'error' | 'warning'; title?: string }>({ open: false, message: '', type: 'error' });
 
     const showAlert = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'error', title?: string) => {
@@ -191,6 +202,7 @@ export default function GoodsReceiveDetailPage() {
     }, []);
 
     const isPending = gr?.status === 'PENDING';
+    const isCancelled = gr?.status === 'CANCELLED';
 
     // Fetch GR data
     useEffect(() => {
@@ -359,6 +371,29 @@ export default function GoodsReceiveDetailPage() {
         }
     };
 
+    // Cancel approved GR & reverse stock
+    const handleCancelApproved = async () => {
+        const clean = cancelReason.trim();
+        if (!clean) {
+            showAlert('กรุณาระบุเหตุผลการยกเลิกใบรับสินค้า', 'warning', 'ข้อมูลไม่ครบ');
+            return;
+        }
+        setActionLoading('cancel');
+        try {
+            const updated = await cancelGoodsReceive(id, clean);
+            if (updated) {
+                setGr(JSON.parse(JSON.stringify(updated)));
+            }
+            setShowCancelModal(false);
+            setCancelReason('');
+            showAlert('ยกเลิกใบรับสินค้าและหักสต็อกคืนเรียบร้อยแล้ว', 'success', 'ยกเลิกสำเร็จ');
+        } catch (error) {
+            showAlert((error as Error).message || 'ไม่สามารถยกเลิกใบรับสินค้าได้', 'error', 'เกิดข้อผิดพลาด');
+        } finally {
+            setActionLoading('');
+        }
+    };
+
     useEffect(() => {
         if (user) {
             const hasAccess = user.role === 'ADMIN' || user.allowedMenus?.includes('/goods-receive');
@@ -383,26 +418,96 @@ export default function GoodsReceiveDetailPage() {
 
     const selectedVendor = vendors.find(v => v.id === vendorId) || gr.vendor;
 
+    const cancelStockPreview = (() => {
+        const map = new Map<string, {
+            key: string;
+            productCode: string;
+            productName: string;
+            unit: string;
+            warehouseName: string;
+            currentQty: number;
+            deductQty: number;
+            afterQty: number;
+        }>();
+        for (const item of gr.items) {
+            const key = `${item.productId}_${item.warehouseId}`;
+            const itemQty = roundQty(item.quantity);
+            const existing = map.get(key);
+            if (existing) {
+                existing.deductQty = roundQty(existing.deductQty + itemQty);
+                existing.afterQty = roundQty(existing.currentQty - existing.deductQty);
+            } else {
+                const stockEntry = item.product.productStocks?.find(ps => ps.warehouseId === item.warehouseId);
+                const currentQty = roundQty(stockEntry?.quantity ?? 0);
+                map.set(key, {
+                    key,
+                    productCode: item.product.code,
+                    productName: item.product.name,
+                    unit: item.product.unit,
+                    warehouseName: item.warehouse.name,
+                    currentQty,
+                    deductQty: itemQty,
+                    afterQty: roundQty(currentQty - itemQty),
+                });
+            }
+        }
+        return Array.from(map.values());
+    })();
+    const hasNegativeAfterCancel = cancelStockPreview.some(p => p.afterQty < 0);
+
     return (
         <div className="animate-fade-in max-w-7xl mx-auto">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 relative z-30">
                 <div>
                     <div className="flex items-center gap-2">
-                        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{gr.grNumber}</h1>
+                        <h1 className={`text-xl sm:text-2xl font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{gr.grNumber}</h1>
                         <StatusBadge status={gr.status} />
                     </div>
                     <p className="text-xs sm:text-sm text-gray-500 mt-1">
                         สร้างโดย {gr.createdBy.name} • {formatDate(gr.createdAt)}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {gr.status === 'APPROVED' && user?.role === 'ADMIN' && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setCancelReason('');
+                                setShowCancelModal(true);
+                            }}
+                            disabled={actionLoading !== ''}
+                            className="px-4 py-2 rounded-lg bg-red-50 text-red-600 border border-red-200 text-sm font-medium hover:bg-red-100 disabled:opacity-50 transition-colors"
+                        >
+                            ❌ ยกเลิกใบรับสินค้า
+                        </button>
+                    )}
                     <PrintGoodsReceiveButton id={id} />
                     <button onClick={() => router.push('/goods-receive')} className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
                         ← กลับ
                     </button>
                 </div>
             </div>
+
+            {/* Cancellation Audit Log Banner */}
+            {isCancelled && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 sm:p-5 mb-4 sm:mb-6 flex items-start gap-3">
+                    <span className="text-2xl leading-none mt-0.5">🚫</span>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-red-700">ใบรับสินค้านี้ถูกยกเลิกและหักสต็อกคืนออกจากคลังแล้ว</p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-red-600 mt-1">
+                            {gr.cancelledBy?.name && <span>ผู้ยกเลิก: <strong>{gr.cancelledBy.name}</strong></span>}
+                            {gr.cancelledAt && <span>เวลาที่ยกเลิก: <strong>{formatDateTime(gr.cancelledAt)}</strong></span>}
+                        </div>
+                        {gr.cancelReason && (
+                            <div className="mt-2 px-3 py-2 rounded-lg bg-white/80 border border-red-100 text-xs text-gray-700">
+                                <span className="font-semibold text-red-700">เหตุผลการยกเลิก: </span>
+                                {gr.cancelReason}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Vendor & Header Info */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6 relative z-20">
@@ -717,13 +822,13 @@ export default function GoodsReceiveDetailPage() {
                 {user?.role === 'ADMIN' && (
                     <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-3 flex justify-between items-center rounded-b-xl">
                         <span className="text-sm font-semibold text-gray-600">มูลค่ารวม</span>
-                        <span className="text-lg font-bold text-emerald-600">{formatCurrency(isPending ? total : Number(gr.totalAmount))}</span>
+                        <span className={`text-lg font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-emerald-600'}`}>{formatCurrency(isPending ? total : Number(gr.totalAmount))}</span>
                     </div>
                 )}
             </div>
 
             {/* Payment Tracking */}
-            {user?.role === 'ADMIN' && (
+            {user?.role === 'ADMIN' && !isCancelled && (
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-semibold text-gray-700">💰 สถานะการจ่ายเงิน</h2>
@@ -824,8 +929,8 @@ export default function GoodsReceiveDetailPage() {
                 </div>
             )}
 
-            {/* Delete button - only visible if not approved */}
-            {gr.status !== 'APPROVED' && (
+            {/* Delete button - only visible if pending or rejected (never approved or cancelled) */}
+            {gr.status !== 'APPROVED' && gr.status !== 'CANCELLED' && (
             <div className="mt-4">
                 <button
                     onClick={() => setShowDelete(true)}
@@ -835,6 +940,106 @@ export default function GoodsReceiveDetailPage() {
                     {actionLoading === 'delete' ? 'กำลังลบ...' : '🗑️ ลบรายการ'}
                 </button>
             </div>
+            )}
+
+            {/* Cancel Approved GR Modal */}
+            {showCancelModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-fade-in">
+                        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-red-50/60">
+                            <div>
+                                <h3 className="text-base font-bold text-red-700">❌ ยกเลิกใบรับสินค้า {gr.grNumber}</h3>
+                                <p className="text-xs text-red-600 mt-0.5">ระบบจะหักสต็อกออกเท่ากับจำนวนที่รับเข้าในใบนี้ และบันทึก Log การยกเลิก</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => !actionLoading && setShowCancelModal(false)}
+                                className="text-gray-400 hover:text-gray-600 text-xl leading-none px-2"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="p-5 overflow-y-auto space-y-4">
+                            {hasNegativeAfterCancel && (
+                                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-1">
+                                    <p className="font-bold text-amber-900">⚠️ มีรายการที่สต็อกคงเหลือน้อยกว่ายอดที่จะยกเลิก</p>
+                                    <p>
+                                        เนื่องจากสินค้าบางส่วนถูกขายหรือตัดออกไปแล้ว ระบบจะหักสต็อกออกเต็มจำนวนที่รับเข้า ทำให้สต็อกกลายเป็นค่าติดลบชั่วคราว (หน้าร้าน POS ยังขายต่อได้ตามปกติ และเมื่อคีย์ใบรับสินค้าใหม่ที่ถูกต้อง สต็อกจะกลับมาตรงตามจริงอัตโนมัติ)
+                                    </p>
+                                </div>
+                            )}
+
+                            <div>
+                                <p className="text-xs font-semibold text-gray-600 mb-2">สรุปสต็อกที่จะถูกหักคืน ({cancelStockPreview.length} รายการคลัง)</p>
+                                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="bg-gray-50 border-b border-gray-200 text-gray-500">
+                                                <th className="px-3 py-2 text-left font-semibold">สินค้า</th>
+                                                <th className="px-3 py-2 text-left font-semibold">คลัง</th>
+                                                <th className="px-3 py-2 text-right font-semibold">คงเหลือปัจจุบัน</th>
+                                                <th className="px-3 py-2 text-right font-semibold">หักคืน</th>
+                                                <th className="px-3 py-2 text-right font-semibold">หลังยกเลิก</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {cancelStockPreview.map(row => (
+                                                <tr key={row.key} className={row.afterQty < 0 ? 'bg-amber-50/40' : ''}>
+                                                    <td className="px-3 py-2">
+                                                        <p className="font-medium text-gray-800">{row.productName}</p>
+                                                        <p className="text-[11px] text-gray-400 font-mono">{row.productCode}</p>
+                                                    </td>
+                                                    <td className="px-3 py-2 text-gray-600">{row.warehouseName}</td>
+                                                    <td className="px-3 py-2 text-right tabular-nums text-gray-700">{row.currentQty.toLocaleString()} {row.unit}</td>
+                                                    <td className="px-3 py-2 text-right tabular-nums font-semibold text-red-600">-{row.deductQty.toLocaleString()} {row.unit}</td>
+                                                    <td className="px-3 py-2 text-right tabular-nums font-bold">
+                                                        <span className={row.afterQty < 0 ? 'text-red-600 bg-red-100 px-1.5 py-0.5 rounded' : 'text-gray-800'}>
+                                                            {row.afterQty.toLocaleString()} {row.unit}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                                    เหตุผลการยกเลิก <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    rows={3}
+                                    value={cancelReason}
+                                    onChange={e => setCancelReason(e.target.value)}
+                                    placeholder="เช่น คีย์จำนวนรับเข้าผิด, เลือกสินค้าผิดตัว, คีย์เอกสารซ้ำ..."
+                                    className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-red-400 focus:border-transparent outline-none resize-none"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+
+                        <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-2.5">
+                            <button
+                                type="button"
+                                onClick={() => setShowCancelModal(false)}
+                                disabled={actionLoading === 'cancel'}
+                                className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-600 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                ปิด
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCancelApproved}
+                                disabled={actionLoading === 'cancel' || !cancelReason.trim()}
+                                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
+                            >
+                                {actionLoading === 'cancel' ? '⏳ กำลังยกเลิกและคืนสต็อก...' : 'ยืนยันยกเลิกและหักสต็อกคืน'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Modals */}

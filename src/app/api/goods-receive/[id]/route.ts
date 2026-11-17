@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
@@ -11,9 +13,20 @@ export async function GET(
         include: {
             vendor: { select: { id: true, name: true, phone: true, lineId: true } },
             createdBy: { select: { name: true } },
+            cancelledBy: { select: { name: true } },
             items: {
                 include: {
-                    product: { select: { name: true, code: true, unit: true, costMethod: true } },
+                    product: {
+                        select: {
+                            name: true,
+                            code: true,
+                            unit: true,
+                            costMethod: true,
+                            productStocks: {
+                                select: { warehouseId: true, quantity: true },
+                            },
+                        },
+                    },
                     warehouse: { select: { name: true } },
                 },
             },

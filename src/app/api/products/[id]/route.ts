@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerUser } from '@/lib/server-auth';
+import {
+    getCancelledGrNumbers,
+    buildActiveReceiveTxWhere,
+    pickLatestReceiveCost,
+} from '@/lib/stock-cost-queries';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,8 +70,11 @@ export async function GET(
                                 receivedDate: true,
                                 status: true,
                                 notes: true,
+                                cancelReason: true,
+                                cancelledAt: true,
                                 vendor: { select: { id: true, name: true } },
                                 createdBy: { select: { name: true } },
+                                cancelledBy: { select: { name: true } },
                             },
                         },
                         warehouse: { select: { id: true, name: true } },
@@ -127,14 +135,16 @@ export async function GET(
 
         // Compute avg/last cost
         // AVG cost is now maintained as moving weighted average in product.cost
-        // so we use it directly. Last cost comes from the most recent GR.
-        const lastReceive = await prisma.stockTransaction.findFirst({
-            where: { productId: id, type: 'GOODS_RECEIVE', quantity: { gt: 0 } },
-            select: { unitCost: true },
+        // so we use it directly. Last cost comes from the most recent non-cancelled GR.
+        const cancelledRefs = await getCancelledGrNumbers(prisma, [id]);
+        const recentReceives = await prisma.stockTransaction.findMany({
+            where: buildActiveReceiveTxWhere({ productId: id, cancelledRefs }),
+            select: { unitCost: true, reference: true },
             orderBy: { createdAt: 'desc' },
+            take: 10,
         });
         const computedAvgCost = Number(product.cost) || 0;
-        const computedLastCost = lastReceive ? Number(lastReceive.unitCost) : 0;
+        const computedLastCost = pickLatestReceiveCost(recentReceives);
 
         // Serialize Decimal objects to plain values
         const result = JSON.parse(JSON.stringify(product));
