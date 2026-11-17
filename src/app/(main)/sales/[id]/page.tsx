@@ -234,11 +234,15 @@ export default function SaleDetailPage() {
     // Live search customers from API when typing/pasting in edit mode
     const customerSearchTimer = useRef<NodeJS.Timeout | null>(null);
     const customerDropdownRef = useRef<HTMLDivElement | null>(null);
+    const a4MenuRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             if (customerDropdownRef.current && !customerDropdownRef.current.contains(e.target as Node)) {
                 setShowCustomerDropdown(false);
+            }
+            if (a4MenuRef.current && !a4MenuRef.current.contains(e.target as Node)) {
+                setShowA4Menu(false);
             }
         };
         document.addEventListener('mousedown', handler);
@@ -555,7 +559,7 @@ export default function SaleDetailPage() {
             </button>
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-6 relative z-30">
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{sale.saleNumber}</h1>
                     <p className="text-sm text-gray-500 mt-1">รายการขาย</p>
@@ -568,7 +572,7 @@ export default function SaleDetailPage() {
                                 className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 text-sm font-medium hover:bg-amber-100">
                                 🧾 สลิป
                             </button>
-                            <div className="relative">
+                            <div ref={a4MenuRef} className="relative">
                                 <button
                                     onClick={() => setShowA4Menu(!showA4Menu)}
                                     className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-sm font-medium hover:bg-emerald-100 flex items-center gap-1.5">
@@ -576,7 +580,7 @@ export default function SaleDetailPage() {
                                 </button>
                                 {showA4Menu && (
                                     <div
-                                        className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-30"
+                                        className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-50"
                                         onMouseLeave={() => setShowA4Menu(false)}
                                     >
                                         <button
@@ -640,7 +644,7 @@ export default function SaleDetailPage() {
             </div>
 
             {/* Summary */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6 relative z-30">
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-6 relative z-20">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                         <p className="text-xs text-gray-500">ลูกค้า</p>

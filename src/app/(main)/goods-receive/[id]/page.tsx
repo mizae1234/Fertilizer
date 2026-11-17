@@ -386,7 +386,7 @@ export default function GoodsReceiveDetailPage() {
     return (
         <div className="animate-fade-in max-w-7xl mx-auto">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 relative z-30">
                 <div>
                     <div className="flex items-center gap-2">
                         <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{gr.grNumber}</h1>
@@ -405,7 +405,7 @@ export default function GoodsReceiveDetailPage() {
             </div>
 
             {/* Vendor & Header Info */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6 relative z-30">
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6 relative z-20">
                 <h2 className="text-sm font-semibold text-gray-700 mb-4">ข้อมูลเอกสาร</h2>
                 {isPending ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

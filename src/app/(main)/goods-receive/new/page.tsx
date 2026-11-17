@@ -328,7 +328,7 @@ export default function NewGoodsReceivePage() {
 
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
                 {/* Vendor + Default Warehouse */}
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 relative z-30">
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6 relative z-20">
                     <h2 className="text-sm font-semibold text-gray-700 mb-3 sm:mb-4">ข้อมูลทั่วไป</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div>
