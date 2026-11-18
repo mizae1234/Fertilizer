@@ -79,6 +79,7 @@ export async function GET(request: Request) {
                             { brand: { contains: token, mode: 'insensitive' } },
                             { packaging: { contains: token, mode: 'insensitive' } },
                             { description: { contains: token, mode: 'insensitive' } },
+                            { posNote: { contains: token, mode: 'insensitive' } },
                             { productGroup: { is: { name: { contains: token, mode: 'insensitive' } } } },
                         ],
                     });
@@ -96,7 +97,7 @@ export async function GET(request: Request) {
             where,
             select: lite
                 ? {
-                    id: true, code: true, barcode: true, name: true, unit: true, brand: true,
+                    id: true, code: true, barcode: true, name: true, unit: true, brand: true, posNote: true,
                     productGroup: { select: { id: true, name: true } },
                     productStocks: warehouseId
                         ? { where: { warehouseId, warehouse: { deletedAt: null, isActive: true } }, select: { warehouseId: true, quantity: true } }
@@ -104,7 +105,7 @@ export async function GET(request: Request) {
                 }
                 : {
                     id: true, code: true, barcode: true, name: true, price: true, cost: true, unit: true,
-                    description: true, brand: true, packaging: true,
+                    description: true, posNote: true, brand: true, packaging: true,
                     imageUrl: true, pointsPerUnit: true, minStock: true,
                     mfgDate: true, expDate: true,
                     productGroup: { select: { id: true, name: true } },

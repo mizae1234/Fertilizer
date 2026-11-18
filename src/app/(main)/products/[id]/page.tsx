@@ -101,6 +101,7 @@ interface ProductDetail {
     barcode: string | null;
     name: string;
     description: string | null;
+    posNote?: string | null;
     unit: string;
     cost: number | string;
     costMethod: string;
@@ -178,7 +179,7 @@ export default function ProductDetailPage() {
     const [unitValue, setUnitValue] = useState('');
 
     // Product info editing
-    const [infoForm, setInfoForm] = useState({ code: '', barcode: '', name: '', description: '', brand: '', packaging: '', productGroupId: '', minStock: 10, mfgDate: '', expDate: '' });
+    const [infoForm, setInfoForm] = useState({ code: '', barcode: '', name: '', description: '', posNote: '', brand: '', packaging: '', productGroupId: '', minStock: 10, mfgDate: '', expDate: '' });
     const [savingInfo, setSavingInfo] = useState(false);
     const [dupBarcodeProduct, setDupBarcodeProduct] = useState<{ id: string; code: string; name: string } | null>(null);
     const [productGroups, setProductGroups] = useState<{ id: string; name: string }[]>([]);
@@ -270,6 +271,7 @@ export default function ProductDetailPage() {
                 barcode: product.barcode || '',
                 name: product.name,
                 description: product.description || '',
+                posNote: product.posNote || '',
                 brand: product.brand || '',
                 packaging: product.packaging || '',
                 productGroupId: product.productGroupId || '',
@@ -642,6 +644,19 @@ export default function ProductDetailPage() {
                         className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm" rows={2} />
                 </div>
 
+                <div className="mb-4 p-3.5 rounded-xl bg-amber-50/50 border border-amber-200">
+                    <label className="block text-sm font-semibold text-amber-900 mb-1">
+                        📌 หมายเหตุสินค้า / โปรโมชั่น (แสดงให้พนักงานเห็นหน้า POS)
+                    </label>
+                    <textarea
+                        value={infoForm.posNote}
+                        onChange={e => setInfoForm({ ...infoForm, posNote: e.target.value })}
+                        className="w-full px-3.5 py-2 rounded-xl border border-amber-200 bg-white focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none text-sm"
+                        rows={2}
+                        placeholder="เช่น โปร 5 แถม 1, ซื้อครบ 10 กระสอบแถมเสื้อ 1 ตัว..."
+                    />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1.5">หมวดหมู่สินค้า</label>
@@ -790,6 +805,7 @@ export default function ProductDetailPage() {
                             barcode: infoForm.barcode?.trim() || null,
                             name: infoForm.name,
                             description: infoForm.description || null,
+                            posNote: infoForm.posNote?.trim() || null,
                             brand: infoForm.brand || null,
                             packaging: infoForm.packaging || null,
                             price: parseFloat(sellingPriceValue) || 0,

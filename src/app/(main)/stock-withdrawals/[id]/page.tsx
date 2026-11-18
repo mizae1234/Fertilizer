@@ -76,12 +76,6 @@ export default async function StockWithdrawalDetailPage({ params }: Props) {
                         <p className="text-sm text-gray-800">{formatDateTime(wd.createdAt)}</p>
                     </div>
                 </div>
-                {wd.notes && (
-                    <div className="mt-3 pt-3 border-t border-gray-100">
-                        <p className="text-xs text-gray-500">หมายเหตุ</p>
-                        <p className="text-sm text-gray-700">{wd.notes}</p>
-                    </div>
-                )}
             </div>
 
             {/* Items */}
@@ -96,6 +90,7 @@ export default async function StockWithdrawalDetailPage({ params }: Props) {
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">สินค้า</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">คลัง</th>
                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">หมายเหตุ</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -107,12 +102,21 @@ export default async function StockWithdrawalDetailPage({ params }: Props) {
                                     <p className="text-xs text-gray-400">{item.product.code}</p>
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600">{item.warehouse.name}</td>
-                                <td className="px-4 py-3 text-sm text-gray-800 text-right">{item.quantity} {item.product.unit}</td>
+                                <td className="px-4 py-3 text-sm text-gray-800 text-right whitespace-nowrap">{item.quantity} {item.product.unit}</td>
+                                <td className="px-4 py-3 text-sm text-gray-600">{item.notes || <span className="text-gray-300">-</span>}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
+
+            {/* Notes Box After Items */}
+            {wd.notes && (
+                <div className={`bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-4 ${isCancelled ? 'opacity-60' : ''}`}>
+                    <p className="text-xs font-semibold text-gray-500 mb-1">📝 หมายเหตุใบเบิกสินค้า</p>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{wd.notes}</p>
+                </div>
+            )}
 
             {/* Signatures */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5">

@@ -141,21 +141,17 @@ export async function getInventoryReport() {
     if (!(await isServerAdmin())) {
         throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูล');
     }
-    const [stocks, lowStockCount] = await Promise.all([
-        prisma.productStock.findMany({
-            where: {
-                warehouse: { deletedAt: null, isActive: true },
-            },
-            include: {
-                product: { select: { id: true, name: true, code: true, minStock: true, cost: true } },
-                warehouse: { select: { id: true, name: true } },
-            },
-            orderBy: [{ warehouse: { name: 'asc' } }, { product: { name: 'asc' } }],
-        }),
-        prisma.productStock.count({
-            where: { quantity: { lt: 10 } },
-        }),
-    ]);
+    const stocks = await prisma.productStock.findMany({
+        where: {
+            warehouse: { deletedAt: null, isActive: true },
+            product: { deletedAt: null, isActive: true },
+        },
+        include: {
+            product: { select: { id: true, name: true, code: true, minStock: true, cost: true } },
+            warehouse: { select: { id: true, name: true } },
+        },
+        orderBy: [{ warehouse: { name: 'asc' } }, { product: { name: 'asc' } }],
+    });
 
     const byWarehouse = new Map<string, {
         warehouseId: string;
@@ -199,7 +195,7 @@ export async function getInventoryReport() {
 
     return {
         totalValue,
-        lowStockCount,
+        lowStockCount: lowStockAlerts.length,
         byWarehouse: Array.from(byWarehouse.values()),
         lowStockAlerts,
         allStocks: stocks.map(s => ({

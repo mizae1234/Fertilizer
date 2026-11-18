@@ -125,12 +125,13 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สถานะ</th>
                             {isAdmin && <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">ค่าสินค้า</th>}
                             {isAdmin && <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">ค่ารถ</th>}
+                            {isAdmin && <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">ค่าลง</th>}
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">วันที่</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {records.length === 0 ? (
-                            <tr><td colSpan={isAdmin ? 9 : 6} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
+                            <tr><td colSpan={isAdmin ? 10 : 6} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
                         ) : (
                             records.map(gr => {
                                 const isCancelled = gr.status === 'CANCELLED';
@@ -149,6 +150,7 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                                     <td className="px-4 py-3"><StatusBadge status={gr.status} /></td>
                                     {isAdmin && <td className="px-4 py-3 text-center text-sm">{gr.goodsPaid ? <span className="text-emerald-500" title="จ่ายแล้ว">✅</span> : <span className="text-gray-300" title="ยังไม่จ่าย">⬜</span>}</td>}
                                     {isAdmin && <td className="px-4 py-3 text-center text-sm">{gr.shippingPaid ? <span className="text-emerald-500" title={`จ่ายแล้ว ฿${Number(gr.shippingCost).toLocaleString()}`}>✅</span> : <span className="text-gray-300" title="ยังไม่จ่าย">⬜</span>}</td>}
+                                    {isAdmin && <td className="px-4 py-3 text-center text-sm">{gr.unloadingPaid ? <span className="text-emerald-500" title={`จ่ายแล้ว ฿${Number(gr.unloadingCost).toLocaleString()}`}>✅</span> : <span className="text-gray-300" title="ยังไม่จ่าย">⬜</span>}</td>}
                                     <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(gr.createdAt)}</td>
                                 </tr>
                                 );
@@ -187,9 +189,10 @@ export default async function GoodsReceivePage({ searchParams }: Props) {
                                 <p className="text-xs text-rose-600 mt-1">❌ ยกเลิก: {gr.cancelReason}</p>
                             )}
                             {isAdmin && (
-                                <div className="flex items-center gap-3 mt-2 text-xs">
+                                <div className="flex items-center gap-3 mt-2 text-xs flex-wrap">
                                     <span className={gr.goodsPaid ? 'text-emerald-600' : 'text-gray-400'}>ค่าสินค้า: {gr.goodsPaid ? '✅' : '⬜'}</span>
                                     <span className={gr.shippingPaid ? 'text-emerald-600' : 'text-gray-400'}>ค่ารถ: {gr.shippingPaid ? '✅' : '⬜'}</span>
+                                    <span className={gr.unloadingPaid ? 'text-emerald-600' : 'text-gray-400'}>ค่าลง: {gr.unloadingPaid ? '✅' : '⬜'}</span>
                                 </div>
                             )}
                             <p className="text-xs text-gray-400 mt-1">{formatDateTime(gr.createdAt)}</p>

@@ -13,6 +13,7 @@ interface GoodsReceiveData {
     createdAt: string;
     cancelledAt?: string | null;
     cancelReason?: string | null;
+    discount?: number | string;
     totalAmount: number | string;
     notes: string | null;
     vendor: { name: string; phone: string | null; lineId: string | null };
@@ -140,16 +141,30 @@ export default function PrintGoodsReceiveButton({ id }: { id: string }) {
         </tbody>
     </table>
 
-    ${!isStaff ? `
+    ${!isStaff ? (() => {
+        const savedDiscount = Number(data.discount || 0);
+        const savedSubtotal = data.items.reduce((s, item) => s + Number(item.totalCost), 0);
+        return `
     <div style="margin-top:14px;display:flex;justify-content:flex-end;">
-        <div style="width:250px;font-size:13px;border-top:1.5px solid #333;padding-top:8px;">
+        <div style="width:260px;font-size:13px;border-top:1.5px solid #333;padding-top:8px;">
+            ${savedDiscount > 0 ? `
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#4b5563;margin-bottom:3px;">
+                <span>ยอดรวมก่อนส่วนลด:</span>
+                <span>${formatCurrency(savedSubtotal)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#dc2626;margin-bottom:4px;">
+                <span>ส่วนลดท้ายบิล:</span>
+                <span>-${formatCurrency(savedDiscount)}</span>
+            </div>
+            ` : ''}
             <div style="display:flex;justify-content:space-between;font-weight:700;">
-                <span>มูลค่ารวม:</span>
+                <span>${savedDiscount > 0 ? 'มูลค่าสุทธิ:' : 'มูลค่ารวม:'}</span>
                 <span style="color:#059669;">${formatCurrency(Number(data.totalAmount))}</span>
             </div>
         </div>
     </div>
-    ` : ''}
+    `;
+    })() : ''}
 
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;margin-top:52px;border:none;">
         <tbody>

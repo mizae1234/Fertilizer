@@ -35,6 +35,7 @@ interface GRDetail {
     poNumber: string | null;
     vendorId: string;
     status: string;
+    discount?: number | string;
     totalAmount: number | string;
     notes: string | null;
     receivedDate: string;
@@ -44,6 +45,8 @@ interface GRDetail {
     goodsPaid: boolean;
     shippingPaid: boolean;
     shippingCost: number | string;
+    unloadingPaid: boolean;
+    unloadingCost: number | string;
     vendor: Vendor;
     createdBy: { name: string };
     cancelledBy?: { name: string } | null;
@@ -173,6 +176,7 @@ export default function GoodsReceiveDetailPage() {
     const [poNumber, setPoNumber] = useState('');
     const [receivedDate, setReceivedDate] = useState('');
     const [notes, setNotes] = useState('');
+    const [billDiscount, setBillDiscount] = useState('');
     const [items, setItems] = useState<GRItem[]>([]);
     const [vendorSearchText, setVendorSearchText] = useState('');
     const [showVendorDropdown, setShowVendorDropdown] = useState(false);
@@ -181,6 +185,8 @@ export default function GoodsReceiveDetailPage() {
     const [goodsPaid, setGoodsPaid] = useState(false);
     const [shippingPaid, setShippingPaid] = useState(false);
     const [shippingCost, setShippingCost] = useState('');
+    const [unloadingPaid, setUnloadingPaid] = useState(false);
+    const [unloadingCost, setUnloadingCost] = useState('');
     const [paymentSaving, setPaymentSaving] = useState(false);
 
     // Lookup data
@@ -214,6 +220,7 @@ export default function GoodsReceiveDetailPage() {
                 setPoNumber(data.poNumber || '');
                 setReceivedDate(data.receivedDate ? new Date(data.receivedDate).toISOString().split('T')[0] : '');
                 setNotes(data.notes || '');
+                setBillDiscount(Number(data.discount) > 0 ? String(Number(data.discount)) : '');
                 setItems(data.items.map(item => ({
                     id: item.id,
                     productId: item.productId,
@@ -231,6 +238,8 @@ export default function GoodsReceiveDetailPage() {
                 setGoodsPaid(data.goodsPaid || false);
                 setShippingPaid(data.shippingPaid || false);
                 setShippingCost(Number(data.shippingCost) ? String(Number(data.shippingCost)) : '');
+                setUnloadingPaid(data.unloadingPaid || false);
+                setUnloadingCost(Number(data.unloadingCost) ? String(Number(data.unloadingCost)) : '');
                 setVendorSearchText(data.vendor?.name || '');
                 setLoading(false);
             });
@@ -273,7 +282,9 @@ export default function GoodsReceiveDetailPage() {
         setItems(newItems);
     };
 
-    const total = items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
+    const subtotal = items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
+    const parsedPendingDiscount = Math.min(subtotal, Math.max(0, parseFloat(billDiscount) || 0));
+    const total = Math.max(0, subtotal - parsedPendingDiscount);
 
     // Save changes
     const handleSave = async () => {
@@ -288,6 +299,7 @@ export default function GoodsReceiveDetailPage() {
                 poNumber: poNumber || undefined,
                 receivedDate,
                 notes: notes || undefined,
+                discount: parsedPendingDiscount,
                 items: validItems.map(i => ({
                     productId: i.productId,
                     warehouseId: i.warehouseId,
@@ -301,6 +313,7 @@ export default function GoodsReceiveDetailPage() {
             if (updated) {
                 const serialized = JSON.parse(JSON.stringify(updated));
                 setGr(serialized);
+                setBillDiscount(Number(serialized.discount) > 0 ? String(Number(serialized.discount)) : '');
             }
             showAlert('บันทึกการแก้ไขเรียบร้อย', 'success', 'สำเร็จ');
         } catch (error) {
@@ -324,12 +337,15 @@ export default function GoodsReceiveDetailPage() {
                 poNumber: poNumber || undefined,
                 receivedDate,
                 notes: notes || undefined,
+                discount: parsedPendingDiscount,
                 items: validItems.map(i => ({
                     productId: i.productId,
                     warehouseId: i.warehouseId,
                     quantity: i.quantity,
                     unitCost: i.unitCost,
                     lotNo: i.lotNo || undefined,
+                    mfgDate: i.mfgDate || undefined,
+                    expDate: i.expDate || undefined,
                 })),
             });
 
@@ -786,7 +802,21 @@ export default function GoodsReceiveDetailPage() {
                                             ) : '-'}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-gray-800 text-right">{item.quantity} {item.product.unit}</td>
-                                        {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm text-gray-800 text-right">{formatCurrency(Number(item.unitCost))}</td>}
+                                        {user?.role === 'ADMIN' && (
+                                            <td className="px-4 py-3 text-sm text-gray-800 text-right">
+                                                <div>{formatCurrency(Number(item.unitCost))}</div>
+                                                {Number(gr.discount || 0) > 0 && Number(item.unitCost) > 0 && (() => {
+                                                    const rawSub = gr.items.reduce((s, x) => s + Number(x.totalCost), 0);
+                                                    const disc = Math.min(rawSub, Math.max(0, Number(gr.discount || 0)));
+                                                    const netUnit = rawSub > 0 ? Number(item.unitCost) * ((rawSub - disc) / rawSub) : Number(item.unitCost);
+                                                    return (
+                                                        <div className="text-[11px] text-emerald-600 font-medium">
+                                                            ทุนสุทธิ {formatCurrency(netUnit)}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </td>
+                                        )}
                                         {user?.role === 'ADMIN' && <td className="px-4 py-3 text-sm font-semibold text-gray-800 text-right">{formatCurrency(Number(item.totalCost))}</td>}
                                     </tr>
                                 ))}
@@ -818,11 +848,65 @@ export default function GoodsReceiveDetailPage() {
                     </>
                 )}
 
-                {/* Total */}
+                {/* Total & Bill Discount */}
                 {user?.role === 'ADMIN' && (
-                    <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-3 flex justify-between items-center rounded-b-xl">
-                        <span className="text-sm font-semibold text-gray-600">มูลค่ารวม</span>
-                        <span className={`text-lg font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-emerald-600'}`}>{formatCurrency(isPending ? total : Number(gr.totalAmount))}</span>
+                    <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-4 flex justify-end rounded-b-xl">
+                        {isPending ? (
+                            <div className="w-full sm:w-80 space-y-2">
+                                <div className="flex justify-between items-center text-sm text-gray-600">
+                                    <span>ยอดรวมก่อนส่วนลด</span>
+                                    <span className="font-medium tabular-nums">{formatCurrency(subtotal)}</span>
+                                </div>
+                                <div className="flex justify-between items-center gap-3">
+                                    <label className="text-sm font-medium text-red-600 shrink-0">ส่วนลดท้ายบิล (บาท)</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={subtotal}
+                                        step="0.01"
+                                        value={billDiscount}
+                                        onFocus={e => e.target.select()}
+                                        onChange={e => setBillDiscount(e.target.value)}
+                                        placeholder="0.00"
+                                        className="w-36 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50/40 text-sm text-right font-medium text-red-600 tabular-nums focus:ring-2 focus:ring-red-400 focus:border-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                </div>
+                                {parsedPendingDiscount > 0 && (
+                                    <p className="text-[11px] text-gray-400 text-right">
+                                        * เฉลี่ยหักต้นทุนสินค้าในคลังและรายงานอัตโนมัติเมื่ออนุมัติ
+                                    </p>
+                                )}
+                                <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
+                                    <span className="text-sm font-semibold text-gray-700">มูลค่าสุทธิ</span>
+                                    <span className="text-lg font-bold text-emerald-600 tabular-nums">{formatCurrency(total)}</span>
+                                </div>
+                            </div>
+                        ) : (() => {
+                            const savedDiscount = Number(gr.discount || 0);
+                            const savedSubtotal = gr.items.reduce((s, x) => s + Number(x.totalCost), 0);
+                            return (
+                                <div className="w-full sm:w-80 space-y-1.5">
+                                    {savedDiscount > 0 && (
+                                        <>
+                                            <div className="flex justify-between items-center text-sm text-gray-600">
+                                                <span>ยอดรวมก่อนส่วนลด</span>
+                                                <span className="tabular-nums">{formatCurrency(savedSubtotal)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm font-medium text-red-600">
+                                                <span>ส่วนลดท้ายบิล</span>
+                                                <span className="tabular-nums">-{formatCurrency(savedDiscount)}</span>
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className={`flex justify-between items-center ${savedDiscount > 0 ? 'pt-1.5 border-t border-gray-200' : ''}`}>
+                                        <span className="text-sm font-semibold text-gray-600">{savedDiscount > 0 ? 'มูลค่าสุทธิ' : 'มูลค่ารวม'}</span>
+                                        <span className={`text-lg font-bold tabular-nums ${isCancelled ? 'text-gray-400 line-through' : 'text-emerald-600'}`}>
+                                            {formatCurrency(Number(gr.totalAmount))}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
             </div>
@@ -836,7 +920,13 @@ export default function GoodsReceiveDetailPage() {
                             onClick={async () => {
                                 setPaymentSaving(true);
                                 try {
-                                    await updateGoodsReceivePayment(id, { goodsPaid, shippingPaid, shippingCost: parseFloat(shippingCost) || 0 });
+                                    await updateGoodsReceivePayment(id, {
+                                        goodsPaid,
+                                        shippingPaid,
+                                        shippingCost: parseFloat(shippingCost) || 0,
+                                        unloadingPaid,
+                                        unloadingCost: parseFloat(unloadingCost) || 0,
+                                    });
                                     showAlert('บันทึกสถานะการจ่ายเงินเรียบร้อย', 'success', 'สำเร็จ');
                                 } catch (error) {
                                     showAlert((error as Error).message || 'ไม่สามารถบันทึกได้', 'error', 'เกิดข้อผิดพลาด');
@@ -885,6 +975,33 @@ export default function GoodsReceiveDetailPage() {
                                     step="0.01"
                                     value={shippingCost}
                                     onChange={(e) => setShippingCost(e.target.value)}
+                                    onFocus={(e) => e.target.select()}
+                                    className="w-48 px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                        </div>
+
+                        {/* ค่าลงสินค้า */}
+                        <div className="border-t border-gray-100 pt-4">
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <input
+                                    type="checkbox"
+                                    checked={unloadingPaid}
+                                    onChange={(e) => setUnloadingPaid(e.target.checked)}
+                                    className="w-5 h-5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                                />
+                                <span className="text-sm font-medium text-gray-700 group-hover:text-emerald-600 transition-colors">จ่ายค่าลงสินค้าแล้ว</span>
+                                {unloadingPaid && <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">✓ จ่ายแล้ว</span>}
+                            </label>
+                            <div className="mt-3 ml-8">
+                                <label className="text-xs text-gray-500 mb-1 block">ยอดค่าลงสินค้า (บาท)</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={unloadingCost}
+                                    onChange={(e) => setUnloadingCost(e.target.value)}
                                     onFocus={(e) => e.target.select()}
                                     className="w-48 px-3 py-2 rounded-xl border border-gray-200 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                                     placeholder="0.00"

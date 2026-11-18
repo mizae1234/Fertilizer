@@ -220,7 +220,7 @@ export async function PATCH(
 
     // Only allow known Product scalar fields
     const allowedFields = [
-        'name', 'description', 'unit', 'cost', 'costMethod', 'price', 'brand',
+        'name', 'description', 'posNote', 'unit', 'cost', 'costMethod', 'price', 'brand',
         'packaging', 'productGroupId', 'pointsPerUnit', 'minStock', 'isActive', 'code', 'barcode', 'imageUrl',
         'mfgDate', 'expDate'
     ];
@@ -235,6 +235,8 @@ export async function PATCH(
                 data.code = body.code ? String(body.code).trim() : '';
             } else if (key === 'barcode') {
                 data.barcode = body.barcode ? (String(body.barcode).trim() || null) : null;
+            } else if (key === 'posNote') {
+                data.posNote = body.posNote ? (String(body.posNote).trim() || null) : null;
             } else if (key === 'mfgDate' || key === 'expDate') {
                 data[key] = body[key] ? new Date(body[key]) : null;
             } else {
@@ -310,7 +312,7 @@ export async function PATCH(
             cost: 'ราคาทุน', costMethod: 'วิธีคิดต้นทุน', price: 'ราคาขาย', brand: 'แบรนด์',
             packaging: 'บรรจุภัณฑ์', productGroupId: 'กลุ่มสินค้า',
             pointsPerUnit: 'แต้มต่อหน่วย', minStock: 'สต็อกขั้นต่ำ',
-            isActive: 'สถานะ', description: 'คำอธิบาย', imageUrl: 'รูปภาพ',
+            isActive: 'สถานะ', description: 'คำอธิบาย', posNote: 'หมายเหตุหน้าขาย (POS)', imageUrl: 'รูปภาพ',
             mfgDate: 'วันผลิต', expDate: 'วันหมดอายุ',
         };
         const logEntries: { field: string; oldValue: string; newValue: string; details: string }[] = [];

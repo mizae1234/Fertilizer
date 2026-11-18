@@ -1,4 +1,5 @@
 import type { Prisma } from '@/generated/prisma/client';
+import { roundQty } from '@/lib/utils';
 
 type DbWithGoodsReceive = {
     goodsReceive: {
@@ -94,3 +95,38 @@ export function pickLatestReceiveCost(
     }
     return Math.round(Number(latest.unitCost) * 100) / 100;
 }
+
+/**
+ * Compute Goods Receive subtotal, clamped bill-level discount, net totalAmount,
+ * and the proportional net cost multiplier (`(subtotal - discount) / subtotal`).
+ */
+export function computeGrBillTotals(
+    items: CostSample[],
+    rawDiscount?: number | Prisma.Decimal | string | null
+): {
+    subtotal: number;
+    discount: number;
+    netTotalAmount: number;
+    discountRatio: number;
+} {
+    const subtotal = Math.round(
+        items.reduce((sum, item) => sum + roundQty(Number(item.quantity)) * Number(item.unitCost), 0) * 100
+    ) / 100;
+    const parsedDiscount = Math.round((Number(rawDiscount) || 0) * 100) / 100;
+    const discount = Math.min(subtotal, Math.max(0, parsedDiscount));
+    const netTotalAmount = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+    const discountRatio = subtotal > 0 && discount > 0 ? (subtotal - discount) / subtotal : 1;
+
+    return { subtotal, discount, netTotalAmount, discountRatio };
+}
+
+/**
+ * Compute proportional effective unit cost after deducting bill-level GR discount.
+ */
+export function computeEffectiveGrUnitCost(
+    rawUnitCost: number | Prisma.Decimal | string,
+    discountRatio: number
+): number {
+    return Number(rawUnitCost) * discountRatio;
+}
+

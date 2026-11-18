@@ -12,6 +12,7 @@ export async function createStockWithdrawal(data: {
         warehouseId: string;
         quantity: number;
         unitCost: number;
+        notes?: string;
     }[];
     approverName?: string;
     packerName?: string;
@@ -62,6 +63,7 @@ export async function createStockWithdrawal(data: {
                             quantity: qty,
                             unitCost: cost,
                             totalCost: Math.round(qty * cost * 100) / 100,
+                            notes: item.notes?.trim() || null,
                         };
                     }),
                 },
@@ -110,7 +112,7 @@ export async function createStockWithdrawal(data: {
                     unitCost: costToUse,
                     reference: withdrawalNumber,
                     userId: data.userId,
-                    notes: `เบิกสินค้า ${withdrawalNumber}`,
+                    notes: `เบิกสินค้า ${withdrawalNumber}${item.notes?.trim() ? ` (${item.notes.trim()})` : ''}`,
                 },
             });
         }));
@@ -147,12 +149,17 @@ export async function getStockWithdrawals(page = 1, from = '', to = '', search =
                 {
                     items: {
                         some: {
-                            product: {
-                                OR: [
-                                    { name: { contains: token, mode: 'insensitive' } },
-                                    { code: { contains: token, mode: 'insensitive' } },
-                                ],
-                            },
+                            OR: [
+                                { notes: { contains: token, mode: 'insensitive' } },
+                                {
+                                    product: {
+                                        OR: [
+                                            { name: { contains: token, mode: 'insensitive' } },
+                                            { code: { contains: token, mode: 'insensitive' } },
+                                        ],
+                                    },
+                                },
+                            ],
                         },
                     },
                 },

@@ -64,6 +64,7 @@ export async function createProduct(data: {
     barcode?: string | null;
     name: string;
     description?: string;
+    posNote?: string | null;
     unit?: string;
     cost?: number;
     price?: number;
@@ -142,6 +143,7 @@ export async function createProduct(data: {
                 barcode,
                 name: data.name,
                 description: data.description,
+                posNote: data.posNote?.trim() || null,
                 unit: data.unit || 'bag',
                 cost: data.cost || 0,
                 price: data.price || 0,
@@ -198,6 +200,7 @@ export async function updateProduct(
         barcode?: string | null;
         name: string;
         description?: string;
+        posNote?: string | null;
         unit?: string;
         cost?: number;
         price?: number;
@@ -236,6 +239,7 @@ export async function updateProduct(
                 ...(data.barcode !== undefined ? { barcode: data.barcode?.trim() || null } : {}),
                 name: data.name,
                 description: data.description,
+                ...(data.posNote !== undefined ? { posNote: data.posNote?.trim() || null } : {}),
                 unit: data.unit,
                 cost: data.cost,
                 price: data.price,

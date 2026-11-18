@@ -24,6 +24,7 @@ interface PriceTierInfo {
 interface Product {
     id: string; code: string; barcode?: string | null; name: string; unit: string; price: string;
     description?: string | null;
+    posNote?: string | null;
     pointsPerUnit: number;
     imageUrl?: string | null;
     productStocks: { warehouseId: string; quantity: number }[];
@@ -45,6 +46,7 @@ interface BundleSubItem {
 }
 interface CartItem {
     productId: string; productName: string; productCode: string; unit: string;
+    posNote?: string | null;
     warehouseId: string; quantity: number; unitPrice: number; points: number;
     availableStock: number; pointsPerUnit: number;
     priceTier: string;
@@ -626,6 +628,7 @@ export default function POSPage() {
 
                     return {
                         ...c,
+                        posNote: product.posNote ?? c.posNote ?? null,
                         quantity: newQty,
                         unitPrice: priceRes.unitPrice,
                         isTierApplied: priceRes.isTierApplied,
@@ -653,6 +656,7 @@ export default function POSPage() {
 
             setCart([...cart, {
                 productId: product.id, productName: product.name, productCode: product.code,
+                posNote: product.posNote || null,
                 unit: unitName, warehouseId, quantity: qtyToAdd, unitPrice: priceRes.unitPrice,
                 points: Math.floor(product.pointsPerUnit * qtyToAdd), availableStock: stock,
                 pointsPerUnit: product.pointsPerUnit,
@@ -1505,7 +1509,12 @@ export default function POSPage() {
                                                             )}
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
-                                                                <p className="text-xs text-gray-400 truncate">
+                                                                {p.posNote && (
+                                                                    <p className="mt-0.5 inline-block max-w-full truncate text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md">
+                                                                        📌 {p.posNote}
+                                                                    </p>
+                                                                )}
+                                                                <p className="text-xs text-gray-400 truncate mt-0.5">
                                                                     {p.code}{p.barcode ? ` · 🏷️ ${p.barcode}` : ''} · {p.unit}{p.description ? ` · ${p.description}` : ''}
                                                                 </p>
                                                             </div>
@@ -1615,7 +1624,12 @@ export default function POSPage() {
                                                         )}
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
-                                                            <p className="text-[10px] text-gray-400 truncate">
+                                                            {p.posNote && (
+                                                                <p className="mt-0.5 inline-block max-w-full truncate text-[10px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded">
+                                                                    📌 {p.posNote}
+                                                                </p>
+                                                            )}
+                                                            <p className="text-[10px] text-gray-400 truncate mt-0.5">
                                                                 {p.code}{p.barcode ? ` · 🏷️ ${p.barcode}` : ''} · {p.unit} · คงเหลือ {stock}{p.description ? ` · ${p.description}` : ''}
                                                             </p>
                                                         </div>
@@ -1750,6 +1764,13 @@ export default function POSPage() {
                                                                 </span>
                                                             )}
                                                         </div>
+                                                        {item.posNote && (
+                                                            <div className="mt-0.5">
+                                                                <span className="inline-block text-[10px] lg:text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md">
+                                                                    📌 {item.posNote}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                         <p className="text-[10px] lg:hidden text-gray-400">{item.productCode} · {formatCurrency(item.unitPrice)}/{item.selectedUnitName}</p>
                                                         <p className="text-xs text-gray-400 hidden lg:block">{item.productCode}</p>
                                                     </div>

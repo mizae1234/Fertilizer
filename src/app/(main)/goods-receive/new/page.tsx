@@ -220,6 +220,7 @@ export default function NewGoodsReceivePage() {
     const [poNumber, setPoNumber] = useState('');
     const [receivedDate, setReceivedDate] = useState(new Date().toISOString().slice(0, 10));
     const [notes, setNotes] = useState('');
+    const [billDiscount, setBillDiscount] = useState('');
     const [defaultWarehouseId, setDefaultWarehouseId] = useState('');
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string; type: 'success' | 'error' | 'warning' | 'info'; title?: string }>({ open: false, message: '', type: 'info' });
     const showAlert = useCallback((message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', title?: string) => {
@@ -269,7 +270,9 @@ export default function NewGoodsReceivePage() {
         setItems(updated);
     };
 
-    const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
+    const subtotalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
+    const parsedDiscount = Math.min(subtotalAmount, Math.max(0, parseFloat(billDiscount) || 0));
+    const totalAmount = Math.max(0, subtotalAmount - parsedDiscount);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -288,6 +291,7 @@ export default function NewGoodsReceivePage() {
                 poNumber: poNumber || undefined,
                 receivedDate,
                 notes: notes || undefined,
+                discount: parsedDiscount,
                 items: validItems.map(i => ({
                     productId: i.productId,
                     warehouseId: i.warehouseId,
@@ -646,14 +650,41 @@ export default function NewGoodsReceivePage() {
                         </div>
                     )}
 
-                    {/* Total */}
+                    {/* Total & Bill Discount */}
                     {user?.role === 'ADMIN' && items.length > 0 && (
                         <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
-                            <div className="text-right">
-                                <p className="text-sm text-gray-500">มูลค่ารวม</p>
-                                <p className="text-xl font-bold text-gray-800">
-                                    {totalAmount.toLocaleString('th-TH', { style: 'currency', currency: 'THB' })}
-                                </p>
+                            <div className="w-full sm:w-80 space-y-2">
+                                <div className="flex items-center justify-between text-sm text-gray-600">
+                                    <span>ยอดรวมก่อนส่วนลด</span>
+                                    <span className="font-medium tabular-nums">
+                                        {subtotalAmount.toLocaleString('th-TH', { style: 'currency', currency: 'THB' })}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                    <label className="text-sm font-medium text-red-600 shrink-0">ส่วนลดท้ายบิล (บาท)</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={subtotalAmount}
+                                        step="0.01"
+                                        value={billDiscount}
+                                        onFocus={e => e.target.select()}
+                                        onChange={e => setBillDiscount(e.target.value)}
+                                        placeholder="0.00"
+                                        className="w-36 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50/40 text-sm text-right font-medium text-red-600 tabular-nums focus:ring-2 focus:ring-red-400 focus:border-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                </div>
+                                {parsedDiscount > 0 && (
+                                    <p className="text-[11px] text-gray-400 text-right">
+                                        * ระบบจะเฉลี่ยส่วนลดหักต้นทุนสินค้าให้อัตโนมัติเมื่ออนุมัติ
+                                    </p>
+                                )}
+                                <div className="pt-2 border-t border-gray-200 flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-gray-700">มูลค่าสุทธิ</span>
+                                    <span className="text-xl font-bold text-emerald-600 tabular-nums">
+                                        {totalAmount.toLocaleString('th-TH', { style: 'currency', currency: 'THB' })}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     )}

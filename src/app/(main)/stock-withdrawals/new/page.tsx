@@ -12,6 +12,7 @@ interface WithdrawalItem {
     productId: string; productName: string; productCode: string; unit: string;
     warehouseId: string;
     quantity: number; unitCost: number;
+    notes: string;
     availableStock: number;
     productStocks?: { warehouseId: string; quantity: number }[];
 }
@@ -75,6 +76,7 @@ export default function NewStockWithdrawalPage() {
             warehouseId: defaultWhId,
             quantity: 1,
             unitCost: Number(product.cost), // ใช้ต้นทุน ณ ตอนนั้น (ไม่แสดงบนหน้าจอ)
+            notes: '',
             availableStock: stock?.quantity || 0,
             productStocks: product.productStocks || [],
         }]);
@@ -141,6 +143,7 @@ export default function NewStockWithdrawalPage() {
                     warehouseId: i.warehouseId,
                     quantity: i.quantity,
                     unitCost: i.unitCost, // ส่งต้นทุน ณ ตอนนั้นไปเก็บในระบบ
+                    notes: i.notes?.trim() || undefined,
                 })),
                 approverName: approverName || undefined,
                 packerName: packerName || undefined,
@@ -177,21 +180,13 @@ export default function NewStockWithdrawalPage() {
                 <p className="text-sm text-gray-500 mt-1">บันทึกการเบิกสินค้าออกจากคลัง</p>
             </div>
 
-            {/* Receiver & Notes */}
+            {/* Receiver */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">ผู้รับสินค้า <span className="text-red-500">*</span></label>
-                        <input type="text" value={requesterName} onChange={e => setRequesterName(e.target.value)}
-                            placeholder="พิมพ์ชื่อผู้รับสินค้า..."
-                            className="w-full px-4 py-2.5 border-0 border-b-2 border-gray-200 focus:border-violet-500 outline-none text-sm bg-gray-50/50 rounded-t-lg transition-colors" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">หมายเหตุ</label>
-                        <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
-                            placeholder="รายละเอียดเพิ่มเติม"
-                            className="w-full px-4 py-2.5 border-0 border-b-2 border-gray-200 focus:border-violet-500 outline-none text-sm bg-gray-50/50 rounded-t-lg transition-colors" />
-                    </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ผู้รับสินค้า <span className="text-red-500">*</span></label>
+                    <input type="text" value={requesterName} onChange={e => setRequesterName(e.target.value)}
+                        placeholder="พิมพ์ชื่อผู้รับสินค้า..."
+                        className="w-full md:w-1/2 px-4 py-2.5 border-0 border-b-2 border-gray-200 focus:border-violet-500 outline-none text-sm bg-gray-50/50 rounded-t-lg transition-colors" />
                 </div>
             </div>
 
@@ -250,6 +245,7 @@ export default function NewStockWithdrawalPage() {
                                         <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">สินค้า</th>
                                         <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">คลัง</th>
                                         <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500">จำนวน</th>
+                                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">หมายเหตุรายการ</th>
                                         <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 w-10"></th>
                                     </tr>
                                 </thead>
@@ -268,9 +264,18 @@ export default function NewStockWithdrawalPage() {
                                                 </select>
                                                 <p className={`text-[10px] mt-0.5 ${item.availableStock <= 0 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>คงเหลือ: {item.availableStock}</p>
                                             </td>
-                                            <td className="px-3 py-2">
+                                            <td className="px-3 py-2 text-right">
                                                 <input type="number" min={0.0001} step="any" value={item.quantity} onFocus={e => e.target.select()} onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
                                                     className="w-24 px-2 py-1 rounded border border-gray-200 text-sm text-right outline-none focus:ring-1 focus:ring-violet-500" />
+                                            </td>
+                                            <td className="px-3 py-2 min-w-[180px]">
+                                                <input
+                                                    type="text"
+                                                    value={item.notes}
+                                                    onChange={e => updateItem(idx, 'notes', e.target.value)}
+                                                    placeholder="หมายเหตุ (ถ้ามี)..."
+                                                    className="w-full px-2.5 py-1 rounded border border-gray-200 text-sm outline-none focus:ring-1 focus:ring-violet-500"
+                                                />
                                             </td>
                                             <td className="px-3 py-2 text-center">
                                                 <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">✕</button>
@@ -306,11 +311,33 @@ export default function NewStockWithdrawalPage() {
                                                 className="w-full px-2 py-1 rounded border border-gray-200 text-xs text-right outline-none" />
                                         </div>
                                     </div>
+                                    <div className="mt-2">
+                                        <label className="text-[10px] text-gray-400">หมายเหตุรายการ</label>
+                                        <input
+                                            type="text"
+                                            value={item.notes}
+                                            onChange={e => updateItem(idx, 'notes', e.target.value)}
+                                            placeholder="หมายเหตุของสินค้านี้ (ถ้ามี)..."
+                                            className="w-full px-2.5 py-1.5 rounded border border-gray-200 text-xs outline-none focus:ring-1 focus:ring-violet-500"
+                                        />
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     </>
                 )}
+            </div>
+
+            {/* Notes Box After Items */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-4">
+                <label className="block text-sm font-bold text-gray-800 mb-2">📝 หมายเหตุใบเบิกสินค้า</label>
+                <textarea
+                    rows={3}
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    placeholder="พิมพ์หมายเหตุหรือรายละเอียดเพิ่มเติมหลังรายการสินค้าที่เบิก..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none text-sm resize-none"
+                />
             </div>
 
             {/* Signatures */}

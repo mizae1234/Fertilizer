@@ -52,6 +52,7 @@ export default async function ProductsPage({ searchParams }: Props) {
                             { brand: { contains: token, mode: 'insensitive' as const } },
                             { packaging: { contains: token, mode: 'insensitive' as const } },
                             { description: { contains: token, mode: 'insensitive' as const } },
+                            { posNote: { contains: token, mode: 'insensitive' as const } },
                             { productGroup: { name: { contains: token, mode: 'insensitive' as const } } },
                         ],
                     };

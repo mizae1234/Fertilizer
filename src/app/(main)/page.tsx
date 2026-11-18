@@ -3,14 +3,15 @@ export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/utils';
 import DashboardCard from '@/components/DashboardCard';
+import LowStockSection from '@/components/LowStockSection';
 import StatusBadge from '@/components/StatusBadge';
 import Link from 'next/link';
-import { isServerAdmin } from '@/lib/server-auth';
+import { getServerUser } from '@/lib/server-auth';
 
 async function getDashboardData() {
     const [
         stockValue,
-        lowStockCount,
+        lowStockResult,
         todaySales,
         pendingGRs,
         recentGRs,
@@ -19,11 +20,17 @@ async function getDashboardData() {
         prisma.product.count({
             where: { deletedAt: null, isActive: true },
         }),
-        prisma.productStock.count({
-            where: {
-                quantity: { lt: 10 },
-            },
-        }),
+        prisma.$queryRaw<[{ count: number }]>`
+            SELECT COUNT(*)::int AS count
+            FROM "ProductStock" ps
+            JOIN "Product" p ON p."id" = ps."productId"
+            JOIN "Warehouse" w ON w."id" = ps."warehouseId"
+            WHERE p."deletedAt" IS NULL
+              AND p."isActive" = true
+              AND w."deletedAt" IS NULL
+              AND w."isActive" = true
+              AND ps."quantity" < p."minStock"
+        `,
         prisma.sale.aggregate({
             where: {
                 status: 'APPROVED',
@@ -54,6 +61,8 @@ async function getDashboardData() {
         }),
     ]);
 
+    const lowStockCount = lowStockResult[0]?.count ?? 0;
+
     return {
         totalStock: stockValue,
         lowStockCount,
@@ -66,8 +75,16 @@ async function getDashboardData() {
 }
 
 export default async function DashboardPage() {
-    const data = await getDashboardData();
-    const adminUser = await isServerAdmin();
+    const [data, serverUser] = await Promise.all([
+        getDashboardData(),
+        getServerUser(),
+    ]);
+    const adminUser = serverUser?.role === 'ADMIN';
+    const canLinkProduct = Boolean(
+        adminUser ||
+        !serverUser?.allowedMenus ||
+        serverUser.allowedMenus.includes('/products')
+    );
 
     return (
         <div className="animate-fade-in">
@@ -88,10 +105,12 @@ export default async function DashboardPage() {
                 />
                 <DashboardCard
                     title="สินค้าใกล้หมด"
-                    value={data.lowStockCount}
+                    value={data.lowStockCount.toLocaleString()}
                     icon="⚠️"
                     color="orange"
                     subtitle="รายการ"
+                    href="#low-stock-section"
+                    actionHint="คลิกดูรายการ / Export ↓"
                 />
                 {adminUser ? (
                     <DashboardCard
@@ -245,6 +264,13 @@ export default async function DashboardPage() {
                     )}
                 </div>
             </div>
+
+            {/* Low Stock Paginated & Exportable Section — lazy-loaded on click */}
+            <LowStockSection
+                initialCount={data.lowStockCount}
+                isAdmin={adminUser}
+                canLinkProduct={canLinkProduct}
+            />
         </div>
     );
 }

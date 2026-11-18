@@ -6,6 +6,8 @@ interface DashboardCardProps {
     icon: string;
     color?: 'emerald' | 'blue' | 'orange' | 'red' | 'purple';
     subtitle?: string;
+    href?: string;
+    actionHint?: string;
 }
 
 const colorMap = {
@@ -22,19 +24,37 @@ export default function DashboardCard({
     icon,
     color = 'emerald',
     subtitle,
+    href,
+    actionHint,
 }: DashboardCardProps) {
+    const inner = (
+        <div className="flex items-center gap-3 sm:gap-4">
+            <div className={cn('w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-lg sm:text-xl shrink-0', colorMap[color])}>
+                {icon}
+            </div>
+            <div className="min-w-0 flex-1">
+                <p className="text-[10px] sm:text-xs text-gray-500 font-medium truncate">{title}</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-800 mt-0.5 truncate">{value}</p>
+                {subtitle && <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+                {actionHint && <p className="text-[10px] sm:text-xs text-orange-600 font-medium mt-0.5">{actionHint}</p>}
+            </div>
+        </div>
+    );
+
+    if (href) {
+        return (
+            <a
+                href={href}
+                className="block bg-white rounded-xl shadow-md border border-gray-100 p-3 sm:p-5 hover:shadow-lg hover:border-orange-300 transition-all duration-200 cursor-pointer"
+            >
+                {inner}
+            </a>
+        );
+    }
+
     return (
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-3 sm:p-5 hover:shadow-lg transition-shadow duration-200">
-            <div className="flex items-center gap-3 sm:gap-4">
-                <div className={cn('w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-lg sm:text-xl shrink-0', colorMap[color])}>
-                    {icon}
-                </div>
-                <div className="min-w-0">
-                    <p className="text-[10px] sm:text-xs text-gray-500 font-medium truncate">{title}</p>
-                    <p className="text-lg sm:text-2xl font-bold text-gray-800 mt-0.5 truncate">{value}</p>
-                    {subtitle && <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{subtitle}</p>}
-                </div>
-            </div>
+            {inner}
         </div>
     );
 }

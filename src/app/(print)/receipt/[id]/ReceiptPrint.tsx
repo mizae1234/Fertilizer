@@ -46,6 +46,17 @@ function formatCurrency(n: number) {
     return rounded.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatReceiptQtyUnit(quantity: number, rawUnit: string) {
+    const unit = (rawUnit || '').trim();
+    if (!unit) return String(quantity);
+    // When unit name itself starts with a digit (e.g. "15ลัง+1ลัง", "10แถม1", "1ลัง"),
+    // avoid sticking "1 " in front of "15ลัง+1ลัง", and separate multi-set quantities clearly.
+    if (/^\d/.test(unit)) {
+        return quantity === 1 ? unit : `${quantity} × (${unit})`;
+    }
+    return `${quantity} ${unit}`;
+}
+
 function formatDate(d: string) {
     return new Date(d).toLocaleDateString('th-TH', {
         year: 'numeric', month: 'short', day: 'numeric',
@@ -193,7 +204,7 @@ export default function ReceiptPrint({ sale, template, cashReceived }: { sale: S
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingLeft: numColWidth }}>
                                 <span>
-                                    {item.quantity} {item.unitName || item.product.unit} x{formatCurrency(item.unitPrice)}
+                                    {formatReceiptQtyUnit(item.quantity, item.unitName || item.product.unit)} x{formatCurrency(item.unitPrice)}
                                     {item.discount && item.discount > 0 ? ` (-${formatCurrency(item.discount)})` : ''}
                                 </span>
                                 <span>{formatCurrency(item.totalPrice)}</span>

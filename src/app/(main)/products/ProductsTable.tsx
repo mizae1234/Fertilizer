@@ -20,6 +20,7 @@ export interface TableProduct {
     barcode: string | null;
     name: string;
     description: string | null;
+    posNote?: string | null;
     unit: string;
     cost: number | string;
     price: number | string;
@@ -509,6 +510,11 @@ export default function ProductsTable({
                                         <td className="px-4 py-3">
                                             <Link href={`/products/${product.id}`}>
                                                 <p className="text-sm font-medium text-emerald-700 hover:text-emerald-800">{product.name}</p>
+                                                {product.posNote && (
+                                                    <span className="inline-block mt-0.5 text-[11px] px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 border border-orange-200 font-medium max-w-[240px] truncate" title={product.posNote}>
+                                                        📌 {product.posNote}
+                                                    </span>
+                                                )}
                                                 {product.description && (
                                                     <p className="text-xs text-gray-400 truncate max-w-[200px]">{product.description}</p>
                                                 )}

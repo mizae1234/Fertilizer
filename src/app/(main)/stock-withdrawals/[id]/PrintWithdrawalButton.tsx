@@ -14,6 +14,7 @@ interface WithdrawalData {
     items: {
         id: string;
         quantity: number;
+        notes?: string | null;
         product: { name: string; code: string; unit: string };
         warehouse: { name: string };
     }[];
@@ -97,7 +98,6 @@ export default function PrintWithdrawalButton({ id }: { id: string }) {
     <div style="background:#f8f9fa;border:1px solid #ddd;border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:12px;">
         <div style="margin-bottom:4px;"><strong>ผู้รับสินค้า:</strong> ${data.requesterName}</div>
         <div><strong>ผู้สร้าง:</strong> ${data.createdBy.name}</div>
-        ${data.notes ? `<div style="margin-top:4px;"><strong>หมายเหตุ:</strong> ${data.notes}</div>` : ''}
     </div>
 
     <table>
@@ -107,7 +107,8 @@ export default function PrintWithdrawalButton({ id }: { id: string }) {
                 <th style="width:80px;">รหัส</th>
                 <th>ชื่อสินค้า</th>
                 <th style="width:80px;">คลัง</th>
-                <th style="width:100px;" class="center">จำนวน</th>
+                <th style="width:90px;" class="center">จำนวน</th>
+                <th style="width:140px;">หมายเหตุ</th>
             </tr>
         </thead>
         <tbody>
@@ -118,9 +119,16 @@ export default function PrintWithdrawalButton({ id }: { id: string }) {
                 <td>${item.product.name}</td>
                 <td>${item.warehouse.name}</td>
                 <td class="center">${item.quantity} ${item.product.unit}</td>
+                <td style="color:#4b5563;">${item.notes || '-'}</td>
             </tr>`).join('')}
         </tbody>
     </table>
+
+    ${data.notes ? `
+    <div style="margin-top:12px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:4px;padding:8px 12px;font-size:12px;white-space:pre-wrap;">
+        <strong>หมายเหตุ:</strong> ${data.notes}
+    </div>
+    ` : ''}
 
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;margin-top:52px;border:none;">
         <tbody>

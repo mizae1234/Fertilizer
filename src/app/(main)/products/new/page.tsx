@@ -28,6 +28,7 @@ export default function NewProductPage() {
         barcode: '',
         name: '',
         description: '',
+        posNote: '',
         unit: '',
         cost: 0,
         price: 0,
@@ -220,6 +221,19 @@ export default function NewProductPage() {
                             onChange={(e) => setForm({ ...form, description: e.target.value })}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm"
                             rows={2}
+                        />
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-200">
+                        <label className="block text-sm font-semibold text-amber-900 mb-1">
+                            📌 หมายเหตุสินค้า / โปรโมชั่น (แสดงให้พนักงานเห็นหน้า POS)
+                        </label>
+                        <textarea
+                            value={form.posNote}
+                            onChange={(e) => setForm({ ...form, posNote: e.target.value })}
+                            className="w-full px-3.5 py-2 rounded-xl border border-amber-200 bg-white focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none text-sm"
+                            rows={2}
+                            placeholder="เช่น โปร 5 แถม 1, ซื้อครบ 10 กระสอบแถมเสื้อ 1 ตัว..."
                         />
                     </div>
 

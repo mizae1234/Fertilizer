@@ -10,6 +10,8 @@ import {
     buildActiveReceiveTxWhere,
     computeWeightedAvgCost,
     pickLatestReceiveCost,
+    computeGrBillTotals,
+    computeEffectiveGrUnitCost,
 } from '@/lib/stock-cost-queries';
 
 async function checkGoodsReceiveAccess(isAdminOnly = false) {
@@ -84,6 +86,7 @@ export async function createGoodsReceive(data: {
     poNumber?: string;
     notes?: string;
     receivedDate?: string;
+    discount?: number;
     items: {
         productId: string;
         warehouseId: string;
@@ -96,10 +99,7 @@ export async function createGoodsReceive(data: {
     userId: string;
 }) {
     await checkGoodsReceiveAccess(false);
-    const totalAmount = Math.round(data.items.reduce(
-        (sum, item) => sum + roundQty(item.quantity) * item.unitCost,
-        0
-    ) * 100) / 100;
+    const { discount, netTotalAmount } = computeGrBillTotals(data.items, data.discount);
 
     // Validate user exists
     const user = await prisma.user.findUnique({ where: { id: data.userId } });
@@ -114,7 +114,8 @@ export async function createGoodsReceive(data: {
             receivedDate: data.receivedDate ? new Date(data.receivedDate) : new Date(),
             vendorId: data.vendorId,
             status: 'PENDING',
-            totalAmount,
+            discount,
+            totalAmount: netTotalAmount,
             notes: data.notes,
             createdById: data.userId,
             items: {
@@ -144,6 +145,7 @@ export async function updateGoodsReceive(id: string, data: {
     poNumber?: string;
     notes?: string;
     receivedDate?: string;
+    discount?: number;
     items: {
         productId: string;
         warehouseId: string;
@@ -160,9 +162,10 @@ export async function updateGoodsReceive(id: string, data: {
         throw new Error('ไม่สามารถแก้ไขรายการที่ไม่ใช่สถานะรออนุมัติ');
     }
 
-    const totalAmount = Math.round(data.items.reduce(
-        (sum, item) => sum + roundQty(item.quantity) * item.unitCost, 0
-    ) * 100) / 100;
+    const { discount, netTotalAmount } = computeGrBillTotals(
+        data.items,
+        data.discount !== undefined ? data.discount : existing.discount
+    );
 
     await prisma.$transaction(async (tx) => {
         // Delete old items
@@ -176,7 +179,8 @@ export async function updateGoodsReceive(id: string, data: {
                 poNumber: data.poNumber || null,
                 receivedDate: data.receivedDate ? new Date(data.receivedDate) : existing.receivedDate,
                 notes: data.notes || null,
-                totalAmount,
+                discount,
+                totalAmount: netTotalAmount,
                 items: {
                     create: data.items.map((item) => {
                         const qty = roundQty(item.quantity);
@@ -262,6 +266,8 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
         });
         const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 
+        const { discount: billDiscount, discountRatio } = computeGrBillTotals(gr.items, gr.discount);
+
         // Run stock updates + transaction creates sequentially so duplicate products in the same GR accumulate accurately
         for (const item of gr.items) {
             const existing = await tx.productStock.findUnique({
@@ -274,24 +280,25 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
             });
 
             const newQty = roundQty(item.quantity);
-            const newCost = Number(item.unitCost);
+            const effectiveCost = computeEffectiveGrUnitCost(item.unitCost, discountRatio);
+            const roundedEffectiveCost = Math.round(effectiveCost * 100) / 100;
 
             if (existing) {
                 const oldQty = existing.quantity;
                 const oldCost = Number(existing.avgCost);
                 const totalQty = roundQty(oldQty + newQty);
                 const avgCost = oldQty <= 0
-                    ? newCost
+                    ? effectiveCost
                     : totalQty > 0
-                        ? ((oldQty * oldCost) + (newQty * newCost)) / totalQty
-                        : newCost;
+                        ? ((oldQty * oldCost) + (newQty * effectiveCost)) / totalQty
+                        : effectiveCost;
 
                 await tx.productStock.update({
                     where: { id: existing.id },
                     data: {
                         quantity: totalQty,
                         avgCost: parseFloat(avgCost.toFixed(2)),
-                        lastCost: newCost > 0 || Number(existing.lastCost) === 0 ? newCost : existing.lastCost,
+                        lastCost: roundedEffectiveCost > 0 || Number(existing.lastCost) === 0 ? roundedEffectiveCost : existing.lastCost,
                     },
                 });
             } else {
@@ -300,8 +307,8 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                         productId: item.productId,
                         warehouseId: item.warehouseId,
                         quantity: newQty,
-                        avgCost: newCost,
-                        lastCost: newCost,
+                        avgCost: roundedEffectiveCost,
+                        lastCost: roundedEffectiveCost,
                     },
                 });
             }
@@ -312,11 +319,13 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                     warehouseId: item.warehouseId,
                     type: 'GOODS_RECEIVE',
                     quantity: newQty,
-                    unitCost: newCost,
+                    unitCost: roundedEffectiveCost,
                     reference: gr.grNumber,
                     lotNo: item.lotNo || null,
                     userId: dbAdmin.id,
-                    notes: `รับสินค้าจาก GR ${gr.grNumber}`,
+                    notes: billDiscount > 0
+                        ? `รับสินค้าจาก GR ${gr.grNumber} (หักส่วนลดท้ายบิลเฉลี่ยแล้ว)`
+                        : `รับสินค้าจาก GR ${gr.grNumber}`,
                 },
             });
 
@@ -345,7 +354,10 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
 
             const oldCost = Number(prod.cost);
             const totalNewQty = roundQty(grItemsForProduct.reduce((s, i) => s + roundQty(i.quantity), 0));
-            const totalNewValue = grItemsForProduct.reduce((s, i) => s + roundQty(i.quantity) * Number(i.unitCost), 0);
+            const totalNewValue = grItemsForProduct.reduce(
+                (s, i) => s + roundQty(i.quantity) * computeEffectiveGrUnitCost(i.unitCost, discountRatio),
+                0
+            );
             const blendedNewCost = totalNewQty > 0 ? totalNewValue / totalNewQty : 0;
 
             // For LAST / MANUAL when a GR has both a paid line and a 0-cost freebie line, prefer the last positive-cost line
@@ -353,6 +365,10 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
             const representativeCostItem = nonZeroItems.length > 0
                 ? nonZeroItems[nonZeroItems.length - 1]
                 : grItemsForProduct[grItemsForProduct.length - 1];
+            const representativeNetCost = Math.round(
+                computeEffectiveGrUnitCost(representativeCostItem.unitCost, discountRatio) * 100
+            ) / 100;
+            const discountNote = billDiscount > 0 ? ` [หักส่วนลดท้ายบิล ฿${billDiscount}]` : '';
 
             if (method === 'AVG') {
                 // Get total current stock across all warehouses for this product
@@ -384,11 +400,11 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                         field: 'cost',
                         oldValue: String(oldCost),
                         newValue: String(parseFloat(newAvgCost.toFixed(2))),
-                        details: `อัพเดตต้นทุนเฉลี่ย จาก ฿${oldCost} → ฿${parseFloat(newAvgCost.toFixed(2))} (คงเหลือ ${currentStock} + รับใหม่ ${totalNewQty} @ เฉลี่ย ฿${Math.round(blendedNewCost * 100) / 100}) (GR ${gr.grNumber})`,
+                        details: `อัพเดตต้นทุนเฉลี่ย จาก ฿${oldCost} → ฿${parseFloat(newAvgCost.toFixed(2))} (คงเหลือ ${currentStock} + รับใหม่ ${totalNewQty} @ ทุนสุทธิ ฿${Math.round(blendedNewCost * 100) / 100})${discountNote} (GR ${gr.grNumber})`,
                     },
                 });
             } else if (method === 'LAST') {
-                const newCost = Number(representativeCostItem.unitCost);
+                const newCost = representativeNetCost;
 
                 await tx.product.update({
                     where: { id: productId },
@@ -403,11 +419,11 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                         field: 'cost',
                         oldValue: String(oldCost),
                         newValue: String(newCost),
-                        details: `อัพเดตต้นทุนล่าสุด จาก ฿${oldCost} → ฿${newCost} (GR ${gr.grNumber})`,
+                        details: `อัพเดตต้นทุนล่าสุด จาก ฿${oldCost} → ฿${newCost}${discountNote} (GR ${gr.grNumber})`,
                     },
                 });
             } else if (method === 'MANUAL') {
-                const newCost = Number(representativeCostItem.unitCost);
+                const newCost = representativeNetCost;
 
                 if (newCost !== oldCost) {
                     await tx.product.update({
@@ -423,7 +439,7 @@ export async function approveGoodsReceive(id: string, costMethodOverrides?: Reco
                             field: 'cost',
                             oldValue: String(oldCost),
                             newValue: String(newCost),
-                            details: `อัพเดตต้นทุนกำหนดเอง จาก ฿${oldCost} → ฿${newCost} (GR ${gr.grNumber})`,
+                            details: `อัพเดตต้นทุนกำหนดเอง จาก ฿${oldCost} → ฿${newCost}${discountNote} (GR ${gr.grNumber})`,
                         },
                     });
                 }
@@ -499,6 +515,8 @@ export async function cancelGoodsReceive(id: string, reason: string) {
         ]);
         const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 
+        const { discountRatio: cancelDiscountRatio } = computeGrBillTotals(gr.items, gr.discount);
+
         // Group stock deductions by (productId, warehouseId) so multi-line items in the same GR deduct atomically
         const whGroups = new Map<
             string,
@@ -507,7 +525,7 @@ export async function cancelGoodsReceive(id: string, reason: string) {
         for (const item of gr.items) {
             const key = `${item.productId}_${item.warehouseId}`;
             const itemQty = roundQty(item.quantity);
-            const itemValue = itemQty * Number(item.unitCost);
+            const itemValue = itemQty * computeEffectiveGrUnitCost(item.unitCost, cancelDiscountRatio);
             const group = whGroups.get(key);
             if (group) {
                 group.deductQty = roundQty(group.deductQty + itemQty);
@@ -586,13 +604,14 @@ export async function cancelGoodsReceive(id: string, reason: string) {
         // 2) Record 1:1 GOODS_RECEIVE_CANCEL StockTransaction per GR item line
         for (const item of gr.items) {
             const qtyToDeduct = roundQty(item.quantity);
+            const roundedNetCost = Math.round(computeEffectiveGrUnitCost(item.unitCost, cancelDiscountRatio) * 100) / 100;
             await tx.stockTransaction.create({
                 data: {
                     productId: item.productId,
                     warehouseId: item.warehouseId,
                     type: 'GOODS_RECEIVE_CANCEL',
                     quantity: -qtyToDeduct,
-                    unitCost: item.unitCost,
+                    unitCost: roundedNetCost,
                     reference: gr.grNumber,
                     lotNo: item.lotNo || null,
                     userId: dbAdmin.id,
@@ -613,7 +632,7 @@ export async function cancelGoodsReceive(id: string, reason: string) {
                 cancelledItemsForProduct.reduce((s, i) => s + roundQty(i.quantity), 0)
             );
             const totalCancelledValue = cancelledItemsForProduct.reduce(
-                (s, i) => s + roundQty(i.quantity) * Number(i.unitCost),
+                (s, i) => s + roundQty(i.quantity) * computeEffectiveGrUnitCost(i.unitCost, cancelDiscountRatio),
                 0
             );
 
@@ -796,6 +815,8 @@ export async function updateGoodsReceivePayment(id: string, data: {
     goodsPaid: boolean;
     shippingPaid: boolean;
     shippingCost: number;
+    unloadingPaid: boolean;
+    unloadingCost: number;
 }) {
     await checkGoodsReceiveAccess(true);
     const gr = await prisma.goodsReceive.findUnique({ where: { id } });
@@ -810,6 +831,8 @@ export async function updateGoodsReceivePayment(id: string, data: {
             goodsPaid: data.goodsPaid,
             shippingPaid: data.shippingPaid,
             shippingCost: data.shippingCost,
+            unloadingPaid: data.unloadingPaid,
+            unloadingCost: data.unloadingCost,
         },
     });
 
