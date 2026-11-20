@@ -72,6 +72,7 @@ export type GoodsReceiveWithDetails = Prisma.GoodsReceiveGetPayload<{
 export type TransferWithDetails = Prisma.StockTransferGetPayload<{
     include: {
         createdBy: true;
+        cancelledBy: true;
         fromWarehouse: true;
         toWarehouse: true;
         items: { include: { product: true; warehouse: true } };

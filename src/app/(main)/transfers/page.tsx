@@ -33,6 +33,7 @@ export default async function TransfersPage({ searchParams }: Props) {
                 fromWarehouse: { select: { name: true } },
                 toWarehouse: { select: { name: true } },
                 createdBy: { select: { name: true } },
+                cancelledBy: { select: { name: true } },
                 _count: { select: { items: true } },
             },
             skip: (page - 1) * perPage,
@@ -66,8 +67,14 @@ export default async function TransfersPage({ searchParams }: Props) {
             {/* Filters */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 mb-4">
                 <div className="flex flex-wrap items-end gap-3">
-                    <div className="flex gap-2">
-                        {[{ v: '', l: 'ทั้งหมด' }, { v: 'PENDING', l: 'รออนุมัติ' }, { v: 'APPROVED', l: 'อนุมัติแล้ว' }, { v: 'REJECTED', l: 'ปฏิเสธ' }].map(f => (
+                    <div className="flex flex-wrap gap-2">
+                        {[
+                            { v: '', l: 'ทั้งหมด' },
+                            { v: 'PENDING', l: 'รออนุมัติ' },
+                            { v: 'APPROVED', l: 'อนุมัติแล้ว' },
+                            { v: 'REJECTED', l: 'ปฏิเสธ' },
+                            { v: 'CANCELLED', l: 'ยกเลิกแล้ว' },
+                        ].map(f => (
                             <Link key={f.v} href={buildUrl({ status: f.v, page: '1' })}
                                 className={`px-3 py-1.5 rounded-lg text-sm font-medium ${status === f.v || (!status && !f.v) ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                                 {f.l}
@@ -81,36 +88,61 @@ export default async function TransfersPage({ searchParams }: Props) {
             </div>
 
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-                <table className="w-full">
-                    <thead>
-                        <tr className="bg-gray-50 border-b border-gray-100">
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เลขที่</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">จาก</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ไป</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">รายการ</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สถานะ</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สร้างโดย</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">วันที่</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {transfers.length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
-                        ) : (
-                            transfers.map(tf => (
-                                <tr key={tf.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3"><Link href={`/transfers/${tf.id}`} className="text-sm font-medium text-emerald-600 hover:underline">{tf.transferNumber}</Link></td>
-                                    <td className="px-4 py-3 text-sm text-gray-800">{tf.fromWarehouse.name}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-800">{tf.toWarehouse.name}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-600">{tf._count.items} รายการ</td>
-                                    <td className="px-4 py-3"><StatusBadge status={tf.status} /></td>
-                                    <td className="px-4 py-3 text-sm text-gray-600">{tf.createdBy.name}</td>
-                                    <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(tf.createdAt)}</td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead>
+                            <tr className="bg-gray-50 border-b border-gray-100">
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">เลขที่</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">จาก</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ไป</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">รายการ</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สถานะ</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">สร้างโดย</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">วันที่</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {transfers.length === 0 ? (
+                                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">ไม่พบรายการ</td></tr>
+                            ) : (
+                                transfers.map(tf => {
+                                    const isCancelled = tf.status === 'CANCELLED';
+                                    return (
+                                        <tr key={tf.id} className={`hover:bg-gray-50 ${isCancelled ? 'bg-rose-50/30' : ''}`}>
+                                            <td className="px-4 py-3">
+                                                <Link
+                                                    href={`/transfers/${tf.id}`}
+                                                    className={`text-sm font-medium hover:underline ${isCancelled ? 'line-through text-rose-500' : 'text-emerald-600'}`}
+                                                >
+                                                    {tf.transferNumber}
+                                                </Link>
+                                                {isCancelled && tf.cancelReason && (
+                                                    <p className="text-xs text-rose-500 mt-0.5 truncate max-w-[220px]" title={tf.cancelReason}>
+                                                        เหตุผล: {tf.cancelReason}
+                                                    </p>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-800">{tf.fromWarehouse.name}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-800">{tf.toWarehouse.name}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-600">{tf._count.items} รายการ</td>
+                                            <td className="px-4 py-3">
+                                                <StatusBadge status={tf.status} />
+                                                {isCancelled && tf.cancelledBy?.name && (
+                                                    <p className="text-[11px] text-rose-500 mt-0.5">
+                                                        ยกเลิกโดย {tf.cancelledBy.name}
+                                                        {tf.cancelledAt ? ` (${formatDateTime(tf.cancelledAt)})` : ''}
+                                                    </p>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-gray-600">{tf.createdBy.name}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(tf.createdAt)}</td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
 
                 {totalPages > 1 && (
                     <Pagination page={page} totalPages={totalPages} basePath="/transfers" params={{ status, from, to }} />

@@ -27,6 +27,7 @@ enum TransactionType {
   SALE_RETURN
   TRANSFER_IN
   TRANSFER_OUT
+  TRANSFER_CANCEL
   ADJUSTMENT
   FACTORY_RETURN
   WITHDRAWAL
@@ -49,9 +50,10 @@ model User {
   defaultWarehouse       Warehouse?     @relation("UserDefaultWarehouse", fields: [defaultWarehouseId], references: [id])
   goodsReceives          GoodsReceive[] @relation("GoodsReceiveCreatedBy")
   cancelledGoodsReceives GoodsReceive[] @relation("GoodsReceiveCancelledBy")
-  sales                  Sale[]
-  stockTransfers    StockTransfer[]
-  expenses          Expense[]
+  sales                   Sale[]
+  stockTransfers          StockTransfer[] @relation("StockTransferCreatedBy")
+  cancelledStockTransfers StockTransfer[] @relation("StockTransferCancelledBy")
+  expenses                Expense[]
   stockTransactions StockTransaction[]
   productLogs       ProductLog[]
   factoryReturns    FactoryReturn[]
@@ -445,11 +447,15 @@ model StockTransfer {
   status          OrderStatus @default(PENDING)
   notes           String?
   createdById     String
+  cancelledAt     DateTime?
+  cancelledById   String?
+  cancelReason    String?     @db.Text
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   deletedAt       DateTime?
 
-  createdBy     User                @relation(fields: [createdById], references: [id])
+  createdBy     User                @relation("StockTransferCreatedBy", fields: [createdById], references: [id])
+  cancelledBy   User?               @relation("StockTransferCancelledBy", fields: [cancelledById], references: [id])
   fromWarehouse Warehouse           @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
   toWarehouse   Warehouse           @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
   items         StockTransferItem[]
