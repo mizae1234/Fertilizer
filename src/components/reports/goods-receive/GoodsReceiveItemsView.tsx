@@ -63,6 +63,7 @@ export default function GoodsReceiveItemsView({
                                             <tr className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
                                                 <th className="text-left py-2.5 px-3 font-semibold">รหัส</th>
                                                 <th className="text-left py-2.5 px-3 font-semibold">ชื่อสินค้า</th>
+                                                <th className="text-left py-2.5 px-3 font-semibold">เลข PO</th>
                                                 <th className="text-center py-2.5 px-2 font-semibold">จำนวนครั้ง</th>
                                                 <th className="text-right py-2.5 px-3 font-semibold">รับเข้ารวม</th>
                                                 <th className="text-right py-2.5 px-3 font-semibold">ทุนเฉลี่ยก่อนลด</th>
@@ -89,6 +90,18 @@ export default function GoodsReceiveItemsView({
                                                         <span className="text-xs text-gray-400 ml-1.5">
                                                             ({prod.vendorCount} บริษัท)
                                                         </span>
+                                                    </td>
+                                                    <td className="py-2 px-3 text-xs text-gray-600 max-w-[180px]">
+                                                        {prod.poNumbers.length > 0 ? (
+                                                            <span
+                                                                className="block truncate font-medium text-indigo-600"
+                                                                title={prod.poNumbers.join(', ')}
+                                                            >
+                                                                {prod.poNumbers.join(', ')}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-300">-</span>
+                                                        )}
                                                     </td>
                                                     <td className="py-2 px-2 text-center text-xs text-gray-600">
                                                         {prod.receiveCount} ครั้ง
@@ -148,6 +161,7 @@ export default function GoodsReceiveItemsView({
                                     <tr className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
                                         <th className="text-left py-2.5 px-3 font-semibold">วันที่</th>
                                         <th className="text-left py-2.5 px-3 font-semibold">เลขที่ GR</th>
+                                        <th className="text-left py-2.5 px-3 font-semibold">เลข PO</th>
                                         <th className="text-left py-2.5 px-3 font-semibold">บริษัทผู้ขาย</th>
                                         <th className="text-left py-2.5 px-3 font-semibold">สินค้า</th>
                                         <th className="text-left py-2.5 px-3 font-semibold">คลัง</th>
@@ -173,8 +187,14 @@ export default function GoodsReceiveItemsView({
                                                     >
                                                         {row.grNumber}
                                                     </Link>
-                                                    {row.poNumber && (
-                                                        <p className="text-[11px] text-gray-400">PO: {row.poNumber}</p>
+                                                </td>
+                                                <td className="py-2.5 px-3 text-xs whitespace-nowrap">
+                                                    {row.poNumber ? (
+                                                        <span className="font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                                                            {row.poNumber}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-300">-</span>
                                                     )}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-gray-700 text-xs font-medium">

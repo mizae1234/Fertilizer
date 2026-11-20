@@ -186,6 +186,7 @@ export default function GoodsReceiveReportTab({
                 const rollupRows = (fullData.productRollup?.rows || []).map((p) => ({
                     'รหัสสินค้า': p.productCode,
                     'ชื่อสินค้า': p.productName,
+                    'เลข PO': p.poNumbers.length > 0 ? p.poNumbers.join(', ') : '-',
                     'จำนวนครั้งที่รับ': p.receiveCount,
                     'จำนวนบริษัท': p.vendorCount,
                     'จำนวนรับรวม': p.totalQuantity,
@@ -228,6 +229,7 @@ export default function GoodsReceiveReportTab({
             } else if (view === 'vendors') {
                 const vendorRows = (fullData.vendors?.rows || []).map((v) => ({
                     'บริษัทผู้ขาย': v.vendorName,
+                    'เลข PO': v.poNumbers.length > 0 ? v.poNumbers.join(', ') : '-',
                     'จำนวนบิล': v.billCount,
                     'จำนวนรายการ': v.itemLineCount,
                     'จำนวนหน่วยรวม': v.totalQuantity,

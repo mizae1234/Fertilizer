@@ -251,6 +251,7 @@ export async function getGoodsReceiveReport(
             unit: string;
             receiveCount: number;
             vendorIds: Set<string>;
+            poSet: Set<string>;
             totalQuantity: number;
             grossTotal: number;
             discountShare: number;
@@ -258,13 +259,14 @@ export async function getGoodsReceiveReport(
         }
     >();
 
-    const vendorMap = new Map<string, GrVendorSummaryRow>();
+    const vendorMap = new Map<string, GrVendorSummaryRow & { poSet: Set<string> }>();
     const billRows: GrBillSummaryRow[] = [];
 
     for (const gr of records) {
         if (gr.items.length === 0 && hasItemLevelFilter) continue;
 
         vendorIdSet.add(gr.vendor.id);
+        const cleanPo = gr.poNumber?.trim() || null;
         const headerNet = Number(gr.totalAmount);
         const headerDiscount = Number(gr.discount);
         const discountRatio = resolveHeaderDiscountRatio(headerNet, headerDiscount);
@@ -299,7 +301,7 @@ export async function getGoodsReceiveReport(
                     itemId: item.id,
                     grId: gr.id,
                     grNumber: gr.grNumber,
-                    poNumber: gr.poNumber,
+                    poNumber: cleanPo,
                     date: displayDateIso,
                     vendorId: gr.vendor.id,
                     vendorName: gr.vendor.name,
@@ -323,6 +325,7 @@ export async function getGoodsReceiveReport(
                 if (existingProd) {
                     existingProd.receiveCount += 1;
                     existingProd.vendorIds.add(gr.vendor.id);
+                    if (cleanPo) existingProd.poSet.add(cleanPo);
                     existingProd.totalQuantity = roundQty(existingProd.totalQuantity + qty);
                     existingProd.grossTotal = roundMoney(existingProd.grossTotal + lineGross);
                     existingProd.discountShare = roundMoney(existingProd.discountShare + lineDiscountShare);
@@ -335,6 +338,7 @@ export async function getGoodsReceiveReport(
                         unit: item.product.unit,
                         receiveCount: 1,
                         vendorIds: new Set([gr.vendor.id]),
+                        poSet: new Set(cleanPo ? [cleanPo] : []),
                         totalQuantity: qty,
                         grossTotal: lineGross,
                         discountShare: lineDiscountShare,
@@ -370,6 +374,7 @@ export async function getGoodsReceiveReport(
             const existingVendor = vendorMap.get(gr.vendor.id);
             if (existingVendor) {
                 existingVendor.billCount += 1;
+                if (cleanPo) existingVendor.poSet.add(cleanPo);
                 existingVendor.itemLineCount += gr.items.length;
                 existingVendor.totalQuantity = roundQty(existingVendor.totalQuantity + billMatchedQty);
                 existingVendor.grossAmount = roundMoney(existingVendor.grossAmount + effectiveBillGross);
@@ -388,6 +393,8 @@ export async function getGoodsReceiveReport(
                     vendorId: gr.vendor.id,
                     vendorName: gr.vendor.name,
                     billCount: 1,
+                    poNumbers: [],
+                    poSet: new Set(cleanPo ? [cleanPo] : []),
                     itemLineCount: gr.items.length,
                     totalQuantity: billMatchedQty,
                     grossAmount: effectiveBillGross,
@@ -414,7 +421,7 @@ export async function getGoodsReceiveReport(
             billRows.push({
                 grId: gr.id,
                 grNumber: gr.grNumber,
-                poNumber: gr.poNumber,
+                poNumber: cleanPo,
                 receivedDate: gr.receivedDate.toISOString(),
                 createdAt: gr.createdAt.toISOString(),
                 vendorId: gr.vendor.id,
@@ -461,6 +468,7 @@ export async function getGoodsReceiveReport(
                 unit: p.unit,
                 receiveCount: p.receiveCount,
                 vendorCount: p.vendorIds.size,
+                poNumbers: Array.from(p.poSet),
                 totalQuantity: p.totalQuantity,
                 avgGrossUnitCost: p.totalQuantity > 0 ? roundMoney(p.grossTotal / p.totalQuantity) : 0,
                 avgNetUnitCost: p.totalQuantity > 0 ? roundMoney(p.netTotal / p.totalQuantity) : 0,
@@ -478,9 +486,12 @@ export async function getGoodsReceiveReport(
     }
 
     if (needVendors) {
-        const sortedVendors = Array.from(vendorMap.values()).sort(
-            (a, b) => b.netAmount - a.netAmount
-        );
+        const sortedVendors: GrVendorSummaryRow[] = Array.from(vendorMap.values())
+            .map(({ poSet, ...rest }) => ({
+                ...rest,
+                poNumbers: Array.from(poSet),
+            }))
+            .sort((a, b) => b.netAmount - a.netAmount);
         return {
             summary,
             vendors: paginateArray(sortedVendors, page, pageSize, exportAll),

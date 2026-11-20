@@ -34,6 +34,7 @@ export default function GoodsReceiveBillsView({
                             <thead>
                                 <tr className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
                                     <th className="text-left py-2.5 px-3 font-semibold">เลขที่ GR</th>
+                                    <th className="text-left py-2.5 px-3 font-semibold">เลข PO</th>
                                     <th className="text-left py-2.5 px-3 font-semibold">วันที่รับ</th>
                                     <th className="text-left py-2.5 px-3 font-semibold">บริษัทผู้ขาย</th>
                                     <th className="text-left py-2.5 px-3 font-semibold">สินค้าในบิล</th>
@@ -55,8 +56,14 @@ export default function GoodsReceiveBillsView({
                                             >
                                                 {bill.grNumber}
                                             </Link>
-                                            {bill.poNumber && (
-                                                <p className="text-[11px] text-gray-400">PO: {bill.poNumber}</p>
+                                        </td>
+                                        <td className="py-2.5 px-3 text-xs whitespace-nowrap">
+                                            {bill.poNumber ? (
+                                                <span className="font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                                                    {bill.poNumber}
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-300">-</span>
                                             )}
                                         </td>
                                         <td className="py-2.5 px-3 text-xs text-gray-500 whitespace-nowrap">

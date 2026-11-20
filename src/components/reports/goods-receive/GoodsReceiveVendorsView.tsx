@@ -68,6 +68,7 @@ export default function GoodsReceiveVendorsView({
                             <thead>
                                 <tr className="text-xs text-gray-500 border-b border-gray-200 bg-gray-50">
                                     <th className="text-left py-2.5 px-3 font-semibold">บริษัทผู้ขาย</th>
+                                    <th className="text-left py-2.5 px-3 font-semibold">เลข PO</th>
                                     <th className="text-center py-2.5 px-2 font-semibold">จำนวนบิล</th>
                                     <th className="text-right py-2.5 px-3 font-semibold">จำนวนหน่วยรวม</th>
                                     <th className="text-right py-2.5 px-3 font-semibold">ยอดก่อนลด</th>
@@ -93,6 +94,18 @@ export default function GoodsReceiveVendorsView({
                                                         {isExpanded ? '▼' : '▶'}
                                                     </span>
                                                     {v.vendorName}
+                                                </td>
+                                                <td className="py-2.5 px-3 text-xs max-w-[180px]">
+                                                    {v.poNumbers.length > 0 ? (
+                                                        <span
+                                                            className="block truncate font-medium text-indigo-600"
+                                                            title={v.poNumbers.join(', ')}
+                                                        >
+                                                            {v.poNumbers.join(', ')}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-300">-</span>
+                                                    )}
                                                 </td>
                                                 <td className="py-2.5 px-2 text-center text-xs text-gray-600">
                                                     {v.billCount} บิล
@@ -139,7 +152,7 @@ export default function GoodsReceiveVendorsView({
 
                                             {isExpanded && (
                                                 <tr>
-                                                    <td colSpan={9} className="bg-gray-50/80 px-4 py-3">
+                                                    <td colSpan={10} className="bg-gray-50/80 px-4 py-3">
                                                         {loadingVendorId === v.vendorId ? (
                                                             <p className="text-xs text-gray-400 py-3 text-center">
                                                                 กำลังโหลดรายการบิลของ {v.vendorName}...
@@ -154,6 +167,7 @@ export default function GoodsReceiveVendorsView({
                                                                     <thead>
                                                                         <tr className="bg-gray-100 text-gray-600 border-b border-gray-200">
                                                                             <th className="py-2 px-3 text-left">เลข GR</th>
+                                                                            <th className="py-2 px-3 text-left">เลข PO</th>
                                                                             <th className="py-2 px-3 text-left">วันที่รับ</th>
                                                                             <th className="py-2 px-3 text-left">รายการสินค้า</th>
                                                                             <th className="py-2 px-3 text-right">ส่วนลด</th>
@@ -171,6 +185,15 @@ export default function GoodsReceiveVendorsView({
                                                                                     >
                                                                                         {b.grNumber}
                                                                                     </Link>
+                                                                                </td>
+                                                                                <td className="py-2 px-3 whitespace-nowrap">
+                                                                                    {b.poNumber ? (
+                                                                                        <span className="font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                                                                                            {b.poNumber}
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span className="text-gray-300">-</span>
+                                                                                    )}
                                                                                 </td>
                                                                                 <td className="py-2 px-3 text-gray-500 whitespace-nowrap">
                                                                                     {formatDate(b.receivedDate)}

@@ -79,6 +79,7 @@ export interface GrProductRollupRow {
     unit: string;
     receiveCount: number;
     vendorCount: number;
+    poNumbers: string[];
     totalQuantity: number;
     avgGrossUnitCost: number;
     avgNetUnitCost: number;
@@ -91,6 +92,7 @@ export interface GrVendorSummaryRow {
     vendorId: string;
     vendorName: string;
     billCount: number;
+    poNumbers: string[];
     itemLineCount: number;
     totalQuantity: number;
     grossAmount: number;
