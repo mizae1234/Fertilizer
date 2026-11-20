@@ -3,6 +3,7 @@ export type GrDateField = 'receivedDate' | 'createdAt';
 export type GrReportViewMode = 'items' | 'vendors' | 'bills';
 
 export const GR_REPORT_DEFAULT_PAGE_SIZE = 20;
+export const GR_PRODUCT_ROLLUP_PAGE_SIZE = 10;
 export const GR_REPORT_MAX_PAGE_SIZE = 100;
 
 export interface GrFilterOption {

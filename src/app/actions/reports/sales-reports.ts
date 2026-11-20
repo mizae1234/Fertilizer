@@ -1,5 +1,6 @@
 'use server';
 
+import { Prisma } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getDateRange } from './utils';
 import { isServerAdmin } from '@/lib/server-auth';
@@ -19,6 +20,15 @@ export async function getSalesOverview(dateFrom?: string, dateTo?: string) {
         ...(dateRange ? { createdAt: dateRange } : {}),
     };
 
+    const startDateFilter = dateFrom
+        ? Prisma.sql`AND s."createdAt" >= ${new Date(dateFrom)}`
+        : Prisma.empty;
+    const endDateObj = dateTo ? new Date(dateTo) : null;
+    if (endDateObj) endDateObj.setHours(23, 59, 59, 999);
+    const endDateFilter = endDateObj
+        ? Prisma.sql`AND s."createdAt" <= ${endDateObj}`
+        : Prisma.empty;
+
     const [totalSales, salesByWarehouse, dailySales, paymentSales] = await Promise.all([
         prisma.sale.aggregate({
             where,
@@ -26,24 +36,34 @@ export async function getSalesOverview(dateFrom?: string, dateTo?: string) {
             _count: true,
         }),
 
-        prisma.saleItem.groupBy({
-            by: ['warehouseId'],
-            where: { sale: where },
-            _sum: { totalPrice: true },
-            _count: true,
-        }),
+        prisma.$queryRaw<
+            { warehouseId: string; totalAmount: number; billCount: number; itemCount: number }[]
+        >(Prisma.sql`
+            SELECT
+                si."warehouseId" AS "warehouseId",
+                COALESCE(SUM(si."totalPrice"::numeric), 0)::float8 AS "totalAmount",
+                COUNT(DISTINCT si."saleId")::int AS "billCount",
+                COUNT(*)::int AS "itemCount"
+            FROM "SaleItem" si
+            INNER JOIN "Sale" s ON s.id = si."saleId"
+            WHERE s.status = 'APPROVED'
+              AND s."deletedAt" IS NULL
+              ${startDateFilter}
+              ${endDateFilter}
+            GROUP BY si."warehouseId"
+        `),
 
-        prisma.$queryRawUnsafe<{ date: string; total: number; count: number }[]>(`
-            SELECT 
-                DATE("createdAt") as date,
-                SUM("totalAmount"::numeric) as total,
-                COUNT(*)::int as count
-            FROM "Sale"
-            WHERE status = 'APPROVED' 
-                AND "deletedAt" IS NULL
-                ${dateFrom ? `AND "createdAt" >= '${new Date(dateFrom).toISOString()}'` : ''}
-                ${dateTo ? `AND "createdAt" <= '${new Date(new Date(dateTo).setHours(23, 59, 59, 999)).toISOString()}'` : ''}
-            GROUP BY DATE("createdAt")
+        prisma.$queryRaw<{ date: Date | string; total: number; count: number }[]>(Prisma.sql`
+            SELECT
+                DATE(s."createdAt") AS date,
+                COALESCE(SUM(s."totalAmount"::numeric), 0)::float8 AS total,
+                COUNT(*)::int AS count
+            FROM "Sale" s
+            WHERE s.status = 'APPROVED'
+              AND s."deletedAt" IS NULL
+              ${startDateFilter}
+              ${endDateFilter}
+            GROUP BY DATE(s."createdAt")
             ORDER BY date ASC
         `),
 
@@ -106,8 +126,10 @@ export async function getSalesOverview(dateFrom?: string, dateTo?: string) {
         byWarehouse: salesByWarehouse.map(s => ({
             warehouseId: s.warehouseId,
             warehouseName: warehouseMap.get(s.warehouseId) || 'ไม่ระบุ',
-            totalAmount: Number(s._sum.totalPrice || 0),
-            count: s._count,
+            totalAmount: Number(s.totalAmount || 0),
+            count: Number(s.billCount || 0),
+            billCount: Number(s.billCount || 0),
+            itemCount: Number(s.itemCount || 0),
         })),
         byPaymentMethod: {
             cash: { total: cashTotal, count: cashCount },
@@ -211,6 +233,7 @@ export async function getTopProducts(dateFrom?: string, dateTo?: string) {
         where: { sale: saleWhere },
         select: {
             id: true,
+            saleId: true,
             productId: true,
             quantity: true,
             totalPrice: true,
@@ -270,6 +293,7 @@ export async function getTopProducts(dateFrom?: string, dateTo?: string) {
         const p = productAgg.get(si.productId)!;
         p.quantity = roundQty(p.quantity + remaining);
         p.totalAmount = Math.round((p.totalAmount + adjustedTotal) * 100) / 100;
+        p.orderIds.add(si.saleId);
 
         // Category aggregation
         const cat = si.product.productGroup?.name || 'ไม่มีหมวดหมู่';
@@ -288,7 +312,7 @@ export async function getTopProducts(dateFrom?: string, dateTo?: string) {
             group: p.group,
             quantity: p.quantity,
             totalAmount: p.totalAmount,
-            orderCount: 0, // simplified
+            orderCount: p.orderIds.size,
         }));
 
     const allProducts = await prisma.product.findMany({

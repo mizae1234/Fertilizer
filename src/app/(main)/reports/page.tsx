@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { getSalesOverview, getSalesDetail, getTopProducts, getCustomerReport } from '@/app/actions/reports';
-import { getInventoryReport, getStockDetailReport, getCashFlowReport, getPnLReport, getPnLDetail, getSaleReturnReport } from '@/app/actions/reports';
+import { getInventoryReport, getStockDetailReport, getCashFlowReport, getArProductDetails, getPnLReport, getPnLDetail, getSaleReturnReport } from '@/app/actions/reports';
 import { getStockWithdrawals } from '@/app/actions/stock-withdrawals';
+import SalesOverviewSection from '@/components/reports/SalesOverviewSection';
 import StatusBadge from '@/components/StatusBadge';
 import * as XLSX from 'xlsx';
 
@@ -17,36 +18,66 @@ function exportToExcel(data: Record<string, unknown>[], filename: string) {
 }
 
 // ==================== PERIOD FILTER COMPONENT ====================
+function computePresetRange(preset: 'today' | 'week' | 'month' | 'year'): { from: string; to: string } {
+    const now = new Date();
+    const from = new Date(now);
+    const to = new Date(now);
+    switch (preset) {
+        case 'today': break;
+        case 'week': from.setDate(now.getDate() - 7); break;
+        case 'month': from.setDate(1); break;
+        case 'year': from.setMonth(0, 1); break;
+    }
+    return {
+        from: from.toISOString().split('T')[0],
+        to: to.toISOString().split('T')[0],
+    };
+}
+
 function PeriodFilter({ dateFrom, dateTo, onChange }: { dateFrom: string; dateTo: string; onChange: (from: string, to: string) => void }) {
-    const setPreset = (preset: string) => {
-        const now = new Date();
-        const from = new Date(now);
-        const to = new Date(now);
-        switch (preset) {
-            case 'today': break;
-            case 'week': from.setDate(now.getDate() - 7); break;
-            case 'month': from.setDate(1); break;
-            case 'year': from.setMonth(0, 1); break;
-            case 'all': onChange('', ''); return;
+    const resolveActivePreset = (): string | null => {
+        if (!dateFrom && !dateTo) return 'all';
+        for (const key of ['today', 'week', 'month', 'year'] as const) {
+            const r = computePresetRange(key);
+            if (r.from === dateFrom && r.to === dateTo) return key;
         }
-        onChange(from.toISOString().split('T')[0], to.toISOString().split('T')[0]);
+        return null;
+    };
+
+    const activePreset = resolveActivePreset();
+
+    const setPreset = (preset: 'today' | 'week' | 'month' | 'year' | 'all') => {
+        if (preset === 'all') {
+            onChange('', '');
+            return;
+        }
+        const range = computePresetRange(preset);
+        onChange(range.from, range.to);
     };
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
             <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-gray-500 mr-1">📅 ช่วงเวลา:</span>
-                {[
-                    { key: 'today', label: 'วันนี้' },
-                    { key: 'week', label: '7 วัน' },
-                    { key: 'month', label: 'เดือนนี้' },
-                    { key: 'year', label: 'ปีนี้' },
-                    { key: 'all', label: 'ทั้งหมด' },
-                ].map(p => (
-                    <button key={p.key} onClick={() => setPreset(p.key)}
-                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${(!dateFrom && !dateTo && p.key === 'all') || (dateFrom && p.key !== 'all') ? '' : ''}
-                            border-gray-200 text-gray-500 hover:bg-gray-50`}
-                    >{p.label}</button>
-                ))}
+                {(
+                    [
+                        { key: 'today', label: 'วันนี้' },
+                        { key: 'week', label: '7 วัน' },
+                        { key: 'month', label: 'เดือนนี้' },
+                        { key: 'year', label: 'ปีนี้' },
+                        { key: 'all', label: 'ทั้งหมด' },
+                    ] as const
+                ).map(p => {
+                    const isActive = activePreset === p.key;
+                    return (
+                        <button key={p.key} onClick={() => setPreset(p.key)}
+                            className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                                isActive
+                                    ? 'border-emerald-500 bg-emerald-500 text-white shadow-xs'
+                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                            }`}
+                        >{p.label}</button>
+                    );
+                })}
                 <div className="flex items-center gap-1 ml-auto">
                     <input type="date" value={dateFrom} onChange={e => onChange(e.target.value, dateTo)}
                         className="px-2 py-1 border border-gray-200 rounded-lg text-xs" />
@@ -147,6 +178,10 @@ const GoodsReceiveReportTab = dynamic(
     () => import('@/components/reports/goods-receive/GoodsReceiveReportTab'),
     { loading: () => <LoadingSpinner /> }
 );
+const VendorCustomerPromoSection = dynamic(
+    () => import('@/components/reports/vendor-customers/VendorCustomerPromoSection'),
+    { loading: () => <LoadingSpinner /> }
+);
 
 // ==================== MAIN PAGE ====================
 export default function ReportsPage() {
@@ -205,7 +240,7 @@ export default function ReportsPage() {
 
 // ==================== SALES TAB ====================
 function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
-    const [section, setSection] = useState<'overview' | 'products' | 'customers' | 'detail'>('overview');
+    const [section, setSection] = useState<'overview' | 'products' | 'customers' | 'vendorCustomers' | 'detail'>('overview');
     const [salesData, setSalesData] = useState<Awaited<ReturnType<typeof getSalesOverview>> | null>(null);
     const [productData, setProductData] = useState<Awaited<ReturnType<typeof getTopProducts>> | null>(null);
     const [customerData, setCustomerData] = useState<Awaited<ReturnType<typeof getCustomerReport>> | null>(null);
@@ -270,6 +305,10 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
     };
 
     const loadData = useCallback(async () => {
+        if (section === 'vendorCustomers') {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
             if (section === 'overview') { const d = await getSalesOverview(dateFrom, dateTo); setSalesData(JSON.parse(JSON.stringify(d))); }
@@ -466,6 +505,7 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                     { key: 'overview' as const, label: '📊 ยอดขายรวม' },
                     { key: 'products' as const, label: '🏆 ตามสินค้า' },
                     { key: 'customers' as const, label: '👥 ตามลูกค้า' },
+                    { key: 'vendorCustomers' as const, label: '🎯 ลูกค้าตามผู้ขาย' },
                     { key: 'detail' as const, label: '📋 รายละเอียด' },
                 ].map(s => (
                     <button key={s.key} onClick={() => setSection(s.key)}
@@ -474,79 +514,15 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                 ))}
             </div>
 
-            {loading ? <LoadingSpinner /> : (
+            {section === 'vendorCustomers' ? (
+                <VendorCustomerPromoSection dateFrom={dateFrom} dateTo={dateTo} />
+            ) : loading ? <LoadingSpinner /> : (
                 <>
                     {section === 'overview' && salesData && (
-                        <div className="space-y-4">
-                            <div className="flex justify-end gap-2"><ExportButton onClick={handleExportSales} label="Export สรุป" /></div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl p-4 text-white">
-                                    <p className="text-emerald-100 text-xs">ยอดขายรวม</p>
-                                    <p className="text-2xl font-bold mt-1">{formatCurrency(salesData.totalAmount)}</p>
-                                    <p className="text-emerald-200 text-xs mt-1">{salesData.totalCount} รายการ</p>
-                                </div>
-                                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                                    <p className="text-gray-400 text-xs">เฉลี่ยต่อบิล</p>
-                                    <p className="text-xl font-bold text-gray-800 mt-1">{formatCurrency(salesData.totalCount > 0 ? salesData.totalAmount / salesData.totalCount : 0)}</p>
-                                </div>
-                            </div>
-                            {salesData.byWarehouse.length > 0 && (
-                                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                                    <h3 className="font-semibold text-gray-800 text-sm mb-3">🏭 แยกตามคลัง</h3>
-                                    {salesData.byWarehouse.map(wh => (
-                                        <div key={wh.warehouseId} className="flex items-center justify-between py-1.5">
-                                            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-sm text-gray-700">{wh.warehouseName}</span></div>
-                                            <div className="text-right"><span className="text-sm font-semibold text-gray-800">{formatCurrency(wh.totalAmount)}</span><span className="text-xs text-gray-400 ml-2">({wh.count} บิล)</span></div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            {(salesData as any).byPaymentMethod && (
-                                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                                    <h3 className="font-semibold text-gray-800 text-sm mb-3">💳 แยกตามช่องทางการชำระ</h3>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                        <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-100/60">
-                                            <p className="text-xs text-emerald-700 font-medium">💵 เงินสด</p>
-                                            <p className="text-base font-bold text-emerald-600 mt-1">{formatCurrency((salesData as any).byPaymentMethod.cash.total)}</p>
-                                            <p className="text-[11px] text-gray-400 mt-0.5">{(salesData as any).byPaymentMethod.cash.count} บิล</p>
-                                        </div>
-                                        <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100/60">
-                                            <p className="text-xs text-blue-700 font-medium">📱 เงินโอน</p>
-                                            <p className="text-base font-bold text-blue-600 mt-1">{formatCurrency((salesData as any).byPaymentMethod.transfer.total)}</p>
-                                            <p className="text-[11px] text-gray-400 mt-0.5">{(salesData as any).byPaymentMethod.transfer.count} บิล</p>
-                                        </div>
-                                        <div className="bg-purple-50 rounded-xl p-3 text-center border border-purple-100/60">
-                                            <p className="text-xs text-purple-700 font-medium">📑 เช็ค</p>
-                                            <p className="text-base font-bold text-purple-600 mt-1">{formatCurrency((salesData as any).byPaymentMethod.cheque.total)}</p>
-                                            <p className="text-[11px] text-gray-400 mt-0.5">{(salesData as any).byPaymentMethod.cheque.count} บิล</p>
-                                        </div>
-                                        <div className="bg-orange-50 rounded-xl p-3 text-center border border-orange-100/60">
-                                            <p className="text-xs text-orange-700 font-medium">⏳ เครดิต/ค้างชำระ</p>
-                                            <p className="text-base font-bold text-orange-600 mt-1">{formatCurrency((salesData as any).byPaymentMethod.credit.total)}</p>
-                                            <p className="text-[11px] text-gray-400 mt-0.5">{(salesData as any).byPaymentMethod.credit.count} บิล</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                            {salesData.dailySales.length > 0 && (
-                                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                                    <h3 className="font-semibold text-gray-800 text-sm mb-3">📊 กราฟยอดขายรายวัน</h3>
-                                    <div className="flex items-end gap-1 h-32 overflow-x-auto">
-                                        {salesData.dailySales.map((d, i) => {
-                                            const max = Math.max(...salesData.dailySales.map(x => x.total), 1);
-                                            return (
-                                                <div key={i} className="flex flex-col items-center min-w-[24px] group">
-                                                    <div className="w-5 bg-gradient-to-t from-emerald-500 to-teal-400 rounded-t-sm hover:from-emerald-600 hover:to-teal-500 cursor-pointer"
-                                                        style={{ height: `${Math.max((d.total / max) * 100, 4)}%` }}
-                                                        title={`${d.date}: ${formatCurrency(d.total)} (${d.count} บิล)`} />
-                                                    <span className="text-[9px] text-gray-400 mt-1">{(() => { try { const dd = new Date(d.date); return isNaN(dd.getTime()) ? '' : dd.getDate(); } catch { return ''; } })()}</span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        <SalesOverviewSection
+                            salesData={salesData}
+                            onExport={handleExportSales}
+                        />
                     )}
 
                     {section === 'products' && productData && (() => {
@@ -599,20 +575,23 @@ function SalesTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
                                         </>
                                     )}
                                 </div>
-                                {productData.byCategory.length > 0 && (
-                                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                                        <h3 className="font-semibold text-gray-800 text-sm mb-3">📁 ตามหมวดหมู่</h3>
-                                        {productData.byCategory.map((c, i) => {
-                                            const max = Math.max(...productData.byCategory.map(x => x.totalAmount));
-                                            return (
+                                {productData.byCategory.length > 0 && (() => {
+                                    const maxCategoryAmount = Math.max(
+                                        ...productData.byCategory.map(x => x.totalAmount),
+                                        1
+                                    );
+                                    return (
+                                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                                            <h3 className="font-semibold text-gray-800 text-sm mb-3">📁 ตามหมวดหมู่</h3>
+                                            {productData.byCategory.map((c, i) => (
                                                 <div key={i} className="mb-2">
                                                     <div className="flex justify-between text-sm mb-1"><span className="text-gray-700">{c.category}</span><span className="font-semibold text-gray-800">{formatCurrency(c.totalAmount)}</span></div>
-                                                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" style={{ width: `${(c.totalAmount / max) * 100}%` }} /></div>
+                                                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" style={{ width: `${(c.totalAmount / maxCategoryAmount) * 100}%` }} /></div>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
                                 {productData.slowMovers.length > 0 && (
                                     <div className="bg-white rounded-xl border border-orange-100 shadow-sm p-4">
                                         <h3 className="font-semibold text-orange-600 text-sm mb-3">🐌 สินค้าไม่มีการขาย</h3>
@@ -1465,38 +1444,12 @@ function FinancialTab({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }
         setLoadingArDetail(true);
         setArDetailPage(1);
         try {
-            const allBills = cashData.ar.byCustomer.flatMap(c => c.items.map(i => ({ ...i, customer: c.customer })));
-            const results = await Promise.all(allBills.map(async (bill) => {
-                try {
-                    const res = await fetch(`/api/sales/${bill.saleId}`);
-                    const data = await res.json();
-                    const retMap = new Map<string, number>();
-                    if (data.saleReturns && Array.isArray(data.saleReturns)) {
-                        for (const sr of data.saleReturns) {
-                            if (sr.items && Array.isArray(sr.items)) {
-                                for (const ri of sr.items) {
-                                    retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + Number(ri.quantity));
-                                }
-                            }
-                        }
-                    }
-                    return (data.items || [])
-                        .map((it: { id: string; product: { name: string; code: string; unit: string }; quantity: number; unitPrice: number; totalPrice: number }) => {
-                            const returnedQty = retMap.get(it.id) || 0;
-                            const remainingQty = Math.max(0, it.quantity - returnedQty);
-                            const unitPrice = Number(it.unitPrice);
-                            return {
-                                customer: bill.customer, saleNumber: bill.saleNumber,
-                                dueDate: bill.dueDate, createdAt: bill.createdAt,
-                                productName: it.product.name, productCode: it.product.code, unit: it.product.unit,
-                                quantity: remainingQty, unitPrice, total: remainingQty * unitPrice,
-                            };
-                        })
-                        .filter((it: { quantity: number }) => it.quantity > 0);
-                } catch { return []; }
-            }));
-            setArDetailRows(results.flat());
-        } catch { setArDetailRows([]); }
+            const saleIds = cashData.ar.byCustomer.flatMap(c => c.items.map(i => i.saleId));
+            const rows = await getArProductDetails(saleIds);
+            setArDetailRows(rows);
+        } catch {
+            setArDetailRows([]);
+        }
         setLoadingArDetail(false);
     }, [cashData]);
 

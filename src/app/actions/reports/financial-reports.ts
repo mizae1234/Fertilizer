@@ -206,6 +206,86 @@ export async function getCashFlowReport(dateFrom?: string, dateTo?: string) {
     };
 }
 
+export async function getArProductDetails(saleIds: string[]) {
+    if (!(await isServerAdmin())) {
+        throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูล');
+    }
+    if (!saleIds || saleIds.length === 0) return [];
+
+    const sales = await prisma.sale.findMany({
+        where: {
+            id: { in: saleIds },
+            status: 'APPROVED',
+            deletedAt: null,
+        },
+        select: {
+            id: true,
+            saleNumber: true,
+            creditDueDate: true,
+            createdAt: true,
+            customer: { select: { name: true } },
+            items: {
+                select: {
+                    id: true,
+                    quantity: true,
+                    unitPrice: true,
+                    product: { select: { name: true, code: true, unit: true } },
+                },
+            },
+            saleReturns: {
+                select: { items: { select: { saleItemId: true, quantity: true } } },
+            },
+        },
+        orderBy: { creditDueDate: 'asc' },
+    });
+
+    const rows: {
+        customer: string;
+        saleNumber: string;
+        dueDate: string | null;
+        createdAt: string;
+        productName: string;
+        productCode: string;
+        unit: string;
+        quantity: number;
+        unitPrice: number;
+        total: number;
+    }[] = [];
+
+    for (const sale of sales) {
+        const retMap = new Map<string, number>();
+        for (const sr of sale.saleReturns) {
+            for (const ri of sr.items) {
+                retMap.set(ri.saleItemId, (retMap.get(ri.saleItemId) || 0) + Number(ri.quantity));
+            }
+        }
+        const customerName = sale.customer?.name || 'ลูกค้าทั่วไป';
+        const dueDateIso = sale.creditDueDate?.toISOString() || null;
+        const createdAtIso = sale.createdAt.toISOString();
+
+        for (const it of sale.items) {
+            const returnedQty = retMap.get(it.id) || 0;
+            const remainingQty = roundQty(Math.max(0, it.quantity - returnedQty));
+            if (remainingQty <= 0) continue;
+            const unitPrice = Number(it.unitPrice);
+            rows.push({
+                customer: customerName,
+                saleNumber: sale.saleNumber,
+                dueDate: dueDateIso,
+                createdAt: createdAtIso,
+                productName: it.product.name,
+                productCode: it.product.code,
+                unit: it.product.unit,
+                quantity: remainingQty,
+                unitPrice,
+                total: Math.round(remainingQty * unitPrice * 100) / 100,
+            });
+        }
+    }
+
+    return rows;
+}
+
 export async function getPnLReport(dateFrom?: string, dateTo?: string) {
     if (!(await isServerAdmin())) {
         throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูล');

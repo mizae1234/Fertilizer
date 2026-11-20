@@ -3,10 +3,15 @@
 
 export { getSalesOverview, getSalesDetail, getTopProducts, getCustomerReport } from './sales-reports';
 export { getStockDetailReport, getInventoryReport } from './stock-reports';
-export { getCashFlowReport, getPnLReport, getPnLDetail } from './financial-reports';
+export { getCashFlowReport, getArProductDetails, getPnLReport, getPnLDetail } from './financial-reports';
 export { getSaleReturnReport } from '../sale-returns';
 export {
     getGoodsReceiveReportOptions,
     getGoodsReceiveReport,
     getVendorGoodsReceiveBills,
 } from './goods-receive-reports';
+export {
+    getVendorCustomerReportOptions,
+    getVendorCustomerReport,
+    getCustomerVendorProductBreakdown,
+} from './vendor-customer-reports';

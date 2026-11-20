@@ -7,6 +7,7 @@ import { roundQty } from '@/lib/utils';
 import { computeEffectiveGrUnitCost } from '@/lib/stock-cost-queries';
 import { getDateRange } from './utils';
 import {
+    GR_PRODUCT_ROLLUP_PAGE_SIZE,
     GR_REPORT_DEFAULT_PAGE_SIZE,
     GR_REPORT_MAX_PAGE_SIZE,
     type GoodsReceiveReportFilters,
@@ -481,7 +482,12 @@ export async function getGoodsReceiveReport(
         return {
             summary,
             items: paginateArray(itemRows, page, pageSize, exportAll),
-            productRollup: paginateArray(productRollupRows, productSummaryPage, 10, exportAll),
+            productRollup: paginateArray(
+                productRollupRows,
+                productSummaryPage,
+                GR_PRODUCT_ROLLUP_PAGE_SIZE,
+                exportAll
+            ),
         };
     }
 
