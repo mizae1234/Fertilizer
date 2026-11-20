@@ -5,3 +5,8 @@ export { getSalesOverview, getSalesDetail, getTopProducts, getCustomerReport } f
 export { getStockDetailReport, getInventoryReport } from './stock-reports';
 export { getCashFlowReport, getPnLReport, getPnLDetail } from './financial-reports';
 export { getSaleReturnReport } from '../sale-returns';
+export {
+    getGoodsReceiveReportOptions,
+    getGoodsReceiveReport,
+    getVendorGoodsReceiveBills,
+} from './goods-receive-reports';

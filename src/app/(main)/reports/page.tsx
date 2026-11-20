@@ -141,12 +141,18 @@ function Pagination({ page, totalPages, onPageChange }: { page: number; totalPag
 
 import { useUser } from '@/hooks/useUser';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+
+const GoodsReceiveReportTab = dynamic(
+    () => import('@/components/reports/goods-receive/GoodsReceiveReportTab'),
+    { loading: () => <LoadingSpinner /> }
+);
 
 // ==================== MAIN PAGE ====================
 export default function ReportsPage() {
     const router = useRouter();
     const user = useUser();
-    const [activeTab, setActiveTab] = useState<'sales' | 'inventory' | 'financial'>('sales');
+    const [activeTab, setActiveTab] = useState<'sales' | 'inventory' | 'goodsReceive' | 'financial'>('sales');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
 
@@ -173,11 +179,16 @@ export default function ReportsPage() {
     return (
         <div className="space-y-4">
             <PeriodFilter dateFrom={dateFrom} dateTo={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} />
-            <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+            <div className="flex bg-gray-100 rounded-xl p-1 gap-1 overflow-x-auto">
                 {[
                     { key: 'sales' as const, label: '💰 ยอดขาย' },
                     { key: 'inventory' as const, label: '📦 สต๊อก' },
-                    ...(user.role === 'ADMIN' ? [{ key: 'financial' as const, label: '🏦 การเงิน' }] : []),
+                    ...(user.role === 'ADMIN'
+                        ? [
+                              { key: 'goodsReceive' as const, label: '📥 รับสินค้าเข้า' },
+                              { key: 'financial' as const, label: '🏦 การเงิน' },
+                          ]
+                        : []),
                 ].map(tab => (
                     <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                         className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab.key ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
@@ -186,6 +197,7 @@ export default function ReportsPage() {
             </div>
             {activeTab === 'sales' && <SalesTab dateFrom={dateFrom} dateTo={dateTo} />}
             {activeTab === 'inventory' && <InventoryTab dateFrom={dateFrom} dateTo={dateTo} />}
+            {activeTab === 'goodsReceive' && user.role === 'ADMIN' && <GoodsReceiveReportTab dateFrom={dateFrom} dateTo={dateTo} />}
             {activeTab === 'financial' && user.role === 'ADMIN' && <FinancialTab dateFrom={dateFrom} dateTo={dateTo} />}
         </div>
     );
